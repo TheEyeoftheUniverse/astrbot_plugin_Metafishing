@@ -1,14 +1,20 @@
 import functools
+import asyncio
 import os
 from typing import Dict, Any
 from datetime import datetime, timedelta
 import json
+import secrets
+from urllib.parse import urlencode
+
+import requests
 
 from quart import (
     Quart, render_template, request, redirect, url_for, session, flash,
     Blueprint, current_app, jsonify
 )
 from astrbot.api import logger
+from ..manager.user_api import user_api_bp
 
 
 player_bp = Blueprint(
@@ -17,6 +23,10 @@ player_bp = Blueprint(
     template_folder="templates",
     static_folder="static",
 )
+
+LINUXDO_AUTHORIZE_URL = "https://connect.linux.do/oauth2/authorize"
+LINUXDO_TOKEN_URL = "https://connect.linux.do/oauth2/token"
+LINUXDO_USER_API_URL = "https://connect.linux.do/api/user"
 
 # 用户凭证持久化辅助函数
 def _get_credentials_file():
@@ -48,6 +58,250 @@ def _save_credentials(credentials):
 
 # 在启动时加载凭证
 USER_CREDENTIALS = _load_credentials()
+
+
+def _get_linuxdo_links_file():
+    """获取 Linux.do OAuth 绑定文件路径"""
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, "linuxdo_oauth_links.json")
+
+
+def _load_linuxdo_links():
+    """从文件加载 Linux.do OAuth 绑定关系"""
+    links_file = _get_linuxdo_links_file()
+    if os.path.exists(links_file):
+        try:
+            with open(links_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception as e:
+            logger.error(f"加载 Linux.do OAuth 绑定失败: {e}")
+    return {}
+
+
+def _save_linuxdo_links(links):
+    """保存 Linux.do OAuth 绑定关系"""
+    links_file = _get_linuxdo_links_file()
+    try:
+        with open(links_file, "w", encoding="utf-8") as f:
+            json.dump(links, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"保存 Linux.do OAuth 绑定失败: {e}")
+
+
+LINUXDO_OAUTH_LINKS = _load_linuxdo_links()
+
+
+def _normalize_linuxdo_oauth_config(config: Dict[str, Any] | None) -> Dict[str, Any]:
+    config = config or {}
+    enabled = bool(config.get("enabled", False))
+    client_id = str(config.get("client_id", "") or "").strip()
+    client_secret = str(config.get("client_secret", "") or "").strip()
+    redirect_uri = str(config.get("redirect_uri", "") or "").strip()
+    normalized = {
+        "enabled": enabled,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "scope": str(config.get("scope", "read") or "read").strip(),
+        "user_id_field": str(config.get("user_id_field", "id") or "id").strip(),
+        "nickname_field": str(config.get("nickname_field", "username") or "username").strip(),
+        "auto_register": bool(config.get("auto_register", True)),
+        "allow_password_fallback": bool(config.get("allow_password_fallback", True)),
+        "authorize_url": str(config.get("authorize_url", LINUXDO_AUTHORIZE_URL) or LINUXDO_AUTHORIZE_URL).strip(),
+        "token_url": str(config.get("token_url", LINUXDO_TOKEN_URL) or LINUXDO_TOKEN_URL).strip(),
+        "user_api_url": str(config.get("user_api_url", LINUXDO_USER_API_URL) or LINUXDO_USER_API_URL).strip(),
+        "proxy_url": str(config.get("proxy_url", "") or "").strip(),
+    }
+    normalized["configured"] = bool(
+        enabled and client_id and client_secret and redirect_uri
+    )
+    normalized["login_entry_enabled"] = normalized["configured"]
+    return normalized
+
+
+def _get_linuxdo_oauth_config() -> Dict[str, Any]:
+    raw_config = current_app.config.get("LINUXDO_OAUTH_CONFIG", {})
+    return _normalize_linuxdo_oauth_config(raw_config)
+
+
+def _normalize_profile_value(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _extract_linuxdo_profile_field(profile: Dict[str, Any], field_name: str) -> str:
+    if not isinstance(profile, dict):
+        return ""
+    return _normalize_profile_value(profile.get(field_name))
+
+
+def _get_linuxdo_provider_key(profile: Dict[str, Any]) -> str:
+    linuxdo_id = _extract_linuxdo_profile_field(profile, "id")
+    if linuxdo_id:
+        return f"id:{linuxdo_id}"
+
+    username = _extract_linuxdo_profile_field(profile, "username").lower()
+    if username:
+        return f"username:{username}"
+
+    return ""
+
+
+def _get_linuxdo_candidate_user_id(profile: Dict[str, Any], oauth_config: Dict[str, Any]) -> str:
+    field_name = oauth_config.get("user_id_field", "id")
+    return _extract_linuxdo_profile_field(profile, field_name)
+
+
+def _get_linuxdo_display_name(profile: Dict[str, Any], oauth_config: Dict[str, Any]) -> str:
+    preferred_fields = [
+        oauth_config.get("nickname_field", "username"),
+        "name",
+        "username",
+        "id",
+    ]
+
+    for field_name in preferred_fields:
+        value = _extract_linuxdo_profile_field(profile, field_name)
+        if value:
+            return value
+
+    return "Linux.do玩家"
+
+
+def _get_linked_game_user_id(provider_key: str) -> str:
+    link = LINUXDO_OAUTH_LINKS.get(provider_key)
+    if isinstance(link, dict):
+        return _normalize_profile_value(link.get("game_user_id"))
+    return _normalize_profile_value(link)
+
+
+def _bind_linuxdo_account(profile: Dict[str, Any], game_user_id: str):
+    provider_key = _get_linuxdo_provider_key(profile)
+    if not provider_key or not game_user_id:
+        return
+
+    LINUXDO_OAUTH_LINKS[provider_key] = {
+        "game_user_id": game_user_id,
+        "linuxdo_id": _extract_linuxdo_profile_field(profile, "id"),
+        "linuxdo_username": _extract_linuxdo_profile_field(profile, "username"),
+        "linked_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+    _save_linuxdo_links(LINUXDO_OAUTH_LINKS)
+
+
+def _login_player_session(user, auth_provider: str = "password"):
+    session["user_id"] = user.user_id
+    session["nickname"] = user.nickname or user.user_id
+    session["auth_provider"] = auth_provider
+
+
+def _get_login_template_context(**kwargs):
+    oauth_config = _get_linuxdo_oauth_config()
+    context = {
+        "first_login": False,
+        "oauth_enabled": oauth_config.get("enabled", False),
+        "oauth_configured": oauth_config.get("login_entry_enabled", False),
+        "oauth_misconfigured": oauth_config.get("enabled", False) and not oauth_config.get("configured", False),
+        "allow_password_login": oauth_config.get("allow_password_fallback", True) or not oauth_config.get("login_entry_enabled", False),
+        "oauth_login_url": url_for("player_bp.login_with_linuxdo") if oauth_config.get("login_entry_enabled", False) else None,
+    }
+    context.update(kwargs)
+    return context
+
+
+async def _render_login_page(**kwargs):
+    return await render_template("login.html", **_get_login_template_context(**kwargs))
+
+
+async def _exchange_linuxdo_access_token(code: str, oauth_config: Dict[str, Any]) -> Dict[str, Any]:
+    proxy_url = oauth_config.get("proxy_url")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+
+    def _request_token():
+        response = requests.post(
+            oauth_config["token_url"],
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": oauth_config["redirect_uri"],
+            },
+            headers={"Accept": "application/json"},
+            auth=(oauth_config["client_id"], oauth_config["client_secret"]),
+            timeout=15,
+            proxies=proxies,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    return await asyncio.to_thread(_request_token)
+
+
+async def _fetch_linuxdo_user_profile(access_token: str, oauth_config: Dict[str, Any]) -> Dict[str, Any]:
+    proxy_url = oauth_config.get("proxy_url")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+
+    def _request_profile():
+        response = requests.get(
+            oauth_config["user_api_url"],
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+            timeout=15,
+            proxies=proxies,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    payload = await asyncio.to_thread(_request_profile)
+    if isinstance(payload, dict) and isinstance(payload.get("user"), dict):
+        return payload["user"]
+    return payload
+
+
+def _resolve_linuxdo_user(profile: Dict[str, Any], user_repo, user_service, oauth_config: Dict[str, Any]):
+    provider_key = _get_linuxdo_provider_key(profile)
+    if not provider_key:
+        return None, "Linux.do 用户资料中缺少可用于绑定的唯一标识"
+
+    linked_user_id = _get_linked_game_user_id(provider_key)
+    if linked_user_id:
+        linked_user = user_repo.get_by_id(linked_user_id)
+        if linked_user:
+            return linked_user, None
+        logger.warning(f"Linux.do 绑定存在失效用户: {provider_key} -> {linked_user_id}")
+
+    candidate_user_id = _get_linuxdo_candidate_user_id(profile, oauth_config)
+    if not candidate_user_id:
+        field_name = oauth_config.get("user_id_field", "id")
+        return None, f"Linux.do 用户资料缺少字段 {field_name}，无法映射到游戏账号"
+
+    user = user_repo.get_by_id(candidate_user_id)
+    if user:
+        _bind_linuxdo_account(profile, candidate_user_id)
+        return user, None
+
+    if not oauth_config.get("auto_register", True):
+        return None, (
+            f"论坛账号已验证，但未找到游戏账号 {candidate_user_id}。"
+            "请先在游戏内注册，或调整 user_id_field/绑定表配置。"
+        )
+
+    nickname = _get_linuxdo_display_name(profile, oauth_config)
+    register_result = user_service.register(candidate_user_id, nickname)
+    if not register_result.get("success"):
+        return None, register_result.get("message", "自动注册失败")
+
+    user = user_repo.get_by_id(candidate_user_id)
+    if not user:
+        return None, "自动注册完成后未能读取到玩家账号"
+
+    _bind_linuxdo_account(profile, candidate_user_id)
+    return user, None
 
 def _get_user_title(current_title_id, item_template_repo):
     """获取用户称号名称"""
@@ -275,7 +529,7 @@ def _get_or_create_daily_exhibition(exhibition_file, user_repo, aquarium_service
     
     return exhibition_data
 
-def create_player_app(services: Dict[str, Any]):
+def create_player_app(services: Dict[str, Any], webui_options: Dict[str, Any] | None = None):
     """
     创建并配置玩家WebUI的Quart应用实例。
 
@@ -284,12 +538,15 @@ def create_player_app(services: Dict[str, Any]):
     """
     app = Quart(__name__)
     app.secret_key = os.urandom(24)
+    webui_options = webui_options or {}
 
     # 将服务实例存入app配置
     for service_name, service_instance in services.items():
         app.config[service_name.upper()] = service_instance
 
+    app.config["LINUXDO_OAUTH_CONFIG"] = webui_options.get("linuxdo_oauth", {})
     app.register_blueprint(player_bp, url_prefix="/player")
+    app.register_blueprint(user_api_bp)
 
     @app.route("/")
     def root():
@@ -329,14 +586,22 @@ def login_required(f):
 @player_bp.route("/login", methods=["GET", "POST"])
 async def login():
     """用户登录页面"""
+    if session.get("user_id"):
+        return redirect(url_for("player_bp.index"))
+
+    oauth_config = _get_linuxdo_oauth_config()
     if request.method == "POST":
+        if oauth_config.get("login_entry_enabled") and not oauth_config.get("allow_password_fallback", True):
+            await flash("当前站点仅允许使用 Linux.do 登录", "warning")
+            return await _render_login_page()
+
         form = await request.form
         user_id = form.get("user_id", "").strip()
         password = form.get("password", "").strip()
 
         if not user_id:
             await flash("请输入用户ID", "danger")
-            return await render_template("login.html")
+            return await _render_login_page()
 
         # 检查用户是否存在
         user_repo = current_app.config.get("USER_REPO")
@@ -345,19 +610,18 @@ async def login():
         if not user:
             await flash("🎣 你不是我们的钓鱼佬，去别处钓鱼吧！", "warning")
             logger.warning(f"未注册用户 {user_id} 尝试登录")
-            return await render_template("login.html")
+            return await _render_login_page()
 
         # 检查是否首次登录（需要设置密钥）
         if user_id not in USER_CREDENTIALS:
             if not password:
                 await flash("首次登录，请设置登录密钥", "warning")
-                return await render_template("login.html", first_login=True, user_id=user_id)
+                return await _render_login_page(first_login=True, user_id=user_id)
             
             # 设置新密钥并保存
             USER_CREDENTIALS[user_id] = password
             _save_credentials(USER_CREDENTIALS)
-            session["user_id"] = user_id
-            session["nickname"] = user.nickname or user_id
+            _login_player_session(user)
             await flash(f"欢迎，{user.nickname or user_id}！密钥已设置", "success")
             logger.info(f"用户 {user_id} 首次登录并设置密钥")
             return redirect(url_for("player_bp.index"))
@@ -365,17 +629,91 @@ async def login():
         # 验证密钥
         if USER_CREDENTIALS.get(user_id) != password:
             await flash("密钥错误", "danger")
-            return await render_template("login.html")
+            return await _render_login_page()
         
         # 登录成功
-        session["user_id"] = user_id
-        session["nickname"] = user.nickname or user_id
+        _login_player_session(user)
         await flash(f"欢迎回来，{user.nickname or user_id}！", "success")
         logger.info(f"用户 {user_id} 登录成功")
         return redirect(url_for("player_bp.index"))
     
     # GET请求，显示登录页面
-    return await render_template("login.html")
+    return await _render_login_page()
+
+
+@player_bp.route("/login/linuxdo")
+async def login_with_linuxdo():
+    """跳转到 Linux.do OAuth 授权页"""
+    oauth_config = _get_linuxdo_oauth_config()
+    if not oauth_config.get("login_entry_enabled"):
+        await flash("Linux.do 登录未启用或配置不完整", "warning")
+        return redirect(url_for("player_bp.login"))
+
+    state = secrets.token_urlsafe(24)
+    session["linuxdo_oauth_state"] = state
+    query = urlencode(
+        {
+            "client_id": oauth_config["client_id"],
+            "response_type": "code",
+            "redirect_uri": oauth_config["redirect_uri"],
+            "scope": oauth_config["scope"],
+            "state": state,
+        }
+    )
+    return redirect(f"{oauth_config['authorize_url']}?{query}")
+
+
+@player_bp.route("/oauth/linuxdo/callback")
+async def linuxdo_oauth_callback():
+    """处理 Linux.do OAuth 授权回调"""
+    oauth_config = _get_linuxdo_oauth_config()
+    if not oauth_config.get("login_entry_enabled"):
+        await flash("Linux.do 登录未启用或配置不完整", "warning")
+        return redirect(url_for("player_bp.login"))
+
+    error = request.args.get("error", "").strip()
+    if error:
+        await flash(f"Linux.do 授权失败：{error}", "danger")
+        return redirect(url_for("player_bp.login"))
+
+    state = request.args.get("state", "").strip()
+    expected_state = session.pop("linuxdo_oauth_state", "")
+    if not expected_state or state != expected_state:
+        await flash("Linux.do 登录状态校验失败，请重试", "danger")
+        return redirect(url_for("player_bp.login"))
+
+    code = request.args.get("code", "").strip()
+    if not code:
+        await flash("Linux.do 回调缺少授权码", "danger")
+        return redirect(url_for("player_bp.login"))
+
+    user_repo = current_app.config.get("USER_REPO")
+    user_service = current_app.config.get("USER_SERVICE")
+
+    try:
+        token_payload = await _exchange_linuxdo_access_token(code, oauth_config)
+        access_token = _normalize_profile_value(token_payload.get("access_token"))
+        if not access_token:
+            raise ValueError("Linux.do 未返回 access_token")
+
+        profile = await _fetch_linuxdo_user_profile(access_token, oauth_config)
+        user, error_message = _resolve_linuxdo_user(profile, user_repo, user_service, oauth_config)
+        if error_message:
+            await flash(error_message, "warning")
+            return redirect(url_for("player_bp.login"))
+
+        _login_player_session(user, auth_provider="linuxdo")
+        await flash(f"欢迎来到钓鱼世界，{user.nickname or user.user_id}！", "success")
+        logger.info(f"Linux.do 用户登录成功: {user.user_id}")
+        return redirect(url_for("player_bp.index"))
+    except requests.RequestException as e:
+        logger.error(f"Linux.do OAuth 请求失败: {e}")
+        await flash("连接 Linux.do OAuth 服务失败，请稍后重试", "danger")
+    except Exception as e:
+        logger.error(f"Linux.do OAuth 登录失败: {e}", exc_info=True)
+        await flash(f"Linux.do 登录失败：{e}", "danger")
+
+    return redirect(url_for("player_bp.login"))
 
 # ==================== API路由 ====================
 
@@ -603,7 +941,7 @@ async def api_delist_item():
 @player_bp.route("/api/open_exchange_account", methods=["POST"])
 @login_required
 async def api_open_exchange_account():
-    """开通交易所账户API"""
+    """开通期货账户API"""
     user_id = session.get("user_id")
     exchange_service = current_app.config.get("EXCHANGE_SERVICE")
     
@@ -612,6 +950,21 @@ async def api_open_exchange_account():
         return jsonify(result)
     except Exception as e:
         logger.error(f"开通交易所账户失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@player_bp.route("/api/upgrade_exchange_capacity", methods=["POST"])
+@login_required
+async def api_upgrade_exchange_capacity():
+    """升级期货容量API"""
+    user_id = session.get("user_id")
+    exchange_service = current_app.config.get("EXCHANGE_SERVICE")
+
+    try:
+        result = exchange_service.upgrade_exchange_capacity(user_id)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"升级期货容量失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/buy_commodity", methods=["POST"])
@@ -1754,7 +2107,7 @@ async def shop():
 @player_bp.route("/exchange")
 @login_required
 async def exchange():
-    """交易所页面"""
+    """期货页面"""
     user_id = session.get("user_id")
     exchange_service = current_app.config.get("EXCHANGE_SERVICE")
     user_repo = current_app.config.get("USER_REPO")
@@ -1766,20 +2119,18 @@ async def exchange():
     # 获取用户信息用于显示金币
     user = user_repo.get_by_id(user_id)
     
-    # 获取开户费用
-    account_fee = exchange_service.config.get("account_fee", 100000)
-    
     if not has_account:
         return await render_template("exchange.html",
                                       has_account=False,
                                       user=user,
-                                      account_fee=account_fee,
                                       market_status={"commodities": []},
                                       user_inventory={},
                                       user_costs={},
+                                      capacity_info={},
                                       price_history={},
                                       history_data={},
-                                      labels=[])
+                                      labels=[],
+                                      auto_sell_message="")
     
     # 获取市场状态
     market_status = exchange_service.get_market_status()
@@ -1787,6 +2138,7 @@ async def exchange():
     # 获取用户库存
     user_inventory_result = exchange_service.get_user_inventory(user_id)
     inventory_data = user_inventory_result.get("inventory", {})
+    auto_sell_message = user_inventory_result.get("auto_sell_message", "")
     
     # 构建用户库存字典和成本字典
     user_inventory = {}
@@ -1799,6 +2151,7 @@ async def exchange():
     price_history_result = exchange_service.get_price_history(days=7)
     history_data = price_history_result.get("history", {})
     labels = price_history_result.get("labels", [])
+    capacity_info = exchange_service.get_exchange_capacity_info(user_id)
     
     # 转换数据结构：从 {commodity_id: [prices]} 转换为 {date: {commodity_id: price}}
     price_history = {}
@@ -1811,13 +2164,14 @@ async def exchange():
     return await render_template("exchange.html",
                                   has_account=True,
                                   user=user,
-                                  account_fee=account_fee,
                                   market_status=market_status,
                                   user_inventory=user_inventory,
                                   user_costs=user_costs,
+                                  capacity_info=capacity_info,
                                   price_history=price_history,
                                   history_data=history_data,
-                                  labels=labels)
+                                  labels=labels,
+                                  auto_sell_message=auto_sell_message)
 
 @player_bp.route("/gacha")
 @login_required

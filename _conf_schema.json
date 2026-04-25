@@ -14,6 +14,77 @@
         "type": "int",
         "hint": "请确保端口未被占用",
         "default": 7777
+      },
+      "player_port": {
+        "description": "玩家WebUI的端口",
+        "type": "int",
+        "hint": "玩家端页面默认端口，Linux.do OAuth 回调地址通常也要用这个端口",
+        "default": 8888
+      },
+      "oauth": {
+        "description": "玩家WebUI第三方登录配置",
+        "type": "object",
+        "items": {
+          "linuxdo": {
+            "description": "Linux.do OAuth 登录配置",
+            "type": "object",
+            "items": {
+              "enabled": {
+                "description": "是否启用 Linux.do OAuth 登录",
+                "type": "bool",
+                "default": false
+              },
+              "client_id": {
+                "description": "Linux.do OAuth Client ID",
+                "type": "string",
+                "default": ""
+              },
+              "client_secret": {
+                "description": "Linux.do OAuth Client Secret",
+                "type": "string",
+                "default": ""
+              },
+              "redirect_uri": {
+                "description": "Linux.do OAuth 回调地址",
+                "type": "string",
+                "hint": "需要与 Linux.do 应用后台配置的 Redirect URI 完全一致",
+                "default": "http://localhost:8888/player/oauth/linuxdo/callback"
+              },
+              "scope": {
+                "description": "Linux.do OAuth scope",
+                "type": "string",
+                "default": "read"
+              },
+              "user_id_field": {
+                "description": "使用 Linux.do 哪个字段映射为游戏 user_id",
+                "type": "string",
+                "hint": "常用值为 id 或 username",
+                "default": "id"
+              },
+              "nickname_field": {
+                "description": "自动注册时用于昵称的 Linux.do 字段",
+                "type": "string",
+                "default": "username"
+              },
+              "auto_register": {
+                "description": "找不到玩家时是否自动注册",
+                "type": "bool",
+                "default": true
+              },
+              "allow_password_fallback": {
+                "description": "是否保留原 user_id+密码 登录回退",
+                "type": "bool",
+                "default": true
+              },
+              "proxy_url": {
+                "description": "OAuth 出站请求使用的代理（仅代理 token/userinfo 两次调用），留空=直连",
+                "type": "string",
+                "hint": "例如 http://mihomo:7890 或 socks5h://mihomo:7890",
+                "default": ""
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -213,28 +284,28 @@
     }
   },
   "exchange": {
-    "description": "交易所配置",
+    "description": "期货配置（内部仍使用 exchange 变量名）",
     "type": "object",
     "items": {
       "update_timing": {
         "type": "string",
         "default": "9:00, 15:00, 21:00",
-        "description": "交易所每日价格更新的时间点，格式为HH:MM（24小时制）"
+        "description": "期货每日价格更新的时间点，格式为HH:MM（24小时制）"
       },
       "account_fee": {
         "type": "int",
-        "default": 100000,
-        "description": "交易所开户费用"
+        "default": 0,
+        "description": "保留字段，当前版本开户免费，不再实际扣费"
       },
       "capacity": {
         "type": "int",
         "default": 1000,
-        "description": "交易所持仓总容量"
+        "description": "期货初始持仓总容量"
       },
       "tax_rate": {
         "type": "float",
         "default": 0.05,
-        "description": "交易所交易税率"
+        "description": "期货交易税率"
       },
       "volatility": {
         "type": "object",

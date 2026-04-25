@@ -1,12 +1,12 @@
 {% extends "layout.html" %}
 
-{% block title %}交易所 - 钓鱼游戏{% endblock %}
+{% block title %}期货 - 钓鱼游戏{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-0">
-            <i class="fas fa-chart-line"></i> 交易所
+            <i class="fas fa-chart-line"></i> 期货
         </h2>
         <p class="text-muted mt-2">大宗商品交易平台 - 低买高卖获取利润</p>
     </div>
@@ -18,18 +18,19 @@
     <div class="col-12">
         <div class="card border-warning">
             <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0"><i class="fas fa-exclamation-circle"></i> 您还未开通交易所账户</h5>
+                <h5 class="mb-0"><i class="fas fa-exclamation-circle"></i> 您还未开通期货账户</h5>
             </div>
             <div class="card-body">
-                <p class="mb-2">开通交易所账户需要支付 <strong>{{ "{:,}".format(account_fee) }} 金币</strong> 的开户费用。开通后您可以：</p>
+                <p class="mb-2">开通期货账户无需支付金币。开通后您可以：</p>
                 <ul class="mb-3">
                     <li>交易大宗商品（鱼干、鱼卵、鱼油）</li>
                     <li>通过低买高卖赚取差价</li>
                     <li>价格每日波动，把握市场机会</li>
+                    <li>持仓到期后自动卖出并结算金币</li>
                 </ul>
                 <div class="text-center">
                     <button class="btn btn-primary btn-lg px-5" onclick="openAccount()">
-                        <i class="fas fa-unlock"></i> 立即开通账户（{{ "{:,}".format(account_fee) }} 金币）
+                        <i class="fas fa-unlock"></i> 立即免费开通账户
                     </button>
                 </div>
             </div>
@@ -37,6 +38,34 @@
     </div>
 </div>
 {% else %}
+{% if auto_sell_message %}
+<div class="alert alert-info">
+    <i class="fas fa-clock me-2"></i>{{ auto_sell_message }}
+</div>
+{% endif %}
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">当前期货容量</h6>
+                <h3 class="mb-1">{{ capacity_info.current_quantity or 0 }} / {{ capacity_info.current_capacity or 0 }}</h3>
+                {% if capacity_info.next_upgrade %}
+                <p class="text-muted mb-3">
+                    下一级：{{ capacity_info.next_upgrade.to }} 容量
+                    · 花费 {{ "{:,}".format(capacity_info.next_upgrade.cost) }} 金币
+                </p>
+                <button class="btn btn-outline-primary" onclick="upgradeCapacity()">
+                    <i class="fas fa-up-right-and-down-left-from-center"></i> 升级期货容量
+                </button>
+                {% else %}
+                <p class="text-success mb-0">当前已达到最高容量</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 市场概况 -->
 <div class="row mb-4">
     <div class="col-md-4">
@@ -226,6 +255,7 @@
                 <li>持仓成本为您购买该商品时的平均价格</li>
                 <li>市值 = 持有数量 × 当前价格</li>
                 <li>盈亏 = 市值 - 成本总额</li>
+                <li>商品到期后会自动卖出并直接结算到金币</li>
                 <li>商品可以放到市场上出售给其他玩家</li>
             </ul>
         </div>
@@ -317,8 +347,7 @@ if (document.getElementById('priceChart')) {
 
 // 开通账户
 async function openAccount() {
-    const accountFee = {{ account_fee }};
-    if (!confirm(`确认开通交易所账户吗？\n开户费用: ${accountFee.toLocaleString()} 金币`)) {
+    if (!confirm('确认免费开通期货账户吗？')) {
         return;
     }
     
@@ -328,6 +357,29 @@ async function openAccount() {
             headers: {'Content-Type': 'application/json'}
         });
         
+        const data = await response.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+async function upgradeCapacity() {
+    if (!confirm('确认升级期货容量吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_upgrade_exchange_capacity") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');

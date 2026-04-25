@@ -50,9 +50,9 @@ class ExchangeHandlers:
         return """【📈 价格历史帮助】
 ══════════════════════════════
 📊 历史数据功能
-• 交易所 历史: 查看7天价格历史
-• 交易所 历史 [天数]: 查看指定天数历史
-• 交易所 历史 [商品]: 查看指定商品历史
+• 期货 历史: 查看7天价格历史
+• 期货 历史 [天数]: 查看指定天数历史
+• 期货 历史 [商品]: 查看指定商品历史
 
 📈 图表信息
 • 价格走势图: 显示价格变化趋势
@@ -67,7 +67,7 @@ class ExchangeHandlers:
 • 结合技术指标，提高分析准确性
 
 ══════════════════════════════
-💬 示例: 【交易所 历史 3】查看3天价格历史
+💬 示例: 【期货 历史 3】查看3天价格历史
         """
 
     def _get_market_analysis_help(self) -> str:
@@ -93,7 +93,7 @@ class ExchangeHandlers:
 • 止损止盈: 控制风险和锁定利润
 
 ══════════════════════════════
-💬 使用【交易所 分析】查看详细分析报告
+💬 使用【期货 分析】查看详细分析报告
         """
 
     def _get_trading_stats_help(self) -> str:
@@ -202,10 +202,10 @@ class ExchangeHandlers:
 
     async def _view_price_history(self, event: AstrMessageEvent):
         """查看价格历史曲线：
-        - 交易所 历史 -> 默认7天，显示所有商品
-        - 交易所 历史 [天数] -> 显示指定天数，所有商品
-        - 交易所 历史 [商品] -> 默认7天，仅该商品
-        - 交易所 历史 [商品] [天数] -> 指定商品与天数
+        - 期货 历史 -> 默认7天，显示所有商品
+        - 期货 历史 [天数] -> 显示指定天数，所有商品
+        - 期货 历史 [商品] -> 默认7天，仅该商品
+        - 期货 历史 [商品] [天数] -> 指定商品与天数
         """
         args = event.message_str.split()
         # 解析参数
@@ -219,10 +219,10 @@ class ExchangeHandlers:
         name_to_id = {info["name"]: cid for cid, info in market_status.get("commodities", {}).items()}
 
         # 参数形态判断
-        # 交易所 历史
-        # 交易所 历史 X
-        # 交易所 历史 商品
-        # 交易所 历史 商品 X
+        # 期货 历史
+        # 期货 历史 X
+        # 期货 历史 商品
+        # 期货 历史 商品 X
         if len(args) >= 3:
             p = args[2]
             # 若是数字，解析为天数
@@ -299,16 +299,16 @@ class ExchangeHandlers:
                 msg += "时间刻度: " + " | ".join(picked) + "\n"
 
         msg += "═" * 30 + "\n"
-        msg += "💡 用法：交易所 历史 [商品] [天数]；最多30天。"
+        msg += "💡 用法：期货 历史 [商品] [天数]；最多30天。"
 
         yield event.plain_result(msg)
 
     async def _view_market_analysis(self, event: AstrMessageEvent):
         """市场分析：
-        - 交易所 分析 -> 默认分析全部商品，7天窗口
-        - 交易所 分析 [商品] -> 分析单商品，7天窗口
-        - 交易所 分析 [商品] [天数] -> 分析单商品，指定窗口（1-30）
-        - 交易所 分析 [天数] -> 分析全部商品，指定窗口
+        - 期货 分析 -> 默认分析全部商品，7天窗口
+        - 期货 分析 [商品] -> 分析单商品，7天窗口
+        - 期货 分析 [商品] [天数] -> 分析单商品，指定窗口（1-30）
+        - 期货 分析 [天数] -> 分析全部商品，指定窗口
         """
         from math import sqrt
         args = event.message_str.split()
@@ -440,16 +440,16 @@ class ExchangeHandlers:
             msg += "─" * 20 + "\n"
 
         msg += "💡 提示：指标仅供参考，注意风险控制。\n"
-        msg += "用法: 交易所 分析 [商品] [天数]"
+        msg += "用法: 期货 分析 [商品] [天数]"
 
         yield event.plain_result(msg)
 
     async def exchange_main(self, event: AstrMessageEvent):
-        """交易所主命令，根据参数分发到不同功能"""
+        """期货主命令，根据参数分发到不同功能"""
         args = event.message_str.split()
 
         if len(args) == 1:
-            # 无参数，显示交易所状态
+            # 无参数，显示期货状态
             async for r in self.exchange_status(event):
                 yield r
         elif len(args) >= 2:
@@ -478,27 +478,29 @@ class ExchangeHandlers:
                     yield r
             else:
                 yield event.plain_result(
-                    "❌ 未知命令。使用【交易所 帮助】查看可用命令。"
+                    "❌ 未知命令。使用【期货 帮助】查看可用命令。"
                 )
 
     def _get_exchange_help(self) -> str:
-        """获取交易所帮助信息"""
+        """获取期货帮助信息"""
         schedule_display = self._get_formatted_update_schedule()
-        return f"""【📈 交易所帮助】
+        return f"""【📈 期货帮助】
 ══════════════════════════════
 📊 市场信息
-• 交易所: 查看市场状态和价格
-• 交易所 历史: 查看价格历史图表
-• 交易所 分析: 查看市场分析报告
+• 期货: 查看市场状态和价格
+• 期货 历史: 查看价格历史图表
+• 期货 分析: 查看市场分析报告
 
 💼 账户管理
-• 交易所 开户: 开通交易所账户
-• 交易所 状态: 查看账户状态
+• 期货 开户: 开通期货账户
+• 期货 状态: 查看账户状态
+• /期货容量: 查看当前期货容量
+• /升级期货: 升级期货容量
 
 💰 交易操作
-• 交易所 买入 [商品] [数量]: 购买大宗商品
-• 交易所 卖出 [商品] [数量]: 卖出大宗商品
-• 交易所 卖出 [库存ID] [数量]: 按库存ID卖出
+• 期货 买入 [商品] [数量]: 购买大宗商品
+• 期货 卖出 [商品] [数量]: 卖出大宗商品
+• 期货 卖出 [库存ID] [数量]: 按库存ID卖出
 
 📦 库存管理
 • /持仓: 查看我的库存详情
@@ -508,28 +510,28 @@ class ExchangeHandlers:
 
 ⏰ 时间信息
 • 价格更新: 每日{schedule_display}
-• 商品保质期: 鱼干3天、鱼卵2天、鱼油1-3天
+• 商品到期: 鱼干3天、鱼卵2天、鱼油1-3天
 • 交易时间: 24小时开放
 
 💡 交易提示
 • 关注价格涨跌幅，把握买卖时机
-• 注意商品保质期，及时卖出避免腐败
+• 到期持仓会自动卖出并结算金币
 • 合理控制仓位，分散投资风险
 • 关注市场情绪和供需状态
 
 ══════════════════════════════
-💬 使用【交易所 帮助 [分类]】查看详细说明
+💬 使用【期货 帮助 [分类]】查看详细说明
     """
 
     async def exchange_status(self, event: AstrMessageEvent):
-        """查看交易所当前状态"""
+        """查看期货当前状态"""
         try:
             user_id = self._get_effective_user_id(event)
             user = self.user_repo.get_by_id(user_id)
 
             if not user or not user.exchange_account_status:
                 yield event.plain_result(
-                    "您尚未开通交易所账户，请使用【交易所 开户】命令开户。"
+                    "您尚未开通期货账户，请使用【期货 开户】命令开户。"
                 )
                 return
 
@@ -561,7 +563,7 @@ class ExchangeHandlers:
                     if len(ulist) >= 2:
                         previous_prices[cid] = ulist[-2].get("price")
 
-            msg = "【📈 交易所行情】\n"
+            msg = "【📈 期货行情】\n"
             msg += f"更新时间: {result.get('date', 'N/A')}\n"
             msg += "═" * 30 + "\n"
 
@@ -603,10 +605,16 @@ class ExchangeHandlers:
                     msg += f"描述: {commodity['description']}\n"
                     msg += "─" * 20 + "\n"
 
-            # 显示持仓容量和盈亏分析
-            capacity = self.plugin.exchange_service.config.get("exchange", {}).get("capacity", 1000)
-
             inventory_result = self.plugin.exchange_service.get_user_inventory(user_id)
+            auto_sell_message = inventory_result.get("auto_sell_message", "")
+            if auto_sell_message:
+                msg += f"{auto_sell_message}\n"
+                msg += "─" * 20 + "\n"
+
+            capacity = self.exchange_service.get_exchange_capacity_info(user_id).get(
+                "current_capacity",
+                getattr(user, "exchange_capacity", 0) or self.plugin.exchange_service.config.get("exchange", {}).get("capacity", 1000),
+            )
             if inventory_result["success"]:
                 inventory = inventory_result["inventory"]
                 current_total_quantity = sum(
@@ -674,7 +682,7 @@ class ExchangeHandlers:
                 msg += "⏰ 下次更新: 未配置\n"
 
             msg += "═" * 30 + "\n"
-            msg += "💡 使用【交易所 帮助】查看更多命令。"
+            msg += "💡 使用【期货 帮助】查看更多命令。"
 
             yield event.plain_result(msg)
         except Exception as e:
@@ -683,9 +691,52 @@ class ExchangeHandlers:
             yield event.plain_result(f"❌ 查询失败: {str(e)}")
 
     async def open_exchange_account(self, event: AstrMessageEvent):
-        """开通交易所账户"""
+        """开通期货账户"""
         user_id = self._get_effective_user_id(event)
         result = self.exchange_service.open_exchange_account(user_id)
+        yield event.plain_result(
+            f"✅ {result['message']}"
+            if result["success"]
+            else f"❌ {result['message']}"
+        )
+
+    async def exchange_capacity(self, event: AstrMessageEvent):
+        """查看期货容量信息。"""
+        user_id = self._get_effective_user_id(event)
+        capacity_info = self.exchange_service.get_exchange_capacity_info(user_id)
+
+        if not capacity_info.get("success", False):
+            yield event.plain_result(f"❌ {capacity_info.get('message', '获取期货容量失败')}")
+            return
+
+        message = "【📦 期货容量】\n"
+        message += "═" * 24 + "\n"
+        auto_sell_message = capacity_info.get("auto_sell_message", "")
+        if auto_sell_message:
+            message += f"{auto_sell_message}\n"
+            message += "─" * 24 + "\n"
+
+        message += (
+            f"当前持仓: {capacity_info['current_quantity']} / "
+            f"{capacity_info['current_capacity']}\n"
+        )
+
+        next_upgrade = capacity_info.get("next_upgrade")
+        if next_upgrade:
+            message += (
+                f"下一级容量: {next_upgrade['to']}\n"
+                f"升级费用: {int(next_upgrade['cost']):,} 金币\n"
+                "使用命令: /升级期货"
+            )
+        else:
+            message += "当前已达到最高容量"
+
+        yield event.plain_result(message)
+
+    async def upgrade_exchange_capacity(self, event: AstrMessageEvent):
+        """升级期货容量。"""
+        user_id = self._get_effective_user_id(event)
+        result = self.exchange_service.upgrade_exchange_capacity(user_id)
         yield event.plain_result(
             f"✅ {result['message']}"
             if result["success"]
@@ -705,8 +756,12 @@ class ExchangeHandlers:
                 return
 
             inventory = result["inventory"]
+            auto_sell_message = result.get("auto_sell_message", "")
             if not inventory:
-                yield event.plain_result("您的交易所库存为空。")
+                empty_message = "您的期货库存为空。"
+                if auto_sell_message:
+                    empty_message = f"{auto_sell_message}\n{empty_message}"
+                yield event.plain_result(empty_message)
                 return
 
             market_status = self.exchange_service.get_market_status()
@@ -714,8 +769,11 @@ class ExchangeHandlers:
 
             analysis = self._calculate_inventory_profit_loss(inventory, current_prices)
 
-            msg = "【📦 我的交易所库存】\n"
+            msg = "【📦 我的期货库存】\n"
             msg += "═" * 30 + "\n"
+            if auto_sell_message:
+                msg += f"{auto_sell_message}\n"
+                msg += "─" * 30 + "\n"
 
             profit_status = (
                 "📈盈利"
@@ -781,7 +839,7 @@ class ExchangeHandlers:
                             display_id = self._get_commodity_display_code(instance_id)
 
                             if time_left.total_seconds() <= 0:
-                                time_str = "💀 已腐败"
+                                time_str = "⏰ 已到期"
                             elif time_left.total_seconds() < 86400:
                                 hours = int(time_left.total_seconds() // 3600)
                                 time_str = f"⚠️剩{hours}小时"
@@ -803,7 +861,7 @@ class ExchangeHandlers:
 
             msg += "═" * 30 + "\n"
 
-            capacity = self.exchange_service.config.get("exchange", {}).get("capacity", 1000)
+            capacity = self.exchange_service.get_exchange_capacity_info(user_id).get("current_capacity", 1000)
             current_total_quantity = sum(
                 data.get("total_quantity", 0) for data in inventory.values()
             )
@@ -823,9 +881,7 @@ class ExchangeHandlers:
         args = event.message_str.split()
 
         if len(args) != 4:
-            yield event.plain_result(
-                "❌ 命令格式错误，请使用：交易所 买入 [商品名称] [数量]"
-            )
+            yield event.plain_result("❌ 命令格式错误，请使用：期货 买入 [商品名称] [数量]")
             return
 
         commodity_name = args[2]

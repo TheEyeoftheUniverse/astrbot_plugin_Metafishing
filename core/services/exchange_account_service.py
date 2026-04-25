@@ -23,23 +23,15 @@ class ExchangeAccountService:
             
             # 检查是否已经开通
             if hasattr(user, 'exchange_account_status') and user.exchange_account_status:
-                return {"success": False, "message": "您已经开通了交易所账户"}
-            
-            # 获取开户费用
-            account_fee = self.config.get("account_fee", 100000)
-            
-            # 检查金币是否足够
-            if user.coins < account_fee:
-                return {"success": False, "message": f"金币不足！开通交易所账户需要 {account_fee:,} 金币，您当前只有 {user.coins:,} 金币"}
-            
-            # 扣除金币
-            user.coins -= account_fee
+                return {"success": False, "message": "您已经开通了期货账户"}
             
             # 开通账户
             user.exchange_account_status = True
+            if getattr(user, "exchange_capacity", 0) <= 0:
+                user.exchange_capacity = int(self.config.get("capacity", 1000) or 1000)
             self.user_repo.update(user)
             
-            return {"success": True, "message": f"交易所账户开通成功！已扣除 {account_fee:,} 金币"}
+            return {"success": True, "message": "期货账户开通成功！本次开户免费"}
         except Exception as e:
             logger.error(f"开通交易所账户失败: {e}")
             return {"success": False, "message": f"开通失败: {str(e)}"}
@@ -54,7 +46,7 @@ class ExchangeAccountService:
             
             # 检查是否已开通
             if not hasattr(user, 'exchange_account_status') or not user.exchange_account_status:
-                return {"success": False, "message": "您还没有开通交易所账户，请先使用「交易所 开户」开通"}
+                return {"success": False, "message": "您还没有开通期货账户，请先使用「期货 开户」开通"}
             
             return {"success": True, "message": "账户状态正常"}
         except Exception as e:

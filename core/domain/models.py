@@ -215,6 +215,7 @@ class User:
     aquarium_capacity: int = 50  # 水族箱容量
     fishing_zone_id: int = 1  # 默认钓鱼区域ID
     exchange_account_status: bool = False # 交易所账户状态
+    exchange_capacity: int = 1000  # 交易所/期货持仓容量
 
     max_wipe_bomb_multiplier: float = 0.0
     min_wipe_bomb_multiplier: Optional[float] = None

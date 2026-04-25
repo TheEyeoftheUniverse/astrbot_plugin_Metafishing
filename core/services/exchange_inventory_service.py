@@ -31,6 +31,235 @@ class ExchangeInventoryService:
             "fish_oil": {"name": "鱼油", "description": "从鱼类中提取的油脂，用途广泛"}
         }
 
+    def _get_base_capacity(self) -> int:
+        """获取期货系统的基础持仓容量。"""
+        return int(self.config.get("capacity", 1000) or 1000)
+
+    def _get_upgrade_path(self) -> List[Dict[str, int]]:
+        """获取期货容量升级路径。"""
+        upgrades = self.config.get("upgrades")
+        if isinstance(upgrades, list) and upgrades:
+            return upgrades
+
+        base_capacity = self._get_base_capacity()
+        return [
+            {"from": base_capacity, "to": base_capacity * 2, "cost": 100000},
+            {"from": base_capacity * 2, "to": base_capacity * 5, "cost": 500000},
+            {"from": base_capacity * 5, "to": base_capacity * 10, "cost": 2000000},
+            {"from": base_capacity * 10, "to": base_capacity * 20, "cost": 10000000},
+        ]
+
+    def _get_user_capacity(self, user: User) -> int:
+        """读取用户当前期货容量；旧数据回退到配置基准值。"""
+        capacity = int(getattr(user, "exchange_capacity", 0) or 0)
+        return capacity if capacity > 0 else self._get_base_capacity()
+
+    def _get_current_prices(self) -> Dict[str, int]:
+        """获取当前可用于结算的商品价格。"""
+        today = datetime.now().date()
+        today_str = today.strftime("%Y-%m-%d")
+        prices = self.exchange_repo.get_prices_for_date(today_str)
+
+        if not prices:
+            yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+            prices = self.exchange_repo.get_prices_for_date(yesterday_str)
+
+        price_map: Dict[str, int] = {}
+        for price in sorted(prices, key=lambda entry: entry.time):
+            price_map[price.commodity_id] = price.price
+
+        initial_prices = self.config.get(
+            "initial_prices",
+            {"dried_fish": 6000, "fish_roe": 12000, "fish_oil": 10000},
+        )
+        for commodity_id in self.commodities.keys():
+            price_map.setdefault(commodity_id, initial_prices.get(commodity_id, 1000))
+
+        return price_map
+
+    def _attach_auto_sell_message(
+        self,
+        result: Dict[str, Any],
+        auto_sell_result: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """将自动卖出提示附加到业务结果中。"""
+        if auto_sell_result and auto_sell_result.get("settled_count", 0) > 0:
+            result["auto_sell_message"] = auto_sell_result.get("message", "")
+            if result.get("message"):
+                result["message"] = f"{auto_sell_result['message']}\n{result['message']}"
+        return result
+
+    def auto_sell_expired_commodities(self, user_id: str) -> Dict[str, Any]:
+        """将到期商品按当前价格自动卖出，而不是按腐败逻辑直接删除。"""
+        try:
+            user = self.user_repo.get_by_id(user_id)
+            if not user:
+                return {"success": False, "message": "用户不存在", "settled_count": 0}
+
+            inventory = self.exchange_repo.get_user_commodities(user_id)
+            now = datetime.now()
+            expired_items = [
+                item
+                for item in inventory
+                if item.expires_at and isinstance(item.expires_at, datetime) and item.expires_at <= now
+            ]
+
+            if not expired_items:
+                return {
+                    "success": True,
+                    "settled_count": 0,
+                    "total_quantity": 0,
+                    "net_income": 0,
+                    "tax_amount": 0,
+                }
+
+            current_prices = self._get_current_prices()
+            total_cost = 0
+            total_income = 0
+            total_quantity = 0
+            summary: Dict[str, Dict[str, int]] = {}
+
+            for item in expired_items:
+                price = current_prices.get(item.commodity_id, 0)
+                item_cost = item.purchase_price * item.quantity
+                item_income = price * item.quantity
+                total_cost += item_cost
+                total_income += item_income
+                total_quantity += item.quantity
+
+                commodity_summary = summary.setdefault(
+                    item.commodity_id,
+                    {"quantity": 0, "income": 0},
+                )
+                commodity_summary["quantity"] += item.quantity
+                commodity_summary["income"] += item_income
+
+            taxable_profit = max(total_income - total_cost, 0)
+            tax_rate = self.config.get("tax_rate", 0.05)
+            tax_amount = int(taxable_profit * tax_rate)
+            net_income = total_income - tax_amount
+
+            for item in expired_items:
+                self.exchange_repo.delete_user_commodity(item.instance_id)
+
+            user.coins += net_income
+            self.user_repo.update(user)
+
+            if self.log_repo:
+                from ..domain.models import TaxRecord
+
+                tax_record = TaxRecord(
+                    tax_id=0,
+                    user_id=user_id,
+                    tax_amount=tax_amount,
+                    tax_rate=tax_rate,
+                    original_amount=taxable_profit,
+                    balance_after=user.coins,
+                    tax_type=(
+                        f"到期期货自动卖出 | 毛收入 {total_income:,} 金币 | 税基 {taxable_profit:,} 金币"
+                    ),
+                    timestamp=datetime.now(),
+                )
+                if tax_amount == 0:
+                    tax_record.tax_type += " | 未盈利免税"
+                self.log_repo.add_tax_record(tax_record)
+
+            details = "、".join(
+                f"{self.commodities.get(commodity_id, {}).get('name', commodity_id)} x{data['quantity']}"
+                for commodity_id, data in summary.items()
+            )
+            message = (
+                f"⏰ 已自动卖出到期的期货持仓：{details}，"
+                f"到账 {net_income:,} 金币"
+            )
+            if tax_amount > 0:
+                message += f"（含税 {tax_amount:,} 金币）"
+
+            return {
+                "success": True,
+                "message": message,
+                "settled_count": len(expired_items),
+                "total_quantity": total_quantity,
+                "total_income": total_income,
+                "tax_amount": tax_amount,
+                "net_income": net_income,
+                "summary": summary,
+            }
+        except Exception as e:
+            logger.error(f"自动卖出到期商品失败: {e}")
+            return {"success": False, "message": f"自动卖出失败: {str(e)}", "settled_count": 0}
+
+    def get_exchange_capacity_info(self, user_id: str) -> Dict[str, Any]:
+        """获取用户当前期货容量与下一档升级信息。"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+
+        inventory_result = self.get_user_inventory(user_id)
+        if not inventory_result.get("success", False):
+            return inventory_result
+
+        current_capacity = self._get_user_capacity(user)
+        current_quantity = sum(
+            item.get("total_quantity", 0)
+            for item in inventory_result.get("inventory", {}).values()
+        )
+
+        next_upgrade = next(
+            (
+                upgrade
+                for upgrade in self._get_upgrade_path()
+                if int(upgrade.get("from", 0)) == current_capacity
+            ),
+            None,
+        )
+
+        return {
+            "success": True,
+            "current_quantity": current_quantity,
+            "current_capacity": current_capacity,
+            "next_upgrade": next_upgrade,
+            "can_upgrade": next_upgrade is not None,
+            "auto_sell_message": inventory_result.get("auto_sell_message", ""),
+        }
+
+    def upgrade_exchange_capacity(self, user_id: str) -> Dict[str, Any]:
+        """升级用户期货容量。"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+
+        if not getattr(user, "exchange_account_status", False):
+            return {"success": False, "message": "请先开通期货账户"}
+
+        current_capacity = self._get_user_capacity(user)
+        next_upgrade = next(
+            (
+                upgrade
+                for upgrade in self._get_upgrade_path()
+                if int(upgrade.get("from", 0)) == current_capacity
+            ),
+            None,
+        )
+
+        if not next_upgrade:
+            return {"success": False, "message": "期货容量已达到最大，无法继续升级"}
+
+        cost = int(next_upgrade.get("cost", 0) or 0)
+        if user.coins < cost:
+            return {"success": False, "message": f"金币不足，升级需要 {cost:,} 金币"}
+
+        user.coins -= cost
+        user.exchange_capacity = int(next_upgrade["to"])
+        self.user_repo.update(user)
+
+        return {
+            "success": True,
+            "message": f"期货扩容成功！新容量为 {user.exchange_capacity}，花费 {cost:,} 金币",
+            "new_capacity": user.exchange_capacity,
+            "cost": cost,
+        }
+
     def get_user_commodities(self, user_id: str) -> List[UserCommodity]:
         """获取用户的大宗商品库存"""
         return self.exchange_repo.get_user_commodities(user_id)
@@ -38,6 +267,7 @@ class ExchangeInventoryService:
     def get_user_inventory(self, user_id: str) -> Dict[str, Any]:
         """获取用户库存信息"""
         try:
+            auto_sell_result = self.auto_sell_expired_commodities(user_id)
             inventory = self.get_user_commodities(user_id)
             
             # 按商品分组统计
@@ -65,7 +295,10 @@ class ExchangeInventoryService:
             return {
                 "success": True,
                 "inventory": inventory_summary,
-                "total_items": len(inventory)
+                "total_items": len(inventory),
+                "auto_sell_message": auto_sell_result.get("message", ""),
+                "auto_sold_count": auto_sell_result.get("settled_count", 0),
+                "auto_sold_net_income": auto_sell_result.get("net_income", 0),
             }
         except Exception as e:
             logger.error(f"获取用户库存失败: {e}")
@@ -74,6 +307,7 @@ class ExchangeInventoryService:
     def purchase_commodity(self, user_id: str, commodity_id: str, quantity: int, current_price: int) -> Dict[str, Any]:
         """购买大宗商品"""
         try:
+            auto_sell_result = self.auto_sell_expired_commodities(user_id)
             # 检查用户是否存在
             user = self.user_repo.get_by_id(user_id)
             if not user:
@@ -90,13 +324,8 @@ class ExchangeInventoryService:
             if user.coins < total_cost:
                 return {"success": False, "message": f"金币不足，需要 {total_cost:,} 金币"}
             
-            # 清理腐败商品
-            cleared_count = self.exchange_repo.clear_expired_commodities(user_id)
-            if cleared_count > 0:
-                logger.info(f"用户 {user_id} 清理了 {cleared_count} 个腐败商品")
-            
             # 检查容量限制
-            capacity = self.config.get("capacity", 1000)
+            capacity = self._get_user_capacity(user)
             current_quantity = self._get_user_total_commodity_quantity(user_id)
             
             if current_quantity + quantity > capacity:
@@ -107,7 +336,7 @@ class ExchangeInventoryService:
             self.user_repo.update(user)
             
             # 添加商品到库存
-            # 根据商品类型设置不同的腐败时间
+            # 根据商品类型设置不同的到期时间
             if commodity_id == 'dried_fish':
                 expires_at = datetime.now() + timedelta(days=3)  # 鱼干：3天
             elif commodity_id == 'fish_roe':
@@ -133,27 +362,28 @@ class ExchangeInventoryService:
             )
             self.exchange_repo.add_user_commodity(user_commodity)
             
-            # 计算腐败时间提示
+            # 计算到期时间提示
             time_left = expires_at - datetime.now()
             if time_left.total_seconds() <= 0:
-                corruption_warning = "，已腐败"
+                corruption_warning = "，已到期并自动卖出"
             elif time_left.total_seconds() < 86400:  # 24小时内
                 hours = int(time_left.total_seconds() // 3600)
-                corruption_warning = f"，{hours}小时后将腐败"
+                corruption_warning = f"，{hours}小时后将到期并自动卖出"
             else:
                 days = int(time_left.total_seconds() // 86400)
                 hours = int((time_left.total_seconds() % 86400) // 3600)
                 if hours > 0:
-                    corruption_warning = f"，{days}天{hours}小时后将腐败"
+                    corruption_warning = f"，{days}天{hours}小时后将到期并自动卖出"
                 else:
-                    corruption_warning = f"，{days}天后将腐败"
-            
-            return {
+                    corruption_warning = f"，{days}天后将到期并自动卖出"
+
+            result = {
                 "success": True,
                 "message": f"购买成功！获得 {self.commodities[commodity_id]['name']} x{quantity}{corruption_warning}",
                 "total_cost": total_cost,
                 "current_price": current_price
             }
+            return self._attach_auto_sell_message(result, auto_sell_result)
         except Exception as e:
             logger.error(f"购买大宗商品失败: {e}")
             return {"success": False, "message": f"购买失败: {str(e)}"}
@@ -161,6 +391,7 @@ class ExchangeInventoryService:
     def sell_commodity(self, user_id: str, commodity_id: str, quantity: int, current_price: int) -> Dict[str, Any]:
         """卖出大宗商品"""
         try:
+            auto_sell_result = self.auto_sell_expired_commodities(user_id)
             # 检查用户是否存在
             user = self.user_repo.get_by_id(user_id)
             if not user:
@@ -278,19 +509,19 @@ class ExchangeInventoryService:
 
             if is_all_expired:
                 message = (
-                    f"💀 清理腐败商品成功！处理了 {expired_sold} 个腐败的{self.commodities[commodity_id]['name']}，"
-                    "获得 0 金币（腐败商品无价值）\n"
+                    f"⏰ 已处理 {expired_sold} 个已到期的{self.commodities[commodity_id]['name']}，"
+                    "获得 0 金币（到期商品已无有效报价）\n"
                     f"{tax_message}"
                 )
             elif expired_sold > 0:
                 message = (
-                    f"✅ 卖出成功！处理了 {quantity} 个商品（其中 {expired_sold} 个已腐败），"
-                    f"获得 {net_income:,} 金币\n{tax_message}\n💀 提示：腐败商品价值为0"
+                    f"✅ 卖出成功！处理了 {quantity} 个商品（其中 {expired_sold} 个已到期），"
+                    f"获得 {net_income:,} 金币\n{tax_message}\n⏰ 提示：到期商品应先自动结算"
                 )
             else:
                 message = f"✅ 卖出成功！获得 {net_income:,} 金币\n{tax_message}"
             
-            return {
+            result = {
                 "success": True,
                 "message": message,
                 "total_income": total_income,
@@ -301,6 +532,7 @@ class ExchangeInventoryService:
                 "expired_sold": expired_sold,
                 "valid_sold": valid_sold
             }
+            return self._attach_auto_sell_message(result, auto_sell_result)
         except Exception as e:
             logger.error(f"卖出大宗商品失败: {e}")
             return {"success": False, "message": f"卖出失败: {str(e)}"}
@@ -326,6 +558,7 @@ class ExchangeInventoryService:
     def clear_all_inventory(self, user_id: str) -> Dict[str, Any]:
         """清空用户所有大宗商品库存"""
         try:
+            auto_sell_result = self.auto_sell_expired_commodities(user_id)
             # 检查用户是否存在
             user = self.user_repo.get_by_id(user_id)
             if not user:
@@ -464,7 +697,7 @@ class ExchangeInventoryService:
                     is_expired = item_data.get("is_expired", False)
                     
                     if is_expired:
-                        message += f"  └─ C{self._to_base36(item_data['instance_id'])}: {item_data['quantity']}个 (💀 已腐败) "
+                        message += f"  └─ C{self._to_base36(item_data['instance_id'])}: {item_data['quantity']}个 (⏰ 已到期) "
                         message += f"{instance_profit_loss:+,}金币 {instance_profit_status}\n"
                     else:
                         message += f"  └─ C{self._to_base36(item_data['instance_id'])}: {item_data['quantity']}个 "
@@ -474,7 +707,7 @@ class ExchangeInventoryService:
             message += f"═" * 25 + "\n"
             message += f"💡 清仓完成，共获得 {net_income:,} 金币"
             
-            return {
+            result = {
                 "success": True,
                 "message": message,
                 "total_cost": total_cost,
@@ -484,6 +717,7 @@ class ExchangeInventoryService:
                 "net_income": net_income,
                 "commodity_summary": commodity_summary
             }
+            return self._attach_auto_sell_message(result, auto_sell_result)
         except Exception as e:
             logger.error(f"清仓失败: {e}")
             return {"success": False, "message": f"清仓失败: {str(e)}"}
@@ -501,6 +735,7 @@ class ExchangeInventoryService:
     def clear_commodity_inventory(self, user_id: str, commodity_id: str) -> Dict[str, Any]:
         """清空指定商品库存"""
         try:
+            auto_sell_result = self.auto_sell_expired_commodities(user_id)
             # 检查用户是否存在
             user = self.user_repo.get_by_id(user_id)
             if not user:
@@ -624,7 +859,7 @@ class ExchangeInventoryService:
                 item_profit_status = "📈" if item_profit_loss > 0 else "📉" if item_profit_loss < 0 else "➖"
                 
                 if is_expired:
-                    message += f"C{self._to_base36(item.instance_id)}: {item.quantity}个 (💀 已腐败) "
+                    message += f"C{self._to_base36(item.instance_id)}: {item.quantity}个 (⏰ 已到期) "
                     message += f"{item_profit_loss:+,}金币 {item_profit_status}\n"
                 else:
                     message += f"C{self._to_base36(item.instance_id)}: {item.quantity}个 "
@@ -634,7 +869,7 @@ class ExchangeInventoryService:
             message += f"═" * 25 + "\n"
             message += f"💡 清仓完成，共获得 {net_income:,} 金币"
             
-            return {
+            result = {
                 "success": True,
                 "message": message,
                 "total_cost": total_cost,
@@ -643,6 +878,7 @@ class ExchangeInventoryService:
                 "tax_amount": tax_amount,
                 "net_income": net_income
             }
+            return self._attach_auto_sell_message(result, auto_sell_result)
         except Exception as e:
             logger.error(f"清仓失败: {e}")
             return {"success": False, "message": f"清仓失败: {str(e)}"}

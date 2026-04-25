@@ -64,6 +64,7 @@ class SqliteUserRepository(AbstractUserRepository):
             consecutive_login_days=row["consecutive_login_days"],
             fish_pond_capacity=row["fish_pond_capacity"],
             aquarium_capacity=row["aquarium_capacity"] if "aquarium_capacity" in row_keys else 50,
+            exchange_capacity=row["exchange_capacity"] if "exchange_capacity" in row_keys else 1000,
             created_at=parse_datetime(row["created_at"]),
             equipped_rod_instance_id=row["equipped_rod_instance_id"],
             equipped_accessory_instance_id=row["equipped_accessory_instance_id"],

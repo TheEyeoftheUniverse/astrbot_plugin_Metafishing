@@ -60,6 +60,9 @@ from .handlers.exchange_handlers import ExchangeHandlers
 
 
 class FishingPlugin(Star):
+    _shared_player_webui_task = None
+    _shared_player_webui_shutdown_event = None
+    _shared_player_webui_owner = None
 
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -116,8 +119,14 @@ class FishingPlugin(Star):
             # 如果框架返回空字典，说明嵌套配置不被支持，手动构建默认值
             logger.warning("[CONFIG] Exchange config is empty, using defaults")
             exchange_config = {
-                "account_fee": 100000,
+                "account_fee": 0,
                 "capacity": 1000,
+                "upgrades": [
+                    {"from": 1000, "to": 2000, "cost": 100000},
+                    {"from": 2000, "to": 5000, "cost": 500000},
+                    {"from": 5000, "to": 10000, "cost": 2000000},
+                    {"from": 10000, "to": 20000, "cost": 10000000},
+                ],
                 "tax_rate": 0.05,
                 "volatility": {"dried_fish": 0.08, "fish_roe": 0.12, "fish_oil": 0.10},
                 "event_chance": 0.1,
@@ -130,6 +139,17 @@ class FishingPlugin(Star):
             }
         else:
             logger.info(f"[CONFIG] Exchange capacity loaded: {exchange_config.get('capacity', 'NOT SET')}")
+
+        exchange_config.setdefault("capacity", 1000)
+        exchange_config.setdefault(
+            "upgrades",
+            [
+                {"from": exchange_config["capacity"], "to": exchange_config["capacity"] * 2, "cost": 100000},
+                {"from": exchange_config["capacity"] * 2, "to": exchange_config["capacity"] * 5, "cost": 500000},
+                {"from": exchange_config["capacity"] * 5, "to": exchange_config["capacity"] * 10, "cost": 2000000},
+                {"from": exchange_config["capacity"] * 10, "to": exchange_config["capacity"] * 20, "cost": 10000000},
+            ],
+        )
         
         self.game_config = {
             "fishing": {
@@ -340,6 +360,7 @@ class FishingPlugin(Star):
 
         # --- Web后台配置 ---
         self.web_admin_task = None
+        self._web_admin_shutdown_event = None
         webui_config = config.get("webui", {})
         self.secret_key = webui_config.get("secret_key")
         if not self.secret_key:
@@ -349,7 +370,25 @@ class FishingPlugin(Star):
         
         # --- 玩家WebUI配置 ---
         self.web_player_task = None
+        self._web_player_shutdown_event = asyncio.Event()
         self.player_port = webui_config.get("player_port", 8888)
+        oauth_config = webui_config.get("oauth", {})
+        linuxdo_oauth_config = oauth_config.get("linuxdo", {})
+        self.player_linuxdo_oauth_config = {
+            "enabled": linuxdo_oauth_config.get("enabled", False),
+            "client_id": linuxdo_oauth_config.get("client_id", ""),
+            "client_secret": linuxdo_oauth_config.get("client_secret", ""),
+            "redirect_uri": linuxdo_oauth_config.get(
+                "redirect_uri",
+                f"http://localhost:{self.player_port}/player/oauth/linuxdo/callback",
+            ),
+            "scope": linuxdo_oauth_config.get("scope", "read"),
+            "user_id_field": linuxdo_oauth_config.get("user_id_field", "id"),
+            "nickname_field": linuxdo_oauth_config.get("nickname_field", "username"),
+            "auto_register": linuxdo_oauth_config.get("auto_register", True),
+            "allow_password_fallback": linuxdo_oauth_config.get("allow_password_fallback", True),
+            "proxy_url": linuxdo_oauth_config.get("proxy_url", ""),
+        }
         
         # 启动玩家WebUI
         self.web_player_task = asyncio.create_task(self._start_player_webui())
@@ -1165,24 +1204,36 @@ class FishingPlugin(Star):
         async for r in social_handlers.tax_record(self, event):
             yield r
             
-    # =========== 交易所 ==========
+    # =========== 期货 ==========
 
-    @filter.command("交易所")
+    @filter.command("期货", alias={"交易所"})
     async def exchange_main(self, event: AstrMessageEvent):
-        """查看交易所信息和进行交易。用法：交易所 [买入/卖出] [商品] [数量]"""
+        """查看期货信息和进行交易。用法：期货 [买入/卖出] [商品] [数量]"""
         async for r in self.exchange_handlers.exchange_main(event):
             yield r
 
     @filter.command("持仓")
     async def view_inventory(self, event: AstrMessageEvent):
-        """查看你在交易所的持仓情况"""
+        """查看你在期货中的持仓情况"""
         async for r in self.exchange_handlers.view_inventory(event):
             yield r
 
     @filter.command("清仓")
     async def clear_inventory(self, event: AstrMessageEvent):
-        """清空交易所持仓，将所有商品按当前价格卖出"""
+        """清空期货持仓，将所有商品按当前价格卖出"""
         async for r in self.exchange_handlers.clear_inventory(event):
+            yield r
+
+    @filter.command("期货容量", alias={"交易所容量"})
+    async def exchange_capacity(self, event: AstrMessageEvent):
+        """查看当前期货容量和升级信息"""
+        async for r in self.exchange_handlers.exchange_capacity(event):
+            yield r
+
+    @filter.command("升级期货", alias={"期货升级", "升级交易所", "交易所升级"})
+    async def upgrade_exchange_capacity(self, event: AstrMessageEvent):
+        """升级期货容量，可以持有更多商品"""
+        async for r in self.exchange_handlers.upgrade_exchange_capacity(event):
             yield r
 
     # =========== 管理后台 ==========
@@ -1388,35 +1439,62 @@ class FishingPlugin(Star):
             finally:
                 self._red_packet_cleanup_task = None
 
-        # 终止玩家WebUI
-        if hasattr(self, 'web_player_task') and self.web_player_task:
-            if not self.web_player_task.done():
-                self.web_player_task.cancel()
-            try:
-                await self.web_player_task
-            except asyncio.CancelledError:
-                logger.info("玩家WebUI任务已取消")
-            except Exception as e:
-                logger.warning(f"等待玩家WebUI任务结束时发生错误: {e}")
-            finally:
-                self.web_player_task = None
-
-        if self.web_admin_task:
-            if not self.web_admin_task.done():
-                self.web_admin_task.cancel()
-            try:
-                await self.web_admin_task
-            except asyncio.CancelledError:
-                logger.info("钓鱼后台管理任务已取消")
-            except Exception as e:
-                logger.warning(f"等待钓鱼后台管理任务结束时发生错误: {e}")
-            finally:
-                self.web_admin_task = None
+        await self._shutdown_server_task(
+            "web_player_task",
+            "_web_player_shutdown_event",
+            "玩家WebUI",
+        )
+        await self._shutdown_server_task(
+            "web_admin_task",
+            "_web_admin_shutdown_event",
+            "钓鱼后台管理",
+        )
 
         logger.info("钓鱼插件已成功终止。")
 
-    async def _cancel_stale_player_webui_tasks(self):
-        """取消事件循环中遗留的旧玩家WebUI任务。"""
+    async def _shutdown_server_task(
+        self,
+        task_attr: str,
+        event_attr: str,
+        task_name: str,
+        timeout: int = 5,
+    ):
+        """优雅关闭 Hypercorn 任务，超时后再回退到 cancel。"""
+        task = getattr(self, task_attr, None)
+        if not task:
+            return
+
+        shutdown_event = getattr(self, event_attr, None)
+        if shutdown_event and not shutdown_event.is_set():
+            shutdown_event.set()
+
+        if not task.done():
+            try:
+                await asyncio.wait_for(task, timeout=timeout)
+            except asyncio.TimeoutError:
+                logger.warning(f"{task_name} 在 {timeout} 秒内未优雅退出，回退到取消任务")
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            except asyncio.CancelledError:
+                logger.info(f"{task_name}任务已取消")
+            except Exception as e:
+                logger.warning(f"等待{task_name}结束时发生错误: {e}")
+        else:
+            try:
+                await task
+            except asyncio.CancelledError:
+                logger.info(f"{task_name}任务已取消")
+            except Exception as e:
+                logger.warning(f"等待{task_name}结束时发生错误: {e}")
+
+        setattr(self, task_attr, None)
+        setattr(self, event_attr, None)
+
+    async def _cancel_stale_server_tasks(self, qualname_suffix: str, event_attr: str, task_name: str):
+        """取消事件循环中遗留的旧服务器任务，并优先触发其优雅关闭事件。"""
         current_task = asyncio.current_task()
         cancelled_count = 0
 
@@ -1426,18 +1504,109 @@ class FishingPlugin(Star):
 
             coro = task.get_coro()
             qualname = getattr(coro, "__qualname__", "")
-            if qualname.endswith("FishingPlugin._start_player_webui"):
-                task.cancel()
+            if qualname.endswith(qualname_suffix):
+                owner = None
+                frame = getattr(coro, "cr_frame", None)
+                if frame is not None:
+                    owner = frame.f_locals.get("self")
+
+                shutdown_event = getattr(owner, event_attr, None) if owner else None
+                if shutdown_event and not shutdown_event.is_set():
+                    shutdown_event.set()
+
                 try:
                     await asyncio.wait_for(task, timeout=5)
+                except asyncio.TimeoutError:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                 except asyncio.CancelledError:
                     pass
                 except Exception as e:
-                    logger.warning(f"等待旧玩家WebUI任务结束时发生错误: {e}")
+                    logger.warning(f"等待旧{task_name}任务结束时发生错误: {e}")
                 cancelled_count += 1
 
         if cancelled_count > 0:
-            logger.warning(f"已取消 {cancelled_count} 个旧玩家WebUI任务")
+            logger.warning(f"已清理 {cancelled_count} 个旧{task_name}任务")
+
+    async def _cancel_stale_player_webui_tasks(self):
+        """取消事件循环中遗留的旧玩家WebUI任务。"""
+        await self._cancel_stale_server_tasks(
+            "FishingPlugin._start_player_webui",
+            "_web_player_shutdown_event",
+            "玩家WebUI",
+        )
+
+    async def _claim_stale_shared_player_webui(self):
+        """优先接管并关闭跨插件实例残留的玩家WebUI任务。"""
+        current_task = asyncio.current_task()
+        shared_task = type(self)._shared_player_webui_task
+        shared_event = type(self)._shared_player_webui_shutdown_event
+
+        if (
+            not shared_task
+            or shared_task is current_task
+            or shared_task.done()
+        ):
+            if shared_task and shared_task.done():
+                type(self)._shared_player_webui_task = None
+                type(self)._shared_player_webui_shutdown_event = None
+                type(self)._shared_player_webui_owner = None
+            return
+
+        logger.warning("检测到跨实例残留的玩家WebUI任务，尝试先优雅关闭旧实例")
+
+        if shared_event and not shared_event.is_set():
+            shared_event.set()
+
+        try:
+            await asyncio.wait_for(shared_task, timeout=8)
+        except asyncio.TimeoutError:
+            logger.warning("旧玩家WebUI任务未在超时内退出，回退到取消任务")
+            shared_task.cancel()
+            try:
+                await shared_task
+            except asyncio.CancelledError:
+                pass
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"等待旧玩家WebUI任务结束时发生错误: {e}")
+        finally:
+            type(self)._shared_player_webui_task = None
+            type(self)._shared_player_webui_shutdown_event = None
+            type(self)._shared_player_webui_owner = None
+
+    async def _cancel_stale_admin_webui_tasks(self):
+        """取消事件循环中遗留的旧后台管理任务。"""
+        await self._cancel_stale_server_tasks(
+            "FishingPlugin._run_admin_webui",
+            "_web_admin_shutdown_event",
+            "钓鱼后台管理",
+        )
+
+    async def _run_admin_webui(self, app):
+        """启动管理员WebUI服务器，并支持优雅关闭。"""
+        from hypercorn.asyncio import serve
+        from hypercorn.config import Config
+
+        config = Config()
+        config.bind = [f"0.0.0.0:{self.port}"]
+        config.use_reloader = False
+        config.accesslog = None
+
+        if self._web_admin_shutdown_event is None:
+            self._web_admin_shutdown_event = asyncio.Event()
+
+        try:
+            logger.info(f"钓鱼后台管理启动中，端口: {self.port}")
+            await serve(app, config, shutdown_trigger=self._web_admin_shutdown_event.wait)
+            logger.info("钓鱼后台管理服务已优雅停止")
+        except asyncio.CancelledError:
+            logger.info("钓鱼后台管理任务已取消")
+            raise
 
     async def _start_player_webui(self):
         """启动玩家WebUI服务器"""
@@ -1446,7 +1615,8 @@ class FishingPlugin(Star):
 
             fixed_port = int(self.player_port)
 
-            # 1) 先清理同进程中的旧任务
+            # 1) 先接管跨实例残留任务，再清理同进程旧任务
+            await self._claim_stale_shared_player_webui()
             await self._cancel_stale_player_webui_tasks()
 
             # 2) 如端口仍被占用，尝试强制释放
@@ -1477,6 +1647,7 @@ class FishingPlugin(Star):
                 "buff_repo": self.buff_repo,
                 "user_service": self.user_service,
                 "fishing_service": self.fishing_service,
+                "game_mechanics_service": self.game_mechanics_service,
                 "inventory_service": self.inventory_service,
                 "shop_service": self.shop_service,
                 "market_service": self.market_service,
@@ -1486,7 +1657,12 @@ class FishingPlugin(Star):
                 "expedition_service": self.expedition_service,
             }
 
-            app = create_player_app(services)
+            app = create_player_app(
+                services,
+                {
+                    "linuxdo_oauth": self.player_linuxdo_oauth_config,
+                },
+            )
 
             # 使用hypercorn启动服务器
             from hypercorn.config import Config
@@ -1495,11 +1671,20 @@ class FishingPlugin(Star):
             config = Config()
             config.bind = [f"0.0.0.0:{fixed_port}"]
             config.use_reloader = False
+            config.accesslog = None
+
+            if self._web_player_shutdown_event is None:
+                self._web_player_shutdown_event = asyncio.Event()
+
+            type(self)._shared_player_webui_task = asyncio.current_task()
+            type(self)._shared_player_webui_shutdown_event = self._web_player_shutdown_event
+            type(self)._shared_player_webui_owner = self
 
             logger.info(f"玩家WebUI启动中，端口: {fixed_port}")
             logger.info(f"访问地址: http://localhost:{fixed_port}/player/login")
 
-            await serve(app, config)
+            await serve(app, config, shutdown_trigger=self._web_player_shutdown_event.wait)
+            logger.info("玩家WebUI服务已优雅停止")
 
         except asyncio.CancelledError:
             logger.info("玩家WebUI服务已停止")
@@ -1517,3 +1702,9 @@ class FishingPlugin(Star):
             logger.error(f"玩家WebUI启动失败: {e}")
             import traceback
             logger.error(traceback.format_exc())
+        finally:
+            current_task = asyncio.current_task()
+            if type(self)._shared_player_webui_task is current_task:
+                type(self)._shared_player_webui_task = None
+                type(self)._shared_player_webui_shutdown_event = None
+                type(self)._shared_player_webui_owner = None

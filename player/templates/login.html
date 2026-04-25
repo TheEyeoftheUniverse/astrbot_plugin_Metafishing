@@ -10,6 +10,31 @@
                 <h4 class="mb-0"><i class="fas fa-sign-in-alt"></i> 玩家登录</h4>
             </div>
             <div class="card-body">
+                {% if oauth_misconfigured %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    Linux.do 登录已启用，但配置不完整，当前只能使用密码登录。
+                </div>
+                {% endif %}
+
+                {% if oauth_configured and oauth_login_url %}
+                <div class="d-grid mb-3">
+                    <a href="{{ oauth_login_url }}" class="btn btn-dark">
+                        <i class="fas fa-right-to-bracket"></i>
+                        使用 Linux.do 登录
+                    </a>
+                </div>
+                <div class="text-center text-muted mb-3">
+                    <small>授权成功后会自动进入你的钓鱼账号</small>
+                </div>
+                {% endif %}
+
+                {% if allow_password_login %}
+                {% if oauth_configured and oauth_login_url %}
+                <div class="text-center text-muted mb-3">
+                    <small>或继续使用原有账号密码登录</small>
+                </div>
+                {% endif %}
                 <form method="POST">
                     <div class="mb-3">
                         <label for="user_id" class="form-label">用户ID</label>
@@ -46,10 +71,17 @@
                         </button>
                     </div>
                 </form>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-circle-info"></i>
+                    当前站点已关闭密码登录，请直接使用上方的 Linux.do 登录按钮。
+                </div>
+                {% endif %}
             </div>
             <div class="card-footer text-center">
                 <small class="text-muted">
-                    <i class="fas fa-info-circle"></i> 请先在游戏中使用 <code>,注册</code> 命令注册账号
+                    <i class="fas fa-info-circle"></i>
+                    若未开启自动注册，请先在游戏中使用 <code>,注册</code> 命令创建账号
                 </small>
             </div>
         </div>

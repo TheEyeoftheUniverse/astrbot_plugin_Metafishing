@@ -12,3 +12,9 @@ __pycache__/
 .idea/
 
 *.db
+
+# 运行时数据与本地凭证
+data/*.json
+data/*.bak
+outputs/
+.codex_write_test
