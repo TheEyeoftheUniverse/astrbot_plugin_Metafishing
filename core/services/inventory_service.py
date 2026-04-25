@@ -123,6 +123,7 @@ class InventoryService:
         for rod_instance in rod_instances:
             rod_template = self.item_template_repo.get_rod_by_id(rod_instance.rod_id)
             if rod_template:
+                can_refine = self._can_refine_rod_instance(rod_instance, rod_instances)
                 # 计算精炼后的最大耐久度
                 if rod_template.durability is not None:
                     # 每级精炼增加前一级50%的耐久上限
@@ -145,6 +146,7 @@ class InventoryService:
                     "refine_level": rod_instance.refine_level,
                     "current_durability": rod_instance.current_durability,
                     "max_durability": refined_max_durability,
+                    "can_refine": can_refine,
                 })
         # 排序：装备的鱼竿优先显示，然后按稀有度降序，最后按精炼等级降序
         enriched_rods.sort(key=lambda x: (
@@ -174,7 +176,12 @@ class InventoryService:
                     "rarity": bait_template.rarity,
                     "quantity": quantity,
                     "duration_minutes": bait_template.duration_minutes,
-                    "effect_description": bait_template.effect_description
+                    "effect_description": bait_template.effect_description,
+                    # Bait 模型使用的是 success/quantity/rare_chance 这套字段，
+                    # 这里统一映射成背包 UI 所需的三项属性。
+                    "fish_quality_bonus": 1.0 + getattr(bait_template, "success_rate_modifier", 0.0),
+                    "fish_quantity_bonus": getattr(bait_template, "quantity_modifier", 1.0),
+                    "rare_fish_chance_bonus": getattr(bait_template, "rare_chance_modifier", 0.0),
                 })
 
         return {
@@ -192,6 +199,7 @@ class InventoryService:
         for accessory_instance in accessory_instances:
             accessory_template = self.item_template_repo.get_accessory_by_id(accessory_instance.accessory_id)
             if accessory_template:
+                can_refine = self._can_refine_accessory_instance(accessory_instance, accessory_instances)
                 enriched_accessories.append({
                     "name": accessory_template.name,
                     "rarity": accessory_template.rarity,
@@ -205,6 +213,7 @@ class InventoryService:
                     "bonus_rare_fish_chance": calculate_after_refine(accessory_template.bonus_rare_fish_chance, refine_level=accessory_instance.refine_level, rarity=accessory_template.rarity),
                     "bonus_coin_modifier": calculate_after_refine(accessory_template.bonus_coin_modifier, refine_level=accessory_instance.refine_level, rarity=accessory_template.rarity),
                     "refine_level": accessory_instance.refine_level,
+                    "can_refine": can_refine,
                 })
 
         # 排序：装备的饰品优先显示，然后按稀有度降序，最后按精炼等级降序
@@ -247,6 +256,40 @@ class InventoryService:
             "success": True,
             "items": enriched_items
         }
+
+    def _can_refine_rod_instance(self, target_instance, all_instances) -> bool:
+        if target_instance.refine_level >= 10:
+            return False
+
+        for candidate in all_instances:
+            if candidate.rod_instance_id == target_instance.rod_instance_id:
+                continue
+            if candidate.rod_id != target_instance.rod_id:
+                continue
+            if getattr(candidate, "is_equipped", False):
+                continue
+            if getattr(candidate, "is_locked", False):
+                continue
+            return True
+
+        return False
+
+    def _can_refine_accessory_instance(self, target_instance, all_instances) -> bool:
+        if target_instance.refine_level >= 10:
+            return False
+
+        for candidate in all_instances:
+            if candidate.accessory_instance_id == target_instance.accessory_instance_id:
+                continue
+            if candidate.accessory_id != target_instance.accessory_id:
+                continue
+            if getattr(candidate, "is_equipped", False):
+                continue
+            if getattr(candidate, "is_locked", False):
+                continue
+            return True
+
+        return False
 
     def _get_user_friendly_description(self, item_template) -> str:
         """
