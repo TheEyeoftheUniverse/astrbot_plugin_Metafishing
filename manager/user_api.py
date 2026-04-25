@@ -9,6 +9,12 @@ import os
 from quart import Blueprint, jsonify, current_app, request, session
 import functools
 from astrbot.api import logger
+from ..core.services.wipe_bomb_daily_service import (
+    create_default_wipe_bomb_daily_state,
+    get_wipe_bomb_reset_marker,
+    load_wipe_bomb_daily_state,
+    save_wipe_bomb_daily_state,
+)
 from ..core.utils import get_last_reset_time, get_today
 
 
@@ -513,17 +519,6 @@ def _get_game_mechanics_service_for_wipe_bomb():
         raise
 
 
-def _get_wipe_bomb_publicity_file() -> str:
-    plugin_root = os.path.dirname(os.path.dirname(__file__))
-    data_dir = os.path.join(plugin_root, "data")
-    os.makedirs(data_dir, exist_ok=True)
-    return os.path.join(data_dir, "tavern_wipe_bomb_daily.json")
-
-
-def _get_current_reset_marker(reset_hour: int) -> str:
-    return get_last_reset_time(reset_hour).strftime("%Y-%m-%d %H:%M:%S")
-
-
 def _create_empty_notice():
     return {
         "has_record": False,
@@ -536,11 +531,7 @@ def _create_empty_notice():
 
 
 def _create_default_wipe_bomb_publicity(reset_marker: str):
-    return {
-        "reset_marker": reset_marker,
-        "king": _create_empty_notice(),
-        "ghost": _create_empty_notice(),
-    }
+    return create_default_wipe_bomb_daily_state(reset_marker)
 
 
 def _normalize_wipe_bomb_notice(entry):
@@ -558,32 +549,14 @@ def _normalize_wipe_bomb_notice(entry):
 
 
 def _save_wipe_bomb_publicity(data):
-    publicity_file = _get_wipe_bomb_publicity_file()
-    with open(publicity_file, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    reset_hour = _get_daily_reset_hour()
+    normalized = save_wipe_bomb_daily_state(reset_hour, data)
+    data.clear()
+    data.update(normalized)
 
 
 def _load_wipe_bomb_publicity(reset_hour: int):
-    publicity_file = _get_wipe_bomb_publicity_file()
-    reset_marker = _get_current_reset_marker(reset_hour)
-    default_data = _create_default_wipe_bomb_publicity(reset_marker)
-
-    if not os.path.exists(publicity_file):
-        _save_wipe_bomb_publicity(default_data)
-        return default_data
-
-    try:
-        with open(publicity_file, "r", encoding="utf-8") as file:
-            data = json.load(file)
-    except Exception as exception:
-        logger.error(f"读取每日擦弹公示失败: {exception}", exc_info=True)
-        _save_wipe_bomb_publicity(default_data)
-        return default_data
-
-    if not isinstance(data, dict) or data.get("reset_marker") != reset_marker:
-        _save_wipe_bomb_publicity(default_data)
-        return default_data
-
+    data = load_wipe_bomb_daily_state(reset_hour)
     data["king"] = _normalize_wipe_bomb_notice(data.get("king"))
     data["ghost"] = _normalize_wipe_bomb_notice(data.get("ghost"))
     return data
@@ -694,6 +667,9 @@ def _format_wipe_bomb_result_text(result: dict) -> str:
         )
 
     message += f"剩余擦弹次数：{remaining_today} 次\n"
+    message += f"当前奖池：{int(result.get('jackpot_amount', 0) or 0)} 金币\n"
+    if result.get("jackpot_notice"):
+        message += f"\n{result['jackpot_notice']}"
     if result.get("suppression_notice"):
         message += f"\n{result['suppression_notice']}"
 
@@ -2327,6 +2303,7 @@ async def get_tavern_wipe_bomb_status():
             "success": True,
             "data": {
                 "remaining_today": remaining_today,
+                "jackpot_amount": int(publicity_data.get("jackpot_amount", 0) or 0),
                 "result_text": "",
                 "king_notice": _serialize_wipe_bomb_notice(publicity_data.get("king")),
                 "ghost_notice": _serialize_wipe_bomb_notice(publicity_data.get("ghost")),
@@ -2390,6 +2367,7 @@ async def do_tavern_wipe_bomb():
 
         response_data = {
             "remaining_today": int(result.get("remaining_today", _get_wipe_bomb_remaining_attempts(user_id)) or 0),
+            "jackpot_amount": int(result.get("jackpot_amount", publicity_data.get("jackpot_amount", 0)) or 0),
             "result_text": _format_wipe_bomb_result_text(result),
             "king_notice": _serialize_wipe_bomb_notice(publicity_data.get("king")),
             "ghost_notice": _serialize_wipe_bomb_notice(publicity_data.get("ghost")),

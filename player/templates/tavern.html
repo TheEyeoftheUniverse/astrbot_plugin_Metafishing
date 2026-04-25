@@ -3,7 +3,7 @@
 {% block title %}酒馆 - 钓鱼插件{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-4" id="leaderboardRow">
     <div class="col-12">
         <h2><i class="fas fa-beer"></i> 渔夫酒馆</h2>
         <p class="text-muted">空军渔夫在线发牌 🎴</p>
@@ -11,7 +11,7 @@
 </div>
 
 <!-- 公告栏 -->
-<div class="row mb-4">
+<div class="row mb-4" id="expeditionRow">
     <div class="col-12">
         <div class="card border-warning">
             <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
@@ -374,6 +374,84 @@
                             <small>使用命令 <code>,发起科考 探险|征服|圣域</code> 发起科考队伍</small>
                         </div>
                     {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 每日擦弹 -->
+<div class="row mb-4" id="dailyWipeBombRow">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0"
+                        type="button" data-bs-toggle="collapse" data-bs-target="#wipeBombCollapse">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bomb"></i> 每日擦弹
+                        <span class="badge bg-light text-danger ms-2" id="wipeBombJackpotBadge">奖池 --</span>
+                        <i class="fas fa-chevron-down ms-2"></i>
+                    </h5>
+                </button>
+            </div>
+            <div class="collapse show" id="wipeBombCollapse">
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="card bg-light h-100 border-warning">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 text-warning"><i class="fas fa-crown"></i> 每日擦弹王</h6>
+                                        <span class="badge bg-warning text-dark" id="wipeBombKingMultiplier">--</span>
+                                    </div>
+                                    <div class="fw-semibold" id="wipeBombKingPlayer">--</div>
+                                    <small class="text-muted d-block" id="wipeBombKingTitle">--</small>
+                                    <div class="mt-2 text-success" id="wipeBombKingProfit">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light h-100 border-secondary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 text-secondary"><i class="fas fa-ghost"></i> 每日擦弹鬼</h6>
+                                        <span class="badge bg-secondary" id="wipeBombGhostMultiplier">--</span>
+                                    </div>
+                                    <div class="fw-semibold" id="wipeBombGhostPlayer">--</div>
+                                    <small class="text-muted d-block" id="wipeBombGhostTitle">--</small>
+                                    <div class="mt-2 text-danger" id="wipeBombGhostProfit">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-light border-0">
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap gap-3 justify-content-between align-items-end">
+                                <div>
+                                    <div class="text-muted small">今日剩余次数</div>
+                                    <div class="h4 mb-0" id="wipeBombRemaining">--</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">当前奖池</div>
+                                    <div class="h4 mb-0 text-danger" id="wipeBombJackpotText">--</div>
+                                </div>
+                                <div class="flex-grow-1" style="min-width: 220px;">
+                                    <label for="wipeBombAmountInput" class="form-label mb-1 text-muted small">擦弹金币</label>
+                                    <input id="wipeBombAmountInput" type="number" min="1" step="1" class="form-control" placeholder="输入擦弹金额">
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-danger" type="button" onclick="submitDailyWipeBomb(true)">
+                                        <i class="fas fa-fire"></i> ALL IN
+                                    </button>
+                                    <button class="btn btn-danger" type="button" onclick="submitDailyWipeBomb(false)">
+                                        <i class="fas fa-play"></i> 开始擦弹
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="wipeBombResultBox" class="alert alert-secondary mt-3 mb-0 d-none" role="alert"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1004,6 +1082,124 @@ async function claimExpeditionReward(expeditionId) {
         showToast('网络错误，请稍后重试', 'error');
     }
 }
+
+function renderWipeBombNotice(prefix, notice) {
+    const titleNode = document.getElementById(`${prefix}Title`);
+    const playerNode = document.getElementById(`${prefix}Player`);
+    const multiplierNode = document.getElementById(`${prefix}Multiplier`);
+    const profitNode = document.getElementById(`${prefix}Profit`);
+    const hasRecord = notice && notice.has_record;
+
+    if (titleNode) {
+        titleNode.textContent = hasRecord ? (notice.title_name || '无称号') : '--';
+    }
+    if (playerNode) {
+        playerNode.textContent = hasRecord ? (notice.nickname || '匿名渔夫') : '--';
+    }
+    if (multiplierNode) {
+        const multiplier = Number(notice && notice.multiplier ? notice.multiplier : 0);
+        multiplierNode.textContent = hasRecord ? `${multiplier.toFixed(multiplier < 0.01 ? 4 : 2)}x` : '--';
+    }
+    if (profitNode) {
+        if (!hasRecord) {
+            profitNode.textContent = '--';
+            return;
+        }
+        const profit = Number(notice.profit || 0);
+        profitNode.textContent = `${profit > 0 ? '+' : ''}${profit} 金币`;
+    }
+}
+
+function renderDailyWipeBombPanel(data) {
+    const jackpotAmount = Math.max(0, Number(data && data.jackpot_amount ? data.jackpot_amount : 0));
+    const remainingAmount = Math.max(0, Number(data && data.remaining_today ? data.remaining_today : 0));
+    const jackpotText = `${jackpotAmount.toLocaleString()} 金币`;
+
+    const remainingNode = document.getElementById('wipeBombRemaining');
+    const jackpotNode = document.getElementById('wipeBombJackpotText');
+    const jackpotBadgeNode = document.getElementById('wipeBombJackpotBadge');
+
+    if (remainingNode) {
+        remainingNode.textContent = String(remainingAmount);
+    }
+    if (jackpotNode) {
+        jackpotNode.textContent = jackpotText;
+    }
+    if (jackpotBadgeNode) {
+        jackpotBadgeNode.textContent = `奖池 ${jackpotAmount.toLocaleString()}`;
+    }
+
+    renderWipeBombNotice('wipeBombKing', data ? data.king_notice : null);
+    renderWipeBombNotice('wipeBombGhost', data ? data.ghost_notice : null);
+}
+
+async function fetchDailyWipeBombStatus() {
+    try {
+        const response = await fetch('/api/user/tavern/wipe-bomb');
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || '获取每日擦弹数据失败');
+        }
+        renderDailyWipeBombPanel(data.data || {});
+    } catch (error) {
+        showToast(error.message || '获取每日擦弹数据失败', 'error');
+    }
+}
+
+async function submitDailyWipeBomb(allIn) {
+    const resultBox = document.getElementById('wipeBombResultBox');
+    const payload = { all_in: !!allIn };
+
+    if (!allIn) {
+        const amountInput = document.getElementById('wipeBombAmountInput');
+        const amount = Number(amountInput ? amountInput.value : 0);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            showToast('请输入大于 0 的擦弹金币数量', 'error');
+            return;
+        }
+        payload.amount = Math.floor(amount);
+    }
+
+    try {
+        const response = await fetch('/api/user/tavern/wipe-bomb/do', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.data) {
+            renderDailyWipeBombPanel(data.data);
+        }
+
+        if (resultBox) {
+            resultBox.classList.remove('d-none', 'alert-secondary', 'alert-success', 'alert-danger');
+            resultBox.classList.add(response.ok && data.success ? 'alert-success' : 'alert-danger');
+            resultBox.textContent = (data.data && data.data.result_text) ? data.data.result_text : (data.message || '擦弹失败');
+        }
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || '擦弹失败');
+        }
+
+        const amountInput = document.getElementById('wipeBombAmountInput');
+        if (amountInput && !allIn) {
+            amountInput.value = '';
+        }
+
+        showToast(data.message || '擦弹成功', 'success');
+    } catch (error) {
+        showToast(error.message || '擦弹失败', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const leaderboardRow = document.getElementById('leaderboardRow');
+    const wipeBombRow = document.getElementById('dailyWipeBombRow');
+    if (leaderboardRow && wipeBombRow) {
+        wipeBombRow.after(leaderboardRow);
+    }
+    fetchDailyWipeBombStatus();
+});
 </script>
 
 <style>

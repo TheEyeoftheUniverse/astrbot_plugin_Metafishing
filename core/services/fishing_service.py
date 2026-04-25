@@ -17,6 +17,7 @@ from ..repositories.abstract_repository import (
 )
 from ..domain.models import FishingRecord, TaxRecord, FishingZone
 from ..services.fishing_zone_service import FishingZoneService
+from ..services.wipe_bomb_daily_service import add_wipe_bomb_jackpot
 from ..utils import get_now, get_fish_template, get_today, get_last_reset_time, calculate_after_refine
 
 
@@ -938,6 +939,7 @@ class FishingService:
                 )
                 self.log_repo.add_tax_record(tax_log)
                 
+                add_wipe_bomb_jackpot(tax_amount, self.daily_reset_hour)
                 total_tax_collected += tax_amount
                 taxed_user_count += 1
         

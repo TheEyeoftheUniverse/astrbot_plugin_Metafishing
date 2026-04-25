@@ -14,6 +14,7 @@ from ..repositories.abstract_repository import (
     AbstractUserBuffRepository,
 )
 from ..domain.models import WipeBombLog, User
+from .wipe_bomb_daily_service import add_wipe_bomb_jackpot, consume_wipe_bomb_jackpot, get_wipe_bomb_jackpot_amount
 from ...core.utils import get_now, get_today
 
 if TYPE_CHECKING:
@@ -344,8 +345,25 @@ class GameMechanicsService:
             return {"success": False, "message": "擦弹失败，似乎时空发生了扭曲..."}
 
         # 6. 计算最终金额并执行事务
-        reward_amount = int(contribution_amount * reward_multiplier)
-        profit = reward_amount - contribution_amount
+        configured_reward_amount = int(contribution_amount * reward_multiplier)
+        configured_profit = configured_reward_amount - contribution_amount
+        daily_reset_hour = int(self.config.get("daily_reset_hour", 0) or 0)
+        jackpot_before = get_wipe_bomb_jackpot_amount(daily_reset_hour)
+        jackpot_after = jackpot_before
+        jackpot_paid = 0
+        jackpot_notice = ""
+
+        if configured_profit > 0:
+            jackpot_paid, jackpot_after = consume_wipe_bomb_jackpot(configured_profit, daily_reset_hour)
+            reward_amount = contribution_amount + jackpot_paid
+            profit = jackpot_paid
+            if jackpot_paid < configured_profit:
+                jackpot_notice = "奖池清空！"
+        else:
+            reward_amount = configured_reward_amount
+            profit = configured_profit
+            if configured_profit < 0:
+                jackpot_after = add_wipe_bomb_jackpot(abs(configured_profit), daily_reset_hour)
 
         # 检查是否触发服务器级别抑制（开出≥15x高倍率）
         suppression_triggered = False
@@ -407,6 +425,12 @@ class GameMechanicsService:
             "profit": profit,
             # 使用 user 对象中的新计数值来计算剩余次数
             "remaining_today": total_max_attempts - user.wipe_bomb_attempts_today,
+            "jackpot_amount": jackpot_after,
+            "jackpot_before": jackpot_before,
+            "configured_profit": configured_profit,
+            "configured_reward": configured_reward_amount,
+            "jackpot_paid": jackpot_paid,
+            "jackpot_notice": jackpot_notice,
         }
         
         if suppression_triggered:

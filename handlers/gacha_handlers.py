@@ -331,6 +331,10 @@ async def wipe_bomb(self: "FishingPlugin", event: AstrMessageEvent):
             else:
                 message += f"💥 你投入 {contribution} 金币，获得了 {multiplier_formatted} 倍奖励！\n 💰 奖励金额：{reward} 金币（亏损：- {abs(profit)})\n"
             message += f"剩余擦弹次数：{remaining_today} 次\n"
+            message += f"当前奖池：{int(result.get('jackpot_amount', 0) or 0)} 金币\n"
+
+            if result.get("jackpot_notice"):
+                message += f"\n{result['jackpot_notice']}"
 
             # 如果触发了抑制模式，添加通知信息
             if "suppression_notice" in result:
