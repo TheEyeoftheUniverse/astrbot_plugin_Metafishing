@@ -323,13 +323,12 @@ def _format_tavern_expedition_reward_preview(reward):
     if not isinstance(reward, dict):
         return ""
 
-    coins = int(reward.get("coins", 0) or 0)
     premium = int(reward.get("premium", 0) or 0)
     if reward.get("claimed"):
-        return f"已领取 {coins:,}金币 + {premium}钻石"
-    if coins <= 0 and premium <= 0:
+        return f"已领取 {premium}钻石"
+    if premium <= 0:
         return "无可领取奖励"
-    return f"{coins:,}金币 + {premium}钻石"
+    return f"{premium}钻石"
 
 
 def _build_tavern_expedition_targets_text(expedition):
@@ -2432,6 +2431,24 @@ async def claim_tavern_expedition_reward(expedition_id):
     except Exception as e:
         logger.error(f"领取科考奖励失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": f"领取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/tavern/expeditions/<expedition_id>/special-event", methods=["GET"])
+@api_login_required
+async def get_tavern_expedition_special_event(expedition_id):
+    """获取指定科考的特殊事件文本（仅在科考完成时返回有效文本）。"""
+    user_id = session.get("user_id", "") or ""
+    expedition_service = current_app.config.get("EXPEDITION_SERVICE")
+    if expedition_service is None:
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = expedition_service.get_expedition_special_event(user_id, expedition_id)
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    except Exception as e:
+        logger.error(f"获取科考特殊事件失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
 
 
 @user_api_bp.route("/profile/update", methods=["POST"])

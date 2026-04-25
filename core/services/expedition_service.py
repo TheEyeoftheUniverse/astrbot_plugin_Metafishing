@@ -19,6 +19,9 @@ from ..utils import get_now
 class ExpeditionService:
     """科学考察服务"""
 
+    # 参与者加入科考所需的通行证物品 ID
+    _JOIN_PASS_ITEM_IDS = {"short": 38, "medium": 39, "long": 40}
+
     def __init__(
         self,
         user_repo: AbstractUserRepository,
@@ -211,7 +214,6 @@ class ExpeditionService:
             "expedition_type": type_names.get(expedition.get("type", ""), expedition.get("type", "")),
             "completion_rate": expedition.get("total_progress", 0),
             "contribution": reward.get("contribution", 0),
-            "coins_reward": reward.get("coins", 0),
             "premium_reward": reward.get("premium", 0),
             "settled_at": get_now().strftime("%Y-%m-%d %H:%M:%S")
         }
@@ -243,13 +245,12 @@ class ExpeditionService:
         if not isinstance(reward, dict):
             return ""
 
-        coins = int(reward.get("coins", 0) or 0)
         premium = int(reward.get("premium", 0) or 0)
         if reward.get("claimed"):
-            return f"已领取 {coins:,}金币 + {premium}钻石"
-        if coins <= 0 and premium <= 0:
+            return f"已领取 {premium}钻石"
+        if premium <= 0:
             return "无可领取奖励"
-        return f"{coins:,}金币 + {premium}钻石"
+        return f"{premium}钻石"
 
     def _prepare_expedition_claims_locked(self, expedition: Dict[str, Any]) -> Dict[str, Any]:
         """将已完成的科考推进到可领取状态。
@@ -283,7 +284,6 @@ class ExpeditionService:
                 reward_stub = {
                     "nickname": participant.get("nickname", ""),
                     "contribution": 0,
-                    "coins": 0,
                     "premium": 0,
                 }
                 self._record_user_expedition_result(user_id, expedition, reward_stub)
@@ -314,13 +314,7 @@ class ExpeditionService:
         base_premium = type_premium_base.get(expedition.get("type", ""), 1000)
         total_premium = int(base_premium * completion_rate)
 
-        join_cost = int(expedition.get("join_cost", 0) or 0)
-        participant_count = len(expedition.get("participants", {}))
-        pool_coins = int(participant_count * join_cost)
-        random_coin_rewards = self._distribute_lucky_money(pool_coins, participant_count)
-
         rewards = {}
-        reward_index = 0
         pending_claims = 0
         for user_id, participant in expedition.get("participants", {}).items():
             contribution_map = participant.get("contribution", {}) if isinstance(participant, dict) else {}
@@ -328,7 +322,6 @@ class ExpeditionService:
             reward = {
                 "nickname": participant.get("nickname", ""),
                 "contribution": user_contribution,
-                "coins": 0,
                 "premium": 0,
                 "claimed": False,
                 "claimed_at": "",
@@ -337,8 +330,6 @@ class ExpeditionService:
 
             if user_contribution > 0:
                 reward["premium"] = max(1, int(total_premium * (user_contribution / total_contribution)))
-                reward["coins"] = random_coin_rewards[reward_index] if reward_index < len(random_coin_rewards) else 0
-                reward_index += 1
                 pending_claims += 1
             else:
                 reward["claimed"] = True
@@ -354,13 +345,16 @@ class ExpeditionService:
             "━━━━━━━━━━━━━━━━━━━━",
             f"📊 完成度：{completion_rate * 100:.1f}%",
             f"💎 总钻石奖励：{total_premium}",
-            f"🎲 拼手气奖池：{pool_coins:,}金币",
         ]
 
+        report_lines.append("")
+        report_lines.append("✨ 特殊事件：")
         if event_results:
-            report_lines.append("")
-            report_lines.append("✨ 特殊事件：")
             report_lines.extend(event_results)
+        else:
+            report_lines.append("  本次科学考察无异象发生……")
+
+        expedition["special_events"] = list(event_results)
 
         report_lines.append("")
         report_lines.append("👤 待领取奖励：")
@@ -368,7 +362,6 @@ class ExpeditionService:
             status_text = "（已自动记账）" if reward.get("auto_claimed") else "（待领取）"
             report_lines.append(
                 f"  {reward['nickname']}: "
-                f"{int(reward.get('coins', 0) or 0):,}金币 + "
                 f"{int(reward.get('premium', 0) or 0)}钻石 {status_text}"
             )
 
@@ -396,13 +389,33 @@ class ExpeditionService:
         fishes = self.item_template_repo.get_fishes_by_rarity(rarity)
         if not fishes:
             return None
-        
+
         selected_fish = random.choice(fishes)
         return {
             "fish_id": selected_fish.fish_id,
             "fish_name": selected_fish.name,
             "rarity": selected_fish.rarity
         }
+
+    def _consume_join_pass(self, user_id: str, expedition_type: str) -> Optional[str]:
+        """检查并消耗加入科考的通行证。
+
+        Returns:
+            None 表示通行证已成功消耗；否则返回失败原因文案。
+        """
+        pass_item_id = self._JOIN_PASS_ITEM_IDS.get(expedition_type)
+        if pass_item_id is None:
+            return "未知的科考类型"
+
+        user_items = self.inventory_repo.get_user_item_inventory(user_id)
+        item_count = user_items.get(pass_item_id, 0)
+        if item_count < 1:
+            item_template = self.item_template_repo.get_item_by_id(pass_item_id)
+            item_name = item_template.name if item_template else "科考通行证"
+            return f"需要1张{item_name}才能加入科考"
+
+        self.inventory_repo.update_item_quantity(user_id, pass_item_id, -1)
+        return None
 
     def create_expedition(
         self, 
@@ -429,25 +442,22 @@ class ExpeditionService:
         # 确定科考参数
         type_config = {
             "short": {
-                "duration_hours": 24, 
-                "targets": 100, 
+                "duration_hours": 24,
+                "targets": 100,
                 "base_reward": 100,
                 "required_item_id": 35,  # 探险许可证
-                "join_cost": 1000000  # 100w金币
             },
             "medium": {
-                "duration_hours": 48, 
-                "targets": 500, 
+                "duration_hours": 48,
+                "targets": 500,
                 "base_reward": 500,
                 "required_item_id": 36,  # 征服许可证
-                "join_cost": 5000000  # 500w金币
             },
             "long": {
-                "duration_hours": 72, 
-                "targets": 1000, 
+                "duration_hours": 72,
+                "targets": 1000,
                 "base_reward": 1000,
                 "required_item_id": 37,  # 圣域许可证
-                "join_cost": 10000000  # 1000w金币
             },
         }
 
@@ -512,7 +522,6 @@ class ExpeditionService:
             "creator_id": creator_id,
             "creator_name": user.nickname or f"渔夫{creator_id[-4:]}",
             "base_reward": config["base_reward"],
-            "join_cost": config["join_cost"],  # 保存入场费用
             "targets": targets,
             "participants": {
                 creator_id: {
@@ -533,33 +542,29 @@ class ExpeditionService:
             "rare_fish_caught": {}  # 记录成员钓起的6~10星鱼ID: {user_id: [fish_ids]}
         }
 
-        # 自动添加被邀请的用户（需要支付入场费）
-        join_cost = config["join_cost"]
+        # 自动添加被邀请的用户
         failed_invites = []  # 记录无法加入的用户
-        
+
         if invited_users:
             for user_id in invited_users:
                 if user_id == creator_id:
                     continue
-                    
+
                 invited_user = self.user_repo.get_by_id(user_id)
                 if not invited_user:
                     continue
-                    
+
                 # 检查用户是否已在其他科考中
                 if self.get_user_expedition(user_id):
                     failed_invites.append((invited_user.nickname or f"渔夫{user_id[-4:]}", "已在其他科考中"))
                     continue
-                
-                # 检查并扣除入场费
-                if not invited_user.can_afford(join_cost):
-                    failed_invites.append((invited_user.nickname or f"渔夫{user_id[-4:]}", "金币不足"))
+
+                # 检查并消耗通行证
+                pass_error = self._consume_join_pass(user_id, expedition_type)
+                if pass_error:
+                    failed_invites.append((invited_user.nickname or f"渔夫{user_id[-4:]}", pass_error))
                     continue
-                
-                # 扣除金币
-                invited_user.coins -= join_cost
-                self.user_repo.update(invited_user)
-                
+
                 # 添加到科考队伍
                 expedition["participants"][user_id] = {
                     "user_id": user_id,
@@ -593,13 +598,12 @@ class ExpeditionService:
         message = (f"🔬 {type_names[expedition_type]}科考已发起！\n"
                   f"📋 邀请码：{expedition_id}\n"
                   f"⏰ 截止时间：{end_time.strftime('%m-%d %H:%M')}\n"
-                  f"💰 参与费用：{config['join_cost']:,}金币\n"
                   f"🎯 目标鱼类：\n{targets_text}\n\n")
-        
+
         # 添加邀请结果信息
         if invited_users:
             if success_count > 0:
-                message += f"✅ {success_count}位成员已自动加入并支付入场费\n"
+                message += f"✅ {success_count}位成员已自动加入\n"
             if failed_invites:
                 message += f"❌ {len(failed_invites)}位成员无法加入：\n"
                 for name, reason in failed_invites:
@@ -648,13 +652,10 @@ class ExpeditionService:
             if user_id in expedition["participants"]:
                 return {"success": False, "message": "你已经在这个科考队伍中了"}
 
-            # 检查并扣除金币
-            join_cost = expedition.get("join_cost", 0)
-            if not user.can_afford(join_cost):
-                return {"success": False, "message": f"金币不足，需要 {join_cost:,} 金币才能加入科考"}
-            
-            user.coins -= join_cost
-            self.user_repo.update(user)
+            # 检查并消耗通行证
+            pass_error = self._consume_join_pass(user_id, expedition.get("type", ""))
+            if pass_error:
+                return {"success": False, "message": pass_error}
 
             # 添加成员
             now = get_now()
@@ -679,8 +680,7 @@ class ExpeditionService:
                 "success": True,
                 "message": f"✅ 成功加入科考队伍！\n"
                           f"队长：{expedition['creator_name']}\n"
-                          f"当前成员：{len(expedition['participants'])}人\n"
-                          f"💸 支付了 {join_cost:,} 金币"
+                          f"当前成员：{len(expedition['participants'])}人"
             }
 
     def leave_expedition(self, user_id: str) -> Dict[str, Any]:
@@ -910,7 +910,6 @@ class ExpeditionService:
             message_parts.append(f"🔬 类型：{user_history['expedition_type']}")
             message_parts.append(f"📊 完成度：{user_history['completion_rate'] * 100:.1f}%")
             message_parts.append(f"🎯 贡献：{user_history['contribution']}条")
-            message_parts.append(f"💰 金币奖励：{user_history['coins_reward']:,}")
             message_parts.append(f"💎 钻石奖励：{user_history['premium_reward']}")
             message_parts.append(f"⏰ 结算时间：{user_history['settled_at']}")
         
@@ -1133,9 +1132,7 @@ class ExpeditionService:
             if not user:
                 return {"success": False, "message": "用户不存在"}
 
-            coins = int(reward.get("coins", 0) or 0)
             premium = int(reward.get("premium", 0) or 0)
-            user.coins += coins
             user.premium_currency += premium
             self.user_repo.update(user)
 
@@ -1159,10 +1156,47 @@ class ExpeditionService:
 
         return {
             "success": True,
-            "message": f"成功领取科考奖励：{coins:,}金币 + {premium}钻石",
+            "message": f"成功领取科考奖励：{premium}钻石",
             "reward": reward,
             "expedition_status": "ended" if should_prune else "claimable",
         }
+
+    def get_expedition_special_event(self, user_id: str, expedition_id: str) -> Dict[str, Any]:
+        """读取指定科考的特殊事件文本。
+
+        仅在科考完成（status 为 claimable/ended）时返回有效文本，否则返回 success=False。
+        """
+        if not expedition_id:
+            return {"success": False, "message": "缺少科考ID"}
+
+        # 触发一次进度推进，必要时把 active 100% 的科考推进到 claimable
+        self.update_expedition_progress(expedition_id)
+
+        with self._expedition_lock:
+            expeditions = self._load_expeditions()
+            expedition = expeditions.get(expedition_id)
+            if not isinstance(expedition, dict):
+                return {"success": False, "message": "科考不存在或已结束"}
+
+            if user_id and user_id not in expedition.get("participants", {}):
+                return {"success": False, "message": "你不是该科考成员"}
+
+            status = expedition.get("status", "active")
+            if status == "active":
+                return {"success": False, "message": "科考尚未完成"}
+
+            events = expedition.get("special_events", [])
+            if not isinstance(events, list):
+                events = []
+
+            has_event = bool(events)
+            text = "\n".join(events).strip() if has_event else "本次科学考察无异象发生……"
+
+            return {
+                "success": True,
+                "has_event": has_event,
+                "text": text,
+            }
 
     def schedule_active_expeditions(self) -> None:
         """兼容旧启动流程：科考不再安排自动结算。"""
@@ -1181,45 +1215,6 @@ class ExpeditionService:
                 timer.cancel()
             except Exception:
                 pass
-
-    def _distribute_lucky_money(self, total_amount: int, count: int) -> list:
-        """拼手气红包算法：随机分配金额
-        
-        Args:
-            total_amount: 总金额
-            count: 人数
-            
-        Returns:
-            每个人获得的金额列表
-        """
-        if count <= 0 or total_amount <= 0:
-            return []
-        
-        if count == 1:
-            return [total_amount]
-        
-        # 使用二倍均值算法
-        amounts = []
-        remaining = total_amount
-        
-        for i in range(count - 1):
-            # 每次随机分配 [1, 剩余金额/(剩余人数)*2] 之间的金额
-            # 确保每个人至少得到1金币
-            max_amount = int(remaining / (count - i) * 2)
-            if max_amount < 1:
-                max_amount = 1
-            
-            amount = random.randint(1, max(1, max_amount))
-            amounts.append(amount)
-            remaining -= amount
-        
-        # 最后一个人获得剩余所有金额
-        amounts.append(max(0, remaining))
-        
-        # 随机打乱顺序，增加随机性
-        random.shuffle(amounts)
-        
-        return amounts
 
     def _trigger_rarity_event(self, expedition: Dict[str, Any], rarity: int) -> Optional[str]:
         """触发星级完成事件判定
