@@ -63,6 +63,19 @@ def _save_credentials(credentials):
 USER_CREDENTIALS = _load_credentials()
 
 
+def _get_next_pond_upgrade(inventory_service, current_capacity: int) -> Dict[str, Any] | None:
+    """根据当前鱼塘容量查找下一档升级信息。"""
+    pond_upgrades = getattr(inventory_service, "config", {}).get("pond_upgrades", [])
+    for upgrade in pond_upgrades:
+        if int(upgrade.get("from", 0) or 0) == current_capacity:
+            return {
+                "from": int(upgrade.get("from", current_capacity) or current_capacity),
+                "to": int(upgrade.get("to", current_capacity) or current_capacity),
+                "cost": int(upgrade.get("cost", 0) or 0),
+            }
+    return None
+
+
 def _get_linuxdo_links_file():
     """获取 Linux.do OAuth 绑定文件路径"""
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
@@ -1246,6 +1259,36 @@ async def api_upgrade_exchange_capacity():
         logger.error(f"升级期货容量失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+
+@player_bp.route("/api/upgrade_fishpond_capacity", methods=["POST"])
+@login_required
+async def api_upgrade_fishpond_capacity():
+    """升级鱼塘容量API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        result = inventory_service.upgrade_fish_pond(user_id)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"升级鱼塘容量失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@player_bp.route("/api/upgrade_aquarium_capacity", methods=["POST"])
+@login_required
+async def api_upgrade_aquarium_capacity():
+    """升级水族箱容量API"""
+    user_id = session.get("user_id")
+    aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
+
+    try:
+        result = aquarium_service.upgrade_aquarium(user_id)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"升级水族箱容量失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @player_bp.route("/api/buy_commodity", methods=["POST"])
 @login_required
 async def api_buy_commodity():
@@ -2183,10 +2226,26 @@ async def fishpond():
         if rarity not in fish_by_rarity:
             fish_by_rarity[rarity] = []
         fish_by_rarity[rarity].append(fish)
-    
+
+    pond_capacity_result = inventory_service.get_user_fish_pond_capacity(user_id)
+    current_capacity = int(pond_capacity_result.get("fish_pond_capacity", 0) or 0)
+    current_count = int(
+        pond_capacity_result.get(
+            "current_fish_count",
+            pond_result.get("stats", {}).get("total_count", 0),
+        )
+        or 0
+    )
+    capacity_info = {
+        "current_quantity": current_count,
+        "current_capacity": current_capacity,
+        "next_upgrade": _get_next_pond_upgrade(inventory_service, current_capacity),
+    }
+
     return await render_template("fishpond.html",
                                   fish_by_rarity=fish_by_rarity,
-                                  stats=pond_result.get("stats", {}))
+                                  stats=pond_result.get("stats", {}),
+                                  capacity_info=capacity_info)
 
 @player_bp.route("/aquarium")
 @login_required
@@ -2205,6 +2264,19 @@ async def aquarium():
         if rarity not in fish_by_rarity:
             fish_by_rarity[rarity] = []
         fish_by_rarity[rarity].append(fish)
+
+    aquarium_upgrade_info = aquarium_service.get_aquarium_upgrade_info(user_id)
+    aquarium_stats = aquarium_result.get("stats", {})
+    capacity_info = {
+        "current_quantity": int(aquarium_stats.get("total_count", 0) or 0),
+        "current_capacity": int(
+            aquarium_upgrade_info.get("current_capacity", aquarium_stats.get("capacity", 0))
+            if aquarium_upgrade_info.get("success")
+            else aquarium_stats.get("capacity", 0)
+            or 0
+        ),
+        "next_upgrade": aquarium_upgrade_info.get("next_upgrade") if aquarium_upgrade_info.get("success") else None,
+    }
     
     # 读取展览评论数据（如果用户是展览者）
     exhibition_comments = {}
@@ -2221,7 +2293,8 @@ async def aquarium():
     
     return await render_template("aquarium.html",
                                   fish_by_rarity=fish_by_rarity,
-                                  stats=aquarium_result.get("stats", {}),
+                                  stats=aquarium_stats,
+                                  capacity_info=capacity_info,
                                   exhibition_comments=exhibition_comments,
                                   current_user_id=user_id)
 
