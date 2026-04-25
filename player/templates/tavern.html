@@ -301,7 +301,12 @@
                                         </div>
                                         <div class="mb-2">
                                             <small class="text-muted">
-                                                <i class="fas fa-clock"></i> 剩余时间：{{ exp.remaining_hours }}小时{{ exp.remaining_minutes }}分钟
+                                                <i class="fas fa-clock"></i>
+                                                {% if exp.is_overtime %}
+                                                已超时，继续完成任务后可领奖
+                                                {% else %}
+                                                剩余时间：{{ exp.remaining_hours }}小时{{ exp.remaining_minutes }}分钟
+                                                {% endif %}
                                             </small>
                                         </div>
                                         <div class="mb-3">
@@ -334,10 +339,28 @@
                                             </div>
                                         </div>
                                         <div class="mt-auto">
-                                            <button class="btn btn-sm btn-outline-primary w-100" 
-                                                    onclick="copyExpeditionCode('{{ exp.expedition_id }}')">
-                                                <i class="fas fa-copy"></i> 复制邀请码
-                                            </button>
+                                            <div class="d-grid gap-2">
+                                                <button class="btn btn-sm btn-outline-primary w-100" 
+                                                        onclick="copyExpeditionCode('{{ exp.expedition_id }}')">
+                                                    <i class="fas fa-copy"></i> 复制邀请码
+                                                </button>
+                                                <button class="btn btn-sm {% if exp.current_user_can_claim %}btn-success{% elif exp.current_user_claimed %}btn-outline-success{% else %}btn-outline-secondary{% endif %} w-100"
+                                                        {% if exp.current_user_can_claim %}
+                                                        onclick="claimExpeditionReward('{{ exp.expedition_id }}')"
+                                                        {% else %}
+                                                        disabled
+                                                        {% endif %}>
+                                                    <i class="fas fa-gift"></i>
+                                                    {% if exp.current_user_claimed %}
+                                                    已领取奖励
+                                                    {% else %}
+                                                    领取奖励
+                                                    {% endif %}
+                                                </button>
+                                                <small class="text-muted text-center">
+                                                    {{ exp.current_user_reward_text or '任务全部完成后可领取' }}
+                                                </small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -955,6 +978,31 @@ function copyExpeditionCode(code) {
     
     // 移除临时输入框
     document.body.removeChild(tempInput);
+}
+
+async function claimExpeditionReward(expeditionId) {
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_claim_expedition_reward") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                expedition_id: expeditionId
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            showToast(data.message || '领取成功！', 'success');
+            window.setTimeout(() => window.location.reload(), 500);
+            return;
+        }
+
+        showToast(data.message || '领取失败', 'error');
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
 }
 </script>
 

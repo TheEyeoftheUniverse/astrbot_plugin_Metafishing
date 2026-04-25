@@ -219,6 +219,173 @@ class ExpeditionService:
         self._save_history(history)
         logger.info(f"已保存用户 {user_id} 的科考结算记录")
 
+    @staticmethod
+    def _is_expedition_completed(expedition: Dict[str, Any]) -> bool:
+        """判断科考目标是否全部完成。"""
+        if not isinstance(expedition, dict):
+            return False
+
+        targets = expedition.get("targets", {})
+        if isinstance(targets, dict) and targets:
+            for target in targets.values():
+                if not isinstance(target, dict):
+                    continue
+                caught = int(target.get("caught", 0) or 0)
+                required = int(target.get("required", 0) or 0)
+                if caught < required:
+                    return False
+            return True
+
+        return float(expedition.get("total_progress", 0.0) or 0.0) >= 1.0
+
+    @staticmethod
+    def _format_reward_preview(reward: Dict[str, Any]) -> str:
+        if not isinstance(reward, dict):
+            return ""
+
+        coins = int(reward.get("coins", 0) or 0)
+        premium = int(reward.get("premium", 0) or 0)
+        if reward.get("claimed"):
+            return f"已领取 {coins:,}金币 + {premium}钻石"
+        if coins <= 0 and premium <= 0:
+            return "无可领取奖励"
+        return f"{coins:,}金币 + {premium}钻石"
+
+    def _prepare_expedition_claims_locked(self, expedition: Dict[str, Any]) -> Dict[str, Any]:
+        """将已完成的科考推进到可领取状态。
+
+        调用约束：必须在持有 `_expedition_lock` 的前提下调用。
+        """
+        if not isinstance(expedition, dict):
+            return {"changed": False, "status": "", "message": ""}
+
+        status = expedition.get("status", "active")
+        if status != "active":
+            return {
+                "changed": False,
+                "status": status,
+                "message": expedition.get("settlement_report", ""),
+            }
+
+        if not self._is_expedition_completed(expedition):
+            return {"changed": False, "status": "active", "message": ""}
+
+        now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
+
+        total_contribution = 0
+        for participant in expedition.get("participants", {}).values():
+            contribution_map = participant.get("contribution", {}) if isinstance(participant, dict) else {}
+            total_contribution += sum(int(amount or 0) for amount in contribution_map.values())
+
+        if total_contribution == 0:
+            report = "科考目标已完成，但无人贡献，无奖励可领取。"
+            for user_id, participant in expedition.get("participants", {}).items():
+                reward_stub = {
+                    "nickname": participant.get("nickname", ""),
+                    "contribution": 0,
+                    "coins": 0,
+                    "premium": 0,
+                }
+                self._record_user_expedition_result(user_id, expedition, reward_stub)
+
+            expedition["status"] = "ended"
+            expedition["completed_at"] = now_str
+            expedition["ended_at"] = now_str
+            expedition["settlement_report"] = report
+            expedition["rewards"] = {}
+            return {"changed": True, "status": "ended", "message": report}
+
+        completed_rarities = []
+        for target in expedition.get("targets", {}).values():
+            if not isinstance(target, dict):
+                continue
+            if int(target.get("caught", 0) or 0) >= int(target.get("required", 0) or 0):
+                completed_rarities.append(int(target.get("rarity", 0) or 0))
+
+        completed_rarities = sorted(set(completed_rarities))
+        event_results = []
+        for rarity in completed_rarities:
+            event_result = self._trigger_rarity_event(expedition, rarity)
+            if event_result:
+                event_results.append(event_result)
+
+        completion_rate = float(expedition.get("total_progress", 0.0) or 0.0)
+        type_premium_base = {"short": 1000, "medium": 5000, "long": 10000}
+        base_premium = type_premium_base.get(expedition.get("type", ""), 1000)
+        total_premium = int(base_premium * completion_rate)
+
+        join_cost = int(expedition.get("join_cost", 0) or 0)
+        participant_count = len(expedition.get("participants", {}))
+        pool_coins = int(participant_count * join_cost)
+        random_coin_rewards = self._distribute_lucky_money(pool_coins, participant_count)
+
+        rewards = {}
+        reward_index = 0
+        pending_claims = 0
+        for user_id, participant in expedition.get("participants", {}).items():
+            contribution_map = participant.get("contribution", {}) if isinstance(participant, dict) else {}
+            user_contribution = sum(int(amount or 0) for amount in contribution_map.values())
+            reward = {
+                "nickname": participant.get("nickname", ""),
+                "contribution": user_contribution,
+                "coins": 0,
+                "premium": 0,
+                "claimed": False,
+                "claimed_at": "",
+                "auto_claimed": False,
+            }
+
+            if user_contribution > 0:
+                reward["premium"] = max(1, int(total_premium * (user_contribution / total_contribution)))
+                reward["coins"] = random_coin_rewards[reward_index] if reward_index < len(random_coin_rewards) else 0
+                reward_index += 1
+                pending_claims += 1
+            else:
+                reward["claimed"] = True
+                reward["claimed_at"] = now_str
+                reward["auto_claimed"] = True
+                self._record_user_expedition_result(user_id, expedition, reward)
+
+            rewards[user_id] = reward
+
+        type_names = {"short": "探险", "medium": "征服", "long": "圣域"}
+        report_lines = [
+            f"🎉 {type_names.get(expedition.get('type', ''), '')}科考任务已完成！",
+            "━━━━━━━━━━━━━━━━━━━━",
+            f"📊 完成度：{completion_rate * 100:.1f}%",
+            f"💎 总钻石奖励：{total_premium}",
+            f"🎲 拼手气奖池：{pool_coins:,}金币",
+        ]
+
+        if event_results:
+            report_lines.append("")
+            report_lines.append("✨ 特殊事件：")
+            report_lines.extend(event_results)
+
+        report_lines.append("")
+        report_lines.append("👤 待领取奖励：")
+        for reward in sorted(rewards.values(), key=lambda item: item["contribution"], reverse=True):
+            status_text = "（已自动记账）" if reward.get("auto_claimed") else "（待领取）"
+            report_lines.append(
+                f"  {reward['nickname']}: "
+                f"{int(reward.get('coins', 0) or 0):,}金币 + "
+                f"{int(reward.get('premium', 0) or 0)}钻石 {status_text}"
+            )
+
+        expedition["completed_at"] = now_str
+        expedition["claimable_at"] = now_str
+        expedition["settlement_report"] = "\n".join(report_lines)
+        expedition["rewards"] = rewards
+        expedition.pop("ended_at", None)
+
+        if pending_claims > 0:
+            expedition["status"] = "claimable"
+            return {"changed": True, "status": "claimable", "message": expedition["settlement_report"]}
+
+        expedition["status"] = "ended"
+        expedition["ended_at"] = now_str
+        return {"changed": True, "status": "ended", "message": expedition["settlement_report"]}
+
     def _generate_expedition_id(self) -> str:
         """生成科考ID"""
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -413,9 +580,6 @@ class ExpeditionService:
             expeditions[expedition_id] = expedition
             self._save_expeditions(expeditions)
 
-        # 安排一次性自动结算
-        self._schedule_settlement(expedition_id, expedition["end_time"])
-
         # 生成目标鱼列表文本
         targets_text = "\n".join([
             f"  {'⭐' * t['rarity']} {t['fish_name']}：0/{t['required']}"
@@ -542,12 +706,28 @@ class ExpeditionService:
             return {"success": True, "message": "已退出科考队伍（你的贡献已保留，但不会获得最终奖励）"}
 
     def get_user_expedition(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """获取用户当前参与的科考"""
+        """获取用户当前参与的未完成科考。"""
         expeditions = self._load_expeditions()
         for exp in expeditions.values():
             if user_id in exp["participants"] and exp["status"] == "active":
                 return exp
         return None
+
+    def get_user_claimable_expeditions(self, user_id: str) -> List[Dict[str, Any]]:
+        """获取用户仍可领取奖励的科考列表。"""
+        expeditions = self._load_expeditions()
+        claimable = []
+        for exp in expeditions.values():
+            if exp.get("status") != "claimable":
+                continue
+            if user_id not in exp.get("participants", {}):
+                continue
+            reward = exp.get("rewards", {}).get(user_id, {})
+            if reward and reward.get("claimed"):
+                continue
+            claimable.append(exp)
+        claimable.sort(key=lambda item: item.get("claimable_at", item.get("completed_at", "")), reverse=True)
+        return claimable
 
     def update_expedition_progress(self, expedition_id: str) -> Dict[str, Any]:
         """
@@ -578,12 +758,19 @@ class ExpeditionService:
             total_required = sum(t["required"] for t in expedition["targets"].values())
             expedition["total_progress"] = total_caught / total_required if total_required > 0 else 0
 
+            transition = self._prepare_expedition_claims_locked(expedition)
+
             expeditions[expedition_id] = expedition
             self._save_expeditions(expeditions)
+
+        if transition.get("status") == "ended":
+            self._prune_storage_to_current_and_last()
 
         logger.info(
             f"科考 {expedition_id} 进度已汇总完成，总进度：{expedition['total_progress']*100:.1f}%"
         )
+        if transition.get("status") == "claimable":
+            return {"success": True, "message": "科考任务已完成，奖励待领取", "claimable": True}
         return {"success": True, "message": "科考进度已更新"}
 
     def update_expedition_on_sell_fish(self, user_id: str, sold_fish: Dict[int, int]) -> Dict[str, Any]:
@@ -611,11 +798,8 @@ class ExpeditionService:
                 return None
             
             expedition = expeditions[expedition_id]
-            
-            # 检查科考是否已经结束
-            now = get_now()
-            end_time = datetime.strptime(expedition["end_time"], "%Y-%m-%d %H:%M:%S")
-            if now > end_time:
+
+            if expedition.get("status") != "active":
                 return None  # 科考已结束，不再接受进度更新
             
             # 初始化稀有鱼记录
@@ -672,10 +856,15 @@ class ExpeditionService:
                 total_caught = sum(t["caught"] for t in expedition["targets"].values())
                 total_required = sum(t["required"] for t in expedition["targets"].values())
                 expedition["total_progress"] = total_caught / total_required if total_required > 0 else 0
-            
+
+            transition = self._prepare_expedition_claims_locked(expedition)
+
             # 保存更新
             expeditions[expedition_id] = expedition
             self._save_expeditions(expeditions)
+
+        if transition.get("status") == "ended":
+            self._prune_storage_to_current_and_last()
         
         # 若没有目标鱼更新，则只记录稀有鱼池，不向外层提示
         if not has_target_update:
@@ -691,7 +880,12 @@ class ExpeditionService:
             f"科考 {expedition_id} 进度已更新（用户出售鱼触发），总进度：{expedition['total_progress']*100:.1f}%"
         )
 
-        return {"updated": True, "targets": updated_targets, "total_progress": expedition["total_progress"]}
+        return {
+            "updated": True,
+            "targets": updated_targets,
+            "total_progress": expedition["total_progress"],
+            "claimable": transition.get("status") == "claimable",
+        }
 
     def get_expedition_status(self, user_id: str) -> Dict[str, Any]:
         """获取用户当前科考的详细状态"""
@@ -699,11 +893,12 @@ class ExpeditionService:
         history = self._load_history()
         user_history = history.get(user_id)
         
-        # 获取当前科考
+        # 获取当前进行中的科考与待领取奖励
         expedition = self.get_user_expedition(user_id)
-        
-        # 如果既没有历史记录也不在科考中
-        if not user_history and not expedition:
+        claimable_expeditions = self.get_user_claimable_expeditions(user_id)
+
+        # 如果既没有历史记录，也没有进行中科考，也没有待领取奖励
+        if not user_history and not expedition and not claimable_expeditions:
             return {"success": False, "message": "你还没有参加过任何科考"}
         
         message_parts = []
@@ -719,6 +914,26 @@ class ExpeditionService:
             message_parts.append(f"💎 钻石奖励：{user_history['premium_reward']}")
             message_parts.append(f"⏰ 结算时间：{user_history['settled_at']}")
         
+        if not expedition and claimable_expeditions:
+            if user_history:
+                message_parts.append("")
+                message_parts.append("")
+            message_parts.append("")
+            message_parts.append("🎁 待领取科考奖励")
+            message_parts.append("━━━━━━━━━━━━━━━━━━━━")
+            type_names = {"short": "探险", "medium": "征服", "long": "圣域"}
+            for claimable in claimable_expeditions[:5]:
+                reward = claimable.get("rewards", {}).get(user_id, {})
+                message_parts.append(
+                    f"  [{claimable.get('expedition_id', '')}] "
+                    f"{type_names.get(claimable.get('type', ''), claimable.get('type', ''))}: "
+                    f"{self._format_reward_preview(reward)}"
+                )
+            return {
+                "success": True,
+                "message": "\n".join(part for part in message_parts if part is not None)
+            }
+
         # 如果当前不在科考中，只返回历史记录
         if not expedition:
             return {
@@ -730,38 +945,10 @@ class ExpeditionService:
         if user_history:
             message_parts.append("")
             message_parts.append("")
-        
+
         expedition_id = expedition["expedition_id"]
-        
-        # 检查科考是否已经超时
         end_time = datetime.strptime(expedition["end_time"], "%Y-%m-%d %H:%M:%S")
         now = get_now()
-        
-        # 如果科考已超时，自动结算并返回结算信息（不再依赖队长触发）
-        if now > end_time:
-            logger.info(f"科考 {expedition_id} 已超时，用户 {user_id} 查看状态时触发自动结算")
-            settle_result = self._settle_expedition(expedition_id, manual=False)
-            
-            # 结算后重新加载历史记录，确保本次结算被读取
-            history_after = self._load_history()
-            user_history_after = history_after.get(user_id)
-            combined_parts = []
-            if user_history_after:
-                combined_parts.append("📜 上次科考结算记录")
-                combined_parts.append("━━━━━━━━━━━━━━━━━━━━")
-                combined_parts.append(f"🔬 类型：{user_history_after['expedition_type']}")
-                combined_parts.append(f"📊 完成度：{user_history_after['completion_rate'] * 100:.1f}%")
-                combined_parts.append(f"🎯 贡献：{user_history_after['contribution']}条")
-                combined_parts.append(f"💰 金币奖励：{user_history_after['coins_reward']:,}")
-                combined_parts.append(f"💎 钻石奖励：{user_history_after['premium_reward']}")
-                combined_parts.append(f"⏰ 结算时间：{user_history_after['settled_at']}")
-                combined_parts.append("")
-            # 追加这次结算报告
-            combined_parts.append(settle_result.get("message", ""))
-            return {
-                "success": True,
-                "message": "\n".join(combined_parts)
-            }
 
         # 显示当前科考状态
         message_parts.append(f"🔬 当前科考状态 [{expedition['expedition_id']}]")
@@ -800,7 +987,10 @@ class ExpeditionService:
         message_parts.append(f"📋 类型：{type_names.get(expedition['type'], expedition['type'])}")
         message_parts.append(f"👑 队长：{expedition['creator_name']}")
         message_parts.append(f"👥 成员：{len(expedition['participants'])}人")
-        message_parts.append(f"⏰ 剩余时间：{hours}小时{minutes}分钟")
+        if remaining.total_seconds() >= 0:
+            message_parts.append(f"⏰ 剩余时间：{hours}小时{minutes}分钟")
+        else:
+            message_parts.append("⏰ 已超时：不会自动结算，继续完成全部任务后可领取奖励")
         message_parts.append(f"📊 总进度：{expedition['total_progress'] * 100:.1f}%")
         message_parts.append("")
         message_parts.append("🎯 目标鱼类：")
@@ -808,6 +998,17 @@ class ExpeditionService:
         message_parts.append("")
         message_parts.append("👤 贡献排行：")
         message_parts.extend(participants_info[:5])
+        if claimable_expeditions:
+            message_parts.append("")
+            message_parts.append("🎁 你还有其他待领取奖励：")
+            type_names = {"short": "探险", "medium": "征服", "long": "圣域"}
+            for claimable in claimable_expeditions[:3]:
+                reward = claimable.get("rewards", {}).get(user_id, {})
+                message_parts.append(
+                    f"  [{claimable.get('expedition_id', '')}] "
+                    f"{type_names.get(claimable.get('type', ''), claimable.get('type', ''))}: "
+                    f"{self._format_reward_preview(reward)}"
+                )
 
         return {
             "success": True,
@@ -840,226 +1041,136 @@ class ExpeditionService:
             expeditions[expedition_id] = exp
             self._save_expeditions(expeditions)
         
+        self.update_expedition_progress(expedition_id)
         logger.info(f"管理员 {user_id} 将科考 {expedition_id} 强制设置为100%完成")
-        
+
         return {
             "success": True,
-            "message": f"✅ 科考 {expedition_id} 已强制设置为100%完成！\n可以使用 /结束科考 命令进行结算。"
+            "message": f"✅ 科考 {expedition_id} 已强制设置为100%完成！\n奖励将改为成员各自领取。"
         }
 
     def end_expedition(self, user_id: str) -> Dict[str, Any]:
-        """结束科考（仅队长可用）"""
+        """兼容旧命令：不再手动结算，只给出当前规则提示。"""
         expedition = self.get_user_expedition(user_id)
-        if not expedition:
-            return {"success": False, "message": "你不在任何科考队伍中"}
-
-        if user_id != expedition["creator_id"]:
-            return {"success": False, "message": "只有队长可以结束科考"}
-
-        # 执行结算
-        return self._settle_expedition(expedition["expedition_id"], manual=True)
-
-    def _settle_expedition(self, expedition_id: str, manual: bool = False) -> Dict[str, Any]:
-        """结算科考"""
-        with self._expedition_lock:
-            expeditions = self._load_expeditions()
-            if expedition_id not in expeditions:
-                return {"success": False, "message": "科考不存在"}
-
-            expedition = expeditions[expedition_id]
-            if expedition.get("status") == "ended":
-                return {"success": True, "message": expedition.get("settlement_report", "科考已结算")}
-            
-            # 在结算前强制汇总一次进度，确保包含最新的出售贡献
-            logger.info(f"科考 {expedition_id} 结算前强制更新进度")
-            self.update_expedition_progress(expedition_id)
-            # 重新加载最新数据
-            expeditions = self._load_expeditions()
-            expedition = expeditions[expedition_id]
-            
-            # 计算总贡献
-            total_contribution = 0
-            for participant in expedition["participants"].values():
-                total_contribution += sum(participant["contribution"].values())
-
-            if total_contribution == 0:
-                # 没有任何贡献：仍记录结算历史（贡献/奖励均为0），便于队长和成员查询“上次科考”
-                completion_rate = expedition.get("total_progress", 0)
-                for user_id, participant in expedition["participants"].items():
-                    reward_stub = {
-                        "nickname": participant.get("nickname", ""),
-                        "contribution": 0,
-                        "coins": 0,
-                        "premium": 0,
-                    }
-                    self._record_user_expedition_result(user_id, expedition, reward_stub)
-                # 标记为已结束并保留记录，不删除
-                expedition["status"] = "ended"
-                expedition["ended_at"] = get_now().strftime("%Y-%m-%d %H:%M:%S")
-                expeditions[expedition_id] = expedition
-                self._save_expeditions(expeditions)
-                # 修剪：仅保留进行中和最近一条已结束科考
-                self._prune_storage_to_current_and_last()
+        if expedition:
+            self.update_expedition_progress(expedition["expedition_id"])
+            refreshed = self._load_expeditions().get(expedition["expedition_id"], expedition)
+            if refreshed.get("status") == "claimable":
                 return {
                     "success": True,
-                    "message": "科考已结束（无人贡献，无奖励发放）"
+                    "message": "科考任务已完成，奖励改为成员各自领取，不再手动结束整队结算。\n"
+                               + refreshed.get("settlement_report", "")
                 }
-
-            # 检查星级完成度并触发事件
-            completed_rarities = []
-            for target_key, target in expedition["targets"].items():
-                if target["caught"] >= target["required"]:
-                    completed_rarities.append(target["rarity"])
-            
-            # 去重并排序
-            completed_rarities = sorted(set(completed_rarities))
-            
-            # 触发事件判定
-            event_results = []
-            for rarity in completed_rarities:
-                event_result = self._trigger_rarity_event(expedition, rarity)
-                if event_result:
-                    event_results.append(event_result)
-            
-            # 计算队伍总奖励
-            completion_rate = expedition["total_progress"]
-            
-            # 钻石奖励基础值
-            type_premium_base = {"short": 1000, "medium": 5000, "long": 10000}
-            base_premium = type_premium_base.get(expedition["type"], 1000)
-            total_premium = int(base_premium * completion_rate)
-            
-            # 计算拼手气红包奖池（参与人数 × 入场费）
-            join_cost = expedition.get("join_cost", 0)
-            participant_count = len(expedition["participants"])
-            pool_coins = int(participant_count * join_cost)
-            
-            # 随机分配奖池金币（拼手气红包算法）
-            random_coin_rewards = self._distribute_lucky_money(pool_coins, participant_count)
-
-            # 分配奖励给各成员
-            rewards = {}
-            reward_index = 0
-            for user_id, participant in expedition["participants"].items():
-                user_contribution = sum(participant["contribution"].values())
-                if user_contribution > 0:
-                    # 按贡献比例分配钻石
-                    personal_premium = max(1, int(total_premium * (user_contribution / total_contribution)))
-                    
-                    # 获取随机金币奖励（拼手气红包）
-                    random_coins = random_coin_rewards[reward_index] if reward_index < len(random_coin_rewards) else 0
-                    reward_index += 1
-                    
-                    # 发放金币和钻石
-                    user = self.user_repo.get_by_id(user_id)
-                    if user:
-                        # 只有随机金币奖励
-                        user.coins += random_coins
-                        
-                        # 钻石奖励
-                        user.premium_currency += personal_premium
-                        
-                        self.user_repo.update(user)
-                        
-                        rewards[user_id] = {
-                            "nickname": participant["nickname"],
-                            "contribution": user_contribution,
-                            "coins": random_coins,
-                            "premium": personal_premium
-                        }
-                        
-                        # 保存用户的科考结算记录
-                        self._record_user_expedition_result(user_id, expedition, rewards[user_id])
-
-            # 确保所有参与者（即使贡献为0）也有“上次科考”历史记录可查
-            for user_id, participant in expedition["participants"].items():
-                if user_id in rewards:
-                    continue
-                reward_stub = {
-                    "nickname": participant.get("nickname", ""),
-                    "contribution": 0,
-                    "coins": 0,
-                    "premium": 0,
-                }
-                self._record_user_expedition_result(user_id, expedition, reward_stub)
-
-            # 生成结算报告
-            type_names = {"short": "探险", "medium": "征服", "long": "圣域"}
-            report_lines = [
-                f"🎉 {type_names.get(expedition['type'], '')}科考已结束！",
-                f"━━━━━━━━━━━━━━━━━━━━",
-                f"📊 完成度：{completion_rate * 100:.1f}%",
-                f"💎 总钻石奖励：{total_premium}",
-                f"🎲 拼手气奖池：{pool_coins:,}金币"
-            ]
-            
-            # 添加事件结果
-            if event_results:
-                report_lines.append("")
-                report_lines.append("✨ 特殊事件：")
-                for event in event_results:
-                    report_lines.append(event)
-            
-            report_lines.append("")
-            report_lines.append("👤 个人奖励：")
-
-            for reward in sorted(rewards.values(), key=lambda x: x["contribution"], reverse=True):
-                report_lines.append(
-                    f"  {reward['nickname']}: "
-                    f"{reward['coins']:,}金币 + "
-                    f"{reward['premium']}钻石"
-                )
-
-            # 标记为已结束并保留记录（包含结算报告）
-            expedition["status"] = "ended"
-            expedition["ended_at"] = get_now().strftime("%Y-%m-%d %H:%M:%S")
-            expedition["settlement_report"] = "\n".join(report_lines)
-            expeditions[expedition_id] = expedition
-            self._save_expeditions(expeditions)
-            self._cancel_settlement_timer(expedition_id)
-            # 修剪：仅保留进行中和最近一条已结束科考
-            self._prune_storage_to_current_and_last()
-
             return {
-                "success": True,
-                "message": "\n".join(report_lines),
-                "rewards": rewards
+                "success": False,
+                "message": "科考不会因超时或手动命令直接结算，请继续完成全部任务后再分别领取奖励。"
             }
 
-    def schedule_active_expeditions(self) -> None:
-        """为当前进行中的科考安排一次性结算任务（仅在启动时调用）"""
+        claimable_expeditions = self.get_user_claimable_expeditions(user_id)
+        if claimable_expeditions:
+            return {
+                "success": True,
+                "message": "你有待领取的科考奖励。请通过前端对应科考卡片或结算窗口逐个领取。"
+            }
+
+        return {"success": False, "message": "你当前没有可结束的科考"}
+
+    def _settle_expedition(self, expedition_id: str, manual: bool = False) -> Dict[str, Any]:
+        """兼容旧接口：仅推进到可领取状态，不再直接发奖。"""
+        update_result = self.update_expedition_progress(expedition_id)
         expeditions = self._load_expeditions()
-        for exp_id, exp in expeditions.items():
-            if exp.get("status", "active") != "active":
-                continue
-            end_time = exp.get("end_time")
-            if not end_time:
-                continue
-            self._schedule_settlement(exp_id, end_time)
+        expedition = expeditions.get(expedition_id)
+        if not expedition:
+            return {"success": False, "message": "科考不存在"}
+        if expedition.get("status") == "claimable":
+            return {
+                "success": True,
+                "message": expedition.get("settlement_report", "科考任务已完成，奖励待领取"),
+                "rewards": expedition.get("rewards", {}),
+            }
+        if expedition.get("status") == "ended":
+            return {"success": True, "message": expedition.get("settlement_report", "科考已结束")}
+        return {
+            "success": False,
+            "message": update_result.get("message", "科考任务尚未全部完成，暂时不能领取奖励"),
+        }
+
+    def claim_expedition_reward(self, user_id: str, expedition_id: str) -> Dict[str, Any]:
+        """领取指定科考的个人奖励。"""
+        if not expedition_id:
+            return {"success": False, "message": "缺少科考ID"}
+
+        self.update_expedition_progress(expedition_id)
+
+        should_prune = False
+        with self._expedition_lock:
+            expeditions = self._load_expeditions()
+            expedition = expeditions.get(expedition_id)
+            if not expedition:
+                return {"success": False, "message": "科考不存在或已结束"}
+
+            if user_id not in expedition.get("participants", {}):
+                return {"success": False, "message": "你不是该科考成员"}
+
+            status = expedition.get("status", "active")
+            if status == "active":
+                return {"success": False, "message": "科考任务尚未全部完成，暂时不能领取奖励"}
+
+            rewards = expedition.get("rewards", {}) if isinstance(expedition.get("rewards", {}), dict) else {}
+            reward = rewards.get(user_id)
+            if not isinstance(reward, dict):
+                return {"success": True, "already_claimed": True, "message": "你当前没有可领取的科考奖励"}
+
+            if reward.get("claimed"):
+                return {
+                    "success": True,
+                    "already_claimed": True,
+                    "message": "你已经领取过该科考奖励了",
+                    "reward": reward,
+                }
+
+            user = self.user_repo.get_by_id(user_id)
+            if not user:
+                return {"success": False, "message": "用户不存在"}
+
+            coins = int(reward.get("coins", 0) or 0)
+            premium = int(reward.get("premium", 0) or 0)
+            user.coins += coins
+            user.premium_currency += premium
+            self.user_repo.update(user)
+
+            now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
+            reward["claimed"] = True
+            reward["claimed_at"] = now_str
+            rewards[user_id] = reward
+            expedition["rewards"] = rewards
+            self._record_user_expedition_result(user_id, expedition, reward)
+
+            if all(entry.get("claimed") for entry in rewards.values()):
+                expedition["status"] = "ended"
+                expedition["ended_at"] = now_str
+                should_prune = True
+
+            expeditions[expedition_id] = expedition
+            self._save_expeditions(expeditions)
+
+        if should_prune:
+            self._prune_storage_to_current_and_last()
+
+        return {
+            "success": True,
+            "message": f"成功领取科考奖励：{coins:,}金币 + {premium}钻石",
+            "reward": reward,
+            "expedition_status": "ended" if should_prune else "claimable",
+        }
+
+    def schedule_active_expeditions(self) -> None:
+        """兼容旧启动流程：科考不再安排自动结算。"""
+        return None
 
     def _schedule_settlement(self, expedition_id: str, end_time_str: str) -> None:
-        """安排单次结算定时器"""
-        try:
-            with self._expedition_lock:
-                if expedition_id in self._settle_timers:
-                    return
-            end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-            now = get_now()
-            delay = max(0, (end_time - now).total_seconds())
-
-            def _settle_job():
-                try:
-                    self._settle_expedition(expedition_id, manual=False)
-                except Exception as e:
-                    logger.error(f"科考自动结算失败: {e}")
-
-            timer = threading.Timer(delay, _settle_job)
-            timer.daemon = True
-            with self._expedition_lock:
-                self._settle_timers[expedition_id] = timer
-            timer.start()
-        except Exception as e:
-            logger.error(f"安排科考结算失败: {e}")
+        """兼容旧接口：不再安排自动结算。"""
+        return None
 
     def _cancel_settlement_timer(self, expedition_id: str) -> None:
         """取消定时器"""
@@ -1239,60 +1350,61 @@ class ExpeditionService:
         
         return None
 
-    def get_all_active_expeditions(self) -> List[Dict[str, Any]]:
-        """获取所有进行中的科考（用于WebUI显示）"""
-        expeditions = self._load_expeditions()
+    def get_all_active_expeditions(self, current_user_id: str = "") -> List[Dict[str, Any]]:
+        """获取可展示的科考列表（未完成中 + 已完成待领取）。"""
         active_list = []
-        
-        for exp in expeditions.values():
-            if exp["status"] == "active":
-                # 计算剩余时间
+        changed = False
+
+        with self._expedition_lock:
+            expeditions = self._load_expeditions()
+
+            for exp in expeditions.values():
+                if exp.get("status", "active") == "active" and self._is_expedition_completed(exp):
+                    self._prepare_expedition_claims_locked(exp)
+                    changed = True
+
+                if exp.get("status") not in ("active", "claimable"):
+                    continue
+
                 end_time = datetime.strptime(exp["end_time"], "%Y-%m-%d %H:%M:%S")
                 now = get_now()
                 remaining = end_time - now
-                
-                if remaining.total_seconds() > 0:
-                    active_list.append({
-                        "expedition_id": exp["expedition_id"],
-                        "type": exp["type"],
-                        "creator_name": exp["creator_name"],
-                        "member_count": len(exp["participants"]),
-                        "total_progress": exp["total_progress"],
-                        "targets": exp["targets"],
-                        "participants": exp["participants"],
-                        "remaining_hours": int(remaining.total_seconds() / 3600),
-                        "remaining_minutes": int((remaining.total_seconds() % 3600) / 60)
-                    })
-        
+                remaining_seconds = max(0, int(remaining.total_seconds()))
+                rewards = exp.get("rewards", {}) if isinstance(exp.get("rewards", {}), dict) else {}
+                current_reward = rewards.get(current_user_id, {}) if current_user_id else {}
+                current_user_claimed = bool(current_reward.get("claimed")) if isinstance(current_reward, dict) else False
+                current_user_can_claim = (
+                    exp.get("status") == "claimable"
+                    and bool(current_user_id)
+                    and current_user_id in exp.get("participants", {})
+                    and isinstance(current_reward, dict)
+                    and not current_user_claimed
+                )
+
+                active_list.append({
+                    "expedition_id": exp["expedition_id"],
+                    "type": exp["type"],
+                    "creator_name": exp["creator_name"],
+                    "member_count": len(exp["participants"]),
+                    "total_progress": exp["total_progress"],
+                    "targets": exp["targets"],
+                    "participants": exp["participants"],
+                    "status": exp.get("status", "active"),
+                    "is_completed": self._is_expedition_completed(exp),
+                    "current_user_can_claim": current_user_can_claim,
+                    "current_user_claimed": current_user_claimed,
+                    "current_user_reward": current_reward if isinstance(current_reward, dict) else {},
+                    "current_user_reward_text": self._format_reward_preview(current_reward if isinstance(current_reward, dict) else {}),
+                    "remaining_hours": int(remaining_seconds / 3600),
+                    "remaining_minutes": int((remaining_seconds % 3600) / 60),
+                    "is_overtime": remaining.total_seconds() < 0,
+                })
+
+            if changed:
+                self._save_expeditions(expeditions)
+
         return active_list
 
     def auto_settle_expired_expeditions(self) -> int:
-        """自动结算所有已超时的科考，返回结算数量"""
-        settled_count = 0
-        try:
-            with self._expedition_lock:
-                expeditions = self._load_expeditions()
-                now = get_now()
-                expired_ids = []
-
-                for exp_id, exp in expeditions.items():
-                    if exp.get("status", "active") != "active":
-                        continue
-                    end_time_str = exp.get("end_time")
-                    if not end_time_str:
-                        continue
-                    try:
-                        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-                    except Exception:
-                        continue
-                    if now > end_time:
-                        expired_ids.append(exp_id)
-
-            for exp_id in expired_ids:
-                result = self._settle_expedition(exp_id, manual=False)
-                if result and result.get("success"):
-                    settled_count += 1
-        except Exception as e:
-            logger.error(f"自动结算科考失败: {e}")
-
-        return settled_count
+        """兼容旧调度入口：科考超时后不再自动结算。"""
+        return 0

@@ -283,6 +283,17 @@ def _serialize_tavern_expedition(expedition):
     total_progress = float(expedition.get("total_progress", 0.0) or 0.0)
     total_progress = max(0.0, min(1.0, total_progress))
     contribution_board = _build_tavern_expedition_contribution_board(expedition)
+    current_user_id = session.get("user_id", "") or ""
+    rewards = expedition.get("rewards", {}) if isinstance(expedition.get("rewards", {}), dict) else {}
+    current_reward = rewards.get(current_user_id, {}) if current_user_id else {}
+    current_user_claimed = bool(current_reward.get("claimed")) if isinstance(current_reward, dict) else False
+    current_user_can_claim = (
+        expedition.get("status", "active") == "claimable"
+        and bool(current_user_id)
+        and current_user_id in (expedition.get("participants", {}) if isinstance(expedition.get("participants", {}), dict) else {})
+        and isinstance(current_reward, dict)
+        and not current_user_claimed
+    )
 
     return {
         "expedition_id": expedition.get("expedition_id", "") or "",
@@ -291,10 +302,28 @@ def _serialize_tavern_expedition(expedition):
         "member_count": int(expedition.get("member_count", 0) or 0),
         "total_progress": total_progress,
         "progress_percent": round(total_progress * 100.0, 1),
+        "status": expedition.get("status", "active") or "active",
+        "is_completed": total_progress >= 1.0 or expedition.get("status") == "claimable",
+        "current_user_can_claim": current_user_can_claim,
+        "current_user_claimed": current_user_claimed,
+        "current_user_reward_text": _format_tavern_expedition_reward_preview(current_reward),
         "targets_text": _build_tavern_expedition_targets_text(expedition),
         "targets": _build_tavern_expedition_targets(expedition),
         "contribution_board": contribution_board,
     }
+
+
+def _format_tavern_expedition_reward_preview(reward):
+    if not isinstance(reward, dict):
+        return ""
+
+    coins = int(reward.get("coins", 0) or 0)
+    premium = int(reward.get("premium", 0) or 0)
+    if reward.get("claimed"):
+        return f"已领取 {coins:,}金币 + {premium}钻石"
+    if coins <= 0 and premium <= 0:
+        return "无可领取奖励"
+    return f"{coins:,}金币 + {premium}钻石"
 
 
 def _build_tavern_expedition_targets_text(expedition):
@@ -358,6 +387,7 @@ def _build_tavern_expedition_contribution_board(expedition):
     creator_id = expedition.get("creator_id", "") or ""
     current_user_id = session.get("user_id", "") or ""
 
+    rewards = expedition.get("rewards", {}) if isinstance(expedition.get("rewards", {}), dict) else {}
     total_contribution = 0
     participant_rows = []
     for user_id, participant in participants.items():
@@ -381,15 +411,14 @@ def _build_tavern_expedition_contribution_board(expedition):
     base_premium = type_premium_base.get(expedition.get("type", ""), 1000)
     total_premium = int(base_premium * total_progress)
     for row in participant_rows:
+        reward = rewards.get(row["user_id"], {}) if isinstance(rewards.get(row["user_id"], {}), dict) else {}
         if total_contribution > 0 and row["contribution"] > 0:
             contribution_percent = (row["contribution"] / total_contribution) * 100.0
-            estimated_premium = max(1, int(total_premium * (row["contribution"] / total_contribution)))
         else:
             contribution_percent = 0.0
-            estimated_premium = 0
 
         row["contribution_percent"] = contribution_percent
-        row["estimated_reward"] = ""
+        row["estimated_reward"] = _format_tavern_expedition_reward_preview(reward)
 
     participant_rows.sort(
         key=lambda item: (
@@ -2387,7 +2416,8 @@ async def get_tavern_expeditions():
         return jsonify({"success": False, "message": "系统配置错误"}), 500
 
     try:
-        expeditions = expedition_service.get_all_active_expeditions() or []
+        user_id = session.get("user_id", "") or ""
+        expeditions = expedition_service.get_all_active_expeditions(user_id) or []
         serialized = [
             item for item in
             (_serialize_tavern_expedition(expedition) for expedition in expeditions)
@@ -2403,6 +2433,24 @@ async def get_tavern_expeditions():
     except Exception as e:
         logger.error(f"获取科学考察列表失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/tavern/expeditions/<expedition_id>/claim", methods=["POST"])
+@api_login_required
+async def claim_tavern_expedition_reward(expedition_id):
+    """领取当前用户在指定科考中的个人奖励"""
+    user_id = session.get("user_id", "") or ""
+    expedition_service = current_app.config.get("EXPEDITION_SERVICE")
+    if expedition_service is None:
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = expedition_service.claim_expedition_reward(user_id, expedition_id)
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    except Exception as e:
+        logger.error(f"领取科考奖励失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"领取失败: {str(e)}"}), 500
 
 
 @user_api_bp.route("/profile/update", methods=["POST"])

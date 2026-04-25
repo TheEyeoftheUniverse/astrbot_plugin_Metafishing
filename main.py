@@ -260,8 +260,6 @@ class FishingPlugin(Star):
             self.log_repo,
             self.game_config,
         )
-        # 启动时为已存在的进行中科考安排一次性结算定时器
-        self.expedition_service.schedule_active_expeditions()
         
         # 将科考服务注入到库存服务
         self.inventory_service.expedition_service = self.expedition_service
@@ -759,7 +757,7 @@ class FishingPlugin(Star):
 
     @filter.command("结束科考")
     async def end_expedition(self, event: AstrMessageEvent):
-        """结束科考并结算（仅队长）"""
+        """查看科考结束/领奖规则提示"""
         from .handlers.expedition_handlers import ExpeditionHandlers
         handlers = ExpeditionHandlers(self.expedition_service)
         result = await handlers.end_expedition(self, event)

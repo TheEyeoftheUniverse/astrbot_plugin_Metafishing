@@ -1691,6 +1691,25 @@ async def api_perform_multi_draw():
         logger.error(f"多次十连失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+
+@player_bp.route("/api/claim_expedition_reward", methods=["POST"])
+@login_required
+async def api_claim_expedition_reward():
+    """领取指定科考的个人奖励。"""
+    user_id = session.get("user_id")
+    expedition_service = current_app.config.get("EXPEDITION_SERVICE")
+    if expedition_service is None:
+        return jsonify({"success": False, "message": "科考服务未初始化"}), 500
+
+    try:
+        data = await request.get_json()
+        expedition_id = str((data or {}).get("expedition_id", "") or "").strip()
+        result = expedition_service.claim_expedition_reward(user_id, expedition_id)
+        return jsonify(result), (200 if result.get("success") else 400)
+    except Exception as e:
+        logger.error(f"领取科考奖励失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"领取失败: {str(e)}"}), 500
+
 @player_bp.route("/api/post_message", methods=["POST"])
 @login_required
 async def api_post_message():
@@ -2567,7 +2586,7 @@ async def tavern():
     active_expeditions = []
     if expedition_service:
         try:
-            active_expeditions = expedition_service.get_all_active_expeditions()
+            active_expeditions = expedition_service.get_all_active_expeditions(user_id)
             logger.info(f"成功获取科考数据，共{len(active_expeditions)}个进行中的科考")
             if active_expeditions:
                 logger.info(f"科考数据示例: {active_expeditions[0]}")
