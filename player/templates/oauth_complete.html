@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>登录完成 - 钓鱼游戏</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/litera/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body class="bg-body-tertiary">
+<main class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 p-md-5 text-center">
+                    <div class="display-5 text-success mb-3">
+                        <i class="fas fa-circle-check"></i>
+                    </div>
+                    <h1 class="h3 mb-3">Linux.do 登录已完成</h1>
+                    <p class="text-muted mb-2">当前账号已绑定到游戏用户 <strong>{{ nickname }}</strong>（{{ linked_user_id }}）。</p>
+                    {% if unity_ticket_ready %}
+                    <p class="text-muted mb-4">游戏会自动同步登录状态，你现在可以返回 Unity 客户端继续操作。</p>
+                    {% else %}
+                    <p class="text-muted mb-4">浏览器登录已经完成，但游戏同步票据未生成，请回到游戏后重新发起一次登录。</p>
+                    {% endif %}
+                    <div class="d-flex flex-column gap-2">
+                        <button type="button" class="btn btn-success" onclick="window.close()">
+                            <i class="fas fa-door-open"></i> 关闭当前页面
+                        </button>
+                        <a href="{{ url_for('player_bp.index') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-globe"></i> 改为进入玩家 WebUI
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+<script>
+window.setTimeout(function () {
+    window.close();
+}, 1500);
+</script>
+</body>
+</html>

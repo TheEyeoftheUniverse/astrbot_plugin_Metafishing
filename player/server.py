@@ -5,7 +5,7 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 import json
 import secrets
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import requests
 
@@ -27,6 +27,9 @@ player_bp = Blueprint(
 LINUXDO_AUTHORIZE_URL = "https://connect.linux.do/oauth2/authorize"
 LINUXDO_TOKEN_URL = "https://connect.linux.do/oauth2/token"
 LINUXDO_USER_API_URL = "https://connect.linux.do/api/user"
+UNITY_OAUTH_PENDING_TTL = timedelta(minutes=10)
+UNITY_OAUTH_TICKET_TTL = timedelta(minutes=3)
+UNITY_LINUXDO_OAUTH_PENDING = {}
 
 # 用户凭证持久化辅助函数
 def _get_credentials_file():
@@ -199,6 +202,205 @@ def _login_player_session(user, auth_provider: str = "password"):
     session["auth_provider"] = auth_provider
 
 
+def _normalize_linuxdo_login_flow(value: Any) -> str:
+    flow = str(value or "").strip().lower()
+    if flow == "game":
+        return "game"
+    return "webui"
+
+
+def _sanitize_post_login_path(value: Any) -> str:
+    target = str(value or "").strip()
+    if not target:
+        return ""
+    if not target.startswith("/") or target.startswith("//"):
+        return ""
+    return target
+
+
+def _sanitize_unity_device_code(value: Any) -> str:
+    device_code = str(value or "").strip()
+    if not device_code or len(device_code) > 128:
+        return ""
+    allowed_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+    if not all(char in allowed_chars for char in device_code):
+        return ""
+    return device_code
+
+
+def _is_loopback_host(hostname: str) -> bool:
+    host = str(hostname or "").strip().lower().strip("[]")
+    return host in {"localhost", "127.0.0.1", "::1"}
+
+
+def _resolve_linuxdo_login_flow_from_request() -> str:
+    if "flow" in request.args:
+        return _normalize_linuxdo_login_flow(request.args.get("flow"))
+    return "webui"
+
+
+def _resolve_linuxdo_redirect_uri(oauth_config: Dict[str, Any]) -> str:
+    configured_uri = str(oauth_config.get("redirect_uri", "") or "").strip()
+    if not configured_uri:
+        return ""
+
+    try:
+        configured_host = (urlsplit(configured_uri).hostname or "").strip().lower()
+    except Exception:
+        configured_host = ""
+
+    request_host = (request.host or "").split(":", 1)[0].strip().lower().strip("[]")
+    if _is_loopback_host(configured_host) and request_host and not _is_loopback_host(request_host):
+        return f"{request.url_root.rstrip('/')}{url_for('player_bp.linuxdo_oauth_callback')}"
+
+    return configured_uri
+
+
+def _cleanup_pending_unity_linuxdo_oauth():
+    now = datetime.utcnow()
+    expired_codes = [
+        device_code
+        for device_code, payload in UNITY_LINUXDO_OAUTH_PENDING.items()
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("expires_at"), datetime)
+            or payload.get("expires_at") <= now
+        )
+    ]
+    for device_code in expired_codes:
+        UNITY_LINUXDO_OAUTH_PENDING.pop(device_code, None)
+
+
+def _register_pending_unity_linuxdo_oauth(device_code: str):
+    sanitized_device_code = _sanitize_unity_device_code(device_code)
+    if not sanitized_device_code:
+        return ""
+
+    _cleanup_pending_unity_linuxdo_oauth()
+    UNITY_LINUXDO_OAUTH_PENDING[sanitized_device_code] = {
+        "status": "pending",
+        "message": "等待浏览器完成 Linux.do 授权",
+        "ticket": "",
+        "user_id": "",
+        "nickname": "",
+        "expires_at": datetime.utcnow() + UNITY_OAUTH_PENDING_TTL,
+    }
+    return sanitized_device_code
+
+
+def _mark_unity_linuxdo_oauth_error(device_code: str, message: str):
+    sanitized_device_code = _sanitize_unity_device_code(device_code)
+    if not sanitized_device_code:
+        return
+
+    _cleanup_pending_unity_linuxdo_oauth()
+    payload = UNITY_LINUXDO_OAUTH_PENDING.get(sanitized_device_code)
+    if not payload:
+        return
+
+    payload["status"] = "error"
+    payload["message"] = str(message or "Linux.do 登录失败").strip()
+    payload["ticket"] = ""
+    payload["expires_at"] = datetime.utcnow() + UNITY_OAUTH_TICKET_TTL
+
+
+def _complete_pending_unity_linuxdo_oauth(device_code: str, user) -> str:
+    sanitized_device_code = _sanitize_unity_device_code(device_code)
+    if not sanitized_device_code:
+        return ""
+
+    _cleanup_pending_unity_linuxdo_oauth()
+    payload = UNITY_LINUXDO_OAUTH_PENDING.get(sanitized_device_code)
+    if not payload:
+        return ""
+
+    ticket = secrets.token_urlsafe(24)
+    payload["status"] = "authorized"
+    payload["message"] = "授权成功，正在同步到游戏"
+    payload["ticket"] = ticket
+    payload["user_id"] = user.user_id
+    payload["nickname"] = user.nickname or user.user_id
+    payload["expires_at"] = datetime.utcnow() + UNITY_OAUTH_TICKET_TTL
+    return ticket
+
+
+def _get_pending_unity_linuxdo_oauth(device_code: str) -> Dict[str, Any] | None:
+    sanitized_device_code = _sanitize_unity_device_code(device_code)
+    if not sanitized_device_code:
+        return None
+
+    _cleanup_pending_unity_linuxdo_oauth()
+    payload = UNITY_LINUXDO_OAUTH_PENDING.get(sanitized_device_code)
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _consume_pending_unity_linuxdo_oauth(device_code: str, ticket: str) -> Dict[str, Any] | None:
+    sanitized_device_code = _sanitize_unity_device_code(device_code)
+    normalized_ticket = str(ticket or "").strip()
+    if not sanitized_device_code or not normalized_ticket:
+        return None
+
+    _cleanup_pending_unity_linuxdo_oauth()
+    payload = UNITY_LINUXDO_OAUTH_PENDING.get(sanitized_device_code)
+    if not isinstance(payload, dict):
+        return None
+
+    if payload.get("status") != "authorized" or payload.get("ticket") != normalized_ticket:
+        return None
+
+    UNITY_LINUXDO_OAUTH_PENDING.pop(sanitized_device_code, None)
+    return payload
+
+
+def _store_linuxdo_oauth_intent(flow: Any, next_path: Any, device_code: Any, redirect_uri: str):
+    session["linuxdo_oauth_flow"] = _normalize_linuxdo_login_flow(flow)
+
+    sanitized_next = _sanitize_post_login_path(next_path)
+    if sanitized_next:
+        session["linuxdo_oauth_next"] = sanitized_next
+    else:
+        session.pop("linuxdo_oauth_next", None)
+
+    sanitized_device_code = _sanitize_unity_device_code(device_code)
+    if session["linuxdo_oauth_flow"] == "game" and sanitized_device_code:
+        session["linuxdo_oauth_device_code"] = sanitized_device_code
+    else:
+        session.pop("linuxdo_oauth_device_code", None)
+
+    if redirect_uri:
+        session["linuxdo_oauth_redirect_uri"] = redirect_uri
+    else:
+        session.pop("linuxdo_oauth_redirect_uri", None)
+
+
+def _pop_linuxdo_oauth_intent() -> Dict[str, str]:
+    return {
+        "flow": _normalize_linuxdo_login_flow(session.pop("linuxdo_oauth_flow", "webui")),
+        "next_path": _sanitize_post_login_path(session.pop("linuxdo_oauth_next", "")),
+        "device_code": _sanitize_unity_device_code(session.pop("linuxdo_oauth_device_code", "")),
+        "redirect_uri": str(session.pop("linuxdo_oauth_redirect_uri", "") or "").strip(),
+    }
+
+
+async def _complete_linuxdo_login(user):
+    intent = _pop_linuxdo_oauth_intent()
+    if intent["flow"] == "game":
+        ticket = _complete_pending_unity_linuxdo_oauth(intent["device_code"], user)
+        return await render_template(
+            "oauth_complete.html",
+            linked_user_id=user.user_id,
+            nickname=user.nickname or user.user_id,
+            unity_ticket_ready=bool(ticket),
+        )
+
+    if intent["next_path"]:
+        return redirect(intent["next_path"])
+
+    return redirect(url_for("player_bp.index"))
+
+
 def _get_login_template_context(**kwargs):
     oauth_config = _get_linuxdo_oauth_config()
     context = {
@@ -207,7 +409,7 @@ def _get_login_template_context(**kwargs):
         "oauth_configured": oauth_config.get("login_entry_enabled", False),
         "oauth_misconfigured": oauth_config.get("enabled", False) and not oauth_config.get("configured", False),
         "allow_password_login": oauth_config.get("allow_password_fallback", True) or not oauth_config.get("login_entry_enabled", False),
-        "oauth_login_url": url_for("player_bp.login_with_linuxdo") if oauth_config.get("login_entry_enabled", False) else None,
+        "oauth_login_url": url_for("player_bp.login_with_linuxdo", flow="webui") if oauth_config.get("login_entry_enabled", False) else None,
     }
     context.update(kwargs)
     return context
@@ -302,6 +504,20 @@ def _resolve_linuxdo_user(profile: Dict[str, Any], user_repo, user_service, oaut
 
     _bind_linuxdo_account(profile, candidate_user_id)
     return user, None
+
+
+def _build_unity_linuxdo_status_response(payload: Dict[str, Any]):
+    return {
+        "success": True,
+        "status": str(payload.get("status", "pending") or "pending"),
+        "message": str(payload.get("message", "") or ""),
+        "ticket": str(payload.get("ticket", "") or ""),
+        "data": {
+            "user_id": str(payload.get("user_id", "") or ""),
+            "nickname": str(payload.get("nickname", "") or ""),
+            "first_login": False,
+        },
+    }
 
 def _get_user_title(current_title_id, item_template_repo):
     """获取用户称号名称"""
@@ -649,13 +865,29 @@ async def login_with_linuxdo():
         await flash("Linux.do 登录未启用或配置不完整", "warning")
         return redirect(url_for("player_bp.login"))
 
+    flow = _resolve_linuxdo_login_flow_from_request()
+    device_code = request.args.get("device_code", "")
+    if flow == "game":
+        device_code = _register_pending_unity_linuxdo_oauth(device_code)
+        if not device_code:
+            await flash("Unity 登录缺少有效的设备标识，请返回游戏重新发起授权", "danger")
+            return redirect(url_for("player_bp.login"))
+
+    redirect_uri = _resolve_linuxdo_redirect_uri(oauth_config)
+    if not redirect_uri:
+        if device_code:
+            _mark_unity_linuxdo_oauth_error(device_code, "Linux.do 回调地址未配置")
+        await flash("Linux.do 回调地址未配置", "danger")
+        return redirect(url_for("player_bp.login"))
+
+    _store_linuxdo_oauth_intent(flow, request.args.get("next", ""), device_code, redirect_uri)
     state = secrets.token_urlsafe(24)
     session["linuxdo_oauth_state"] = state
     query = urlencode(
         {
             "client_id": oauth_config["client_id"],
             "response_type": "code",
-            "redirect_uri": oauth_config["redirect_uri"],
+            "redirect_uri": redirect_uri,
             "scope": oauth_config["scope"],
             "state": state,
         }
@@ -667,53 +899,118 @@ async def login_with_linuxdo():
 async def linuxdo_oauth_callback():
     """处理 Linux.do OAuth 授权回调"""
     oauth_config = _get_linuxdo_oauth_config()
+    pending_device_code = _sanitize_unity_device_code(session.get("linuxdo_oauth_device_code", ""))
     if not oauth_config.get("login_entry_enabled"):
+        if pending_device_code:
+            _mark_unity_linuxdo_oauth_error(pending_device_code, "Linux.do 登录未启用或配置不完整")
         await flash("Linux.do 登录未启用或配置不完整", "warning")
         return redirect(url_for("player_bp.login"))
 
     error = request.args.get("error", "").strip()
     if error:
+        if pending_device_code:
+            _mark_unity_linuxdo_oauth_error(pending_device_code, f"Linux.do 授权失败：{error}")
         await flash(f"Linux.do 授权失败：{error}", "danger")
         return redirect(url_for("player_bp.login"))
 
     state = request.args.get("state", "").strip()
     expected_state = session.pop("linuxdo_oauth_state", "")
     if not expected_state or state != expected_state:
+        if pending_device_code:
+            _mark_unity_linuxdo_oauth_error(pending_device_code, "Linux.do 登录状态校验失败，请重试")
         await flash("Linux.do 登录状态校验失败，请重试", "danger")
         return redirect(url_for("player_bp.login"))
 
     code = request.args.get("code", "").strip()
     if not code:
+        if pending_device_code:
+            _mark_unity_linuxdo_oauth_error(pending_device_code, "Linux.do 回调缺少授权码")
         await flash("Linux.do 回调缺少授权码", "danger")
         return redirect(url_for("player_bp.login"))
 
     user_repo = current_app.config.get("USER_REPO")
     user_service = current_app.config.get("USER_SERVICE")
+    session_redirect_uri = str(session.get("linuxdo_oauth_redirect_uri", "") or "").strip()
+    effective_oauth_config = dict(oauth_config)
+    effective_oauth_config["redirect_uri"] = session_redirect_uri or _resolve_linuxdo_redirect_uri(oauth_config)
 
     try:
-        token_payload = await _exchange_linuxdo_access_token(code, oauth_config)
+        token_payload = await _exchange_linuxdo_access_token(code, effective_oauth_config)
         access_token = _normalize_profile_value(token_payload.get("access_token"))
         if not access_token:
             raise ValueError("Linux.do 未返回 access_token")
 
-        profile = await _fetch_linuxdo_user_profile(access_token, oauth_config)
-        user, error_message = _resolve_linuxdo_user(profile, user_repo, user_service, oauth_config)
+        profile = await _fetch_linuxdo_user_profile(access_token, effective_oauth_config)
+        user, error_message = _resolve_linuxdo_user(profile, user_repo, user_service, effective_oauth_config)
         if error_message:
+            if pending_device_code:
+                _mark_unity_linuxdo_oauth_error(pending_device_code, error_message)
             await flash(error_message, "warning")
             return redirect(url_for("player_bp.login"))
 
         _login_player_session(user, auth_provider="linuxdo")
         await flash(f"欢迎来到钓鱼世界，{user.nickname or user.user_id}！", "success")
         logger.info(f"Linux.do 用户登录成功: {user.user_id}")
-        return redirect(url_for("player_bp.index"))
+        return await _complete_linuxdo_login(user)
     except requests.RequestException as e:
+        if pending_device_code:
+            _mark_unity_linuxdo_oauth_error(pending_device_code, "连接 Linux.do OAuth 服务失败，请稍后重试")
         logger.error(f"Linux.do OAuth 请求失败: {e}")
         await flash("连接 Linux.do OAuth 服务失败，请稍后重试", "danger")
     except Exception as e:
+        if pending_device_code:
+            _mark_unity_linuxdo_oauth_error(pending_device_code, f"Linux.do 登录失败：{e}")
         logger.error(f"Linux.do OAuth 登录失败: {e}", exc_info=True)
         await flash(f"Linux.do 登录失败：{e}", "danger")
 
     return redirect(url_for("player_bp.login"))
+
+
+@player_bp.route("/oauth/linuxdo/status")
+async def linuxdo_oauth_status():
+    """给 Unity 轮询 Linux.do OAuth 状态"""
+    device_code = _sanitize_unity_device_code(request.args.get("device_code", ""))
+    if not device_code:
+        return jsonify({"success": False, "status": "invalid", "message": "缺少有效的设备标识"}), 400
+
+    payload = _get_pending_unity_linuxdo_oauth(device_code)
+    if not payload:
+        return jsonify({"success": False, "status": "expired", "message": "登录请求不存在或已过期，请重新发起授权"}), 404
+
+    return jsonify(_build_unity_linuxdo_status_response(payload))
+
+
+@player_bp.route("/oauth/linuxdo/consume", methods=["POST"])
+async def consume_linuxdo_oauth_for_unity():
+    """给 Unity 消费一次性 Linux.do 登录票据并建立自己的 session cookie"""
+    form = await request.form
+    device_code = _sanitize_unity_device_code(form.get("device_code", ""))
+    ticket = str(form.get("ticket", "") or "").strip()
+
+    if not device_code or not ticket:
+        return jsonify({"success": False, "message": "缺少必要的登录票据"}), 400
+
+    payload = _consume_pending_unity_linuxdo_oauth(device_code, ticket)
+    if not payload:
+        return jsonify({"success": False, "message": "登录票据无效或已过期，请重新发起授权"}), 404
+
+    user_repo = current_app.config.get("USER_REPO")
+    user = user_repo.get_by_id(payload.get("user_id", ""))
+    if not user:
+        return jsonify({"success": False, "message": "对应的游戏账号不存在"}), 404
+
+    session.clear()
+    _login_player_session(user, auth_provider="linuxdo")
+    logger.info(f"Unity 通过 Linux.do 票据登录成功: {user.user_id}")
+    return jsonify({
+        "success": True,
+        "message": f"欢迎来到钓鱼世界，{user.nickname or user.user_id}！",
+        "data": {
+            "user_id": user.user_id,
+            "nickname": user.nickname or user.user_id,
+            "first_login": False,
+        }
+    })
 
 # ==================== API路由 ====================
 
