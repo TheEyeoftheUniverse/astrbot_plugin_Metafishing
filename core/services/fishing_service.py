@@ -2,6 +2,7 @@ import json
 import random
 import threading
 import time
+import zlib
 from typing import Dict, Any, Optional
 from datetime import timedelta
 from astrbot.api import logger
@@ -49,6 +50,8 @@ class FishingService:
         # 自动钓鱼线程相关属性
         self.auto_fishing_thread: Optional[threading.Thread] = None
         self.auto_fishing_running = False
+        # 自动钓鱼分桶轮询：每 tick 只处理 user_id hash 落在当前桶的玩家
+        self._auto_bucket_tick = 0
         # 税收线程相关属性
         self.tax_thread: Optional[threading.Thread] = None
         self.tax_running = False
@@ -1296,9 +1299,14 @@ class FishingService:
         """自动钓鱼循环任务，由后台线程执行。"""
         fishing_config = self.config.get("fishing", {})
         cooldown = fishing_config.get("cooldown_seconds", 180)
+        base_sleep = 40
 
         while self.auto_fishing_running:
             try:
+                # 每轮重新读取桶数，便于热更新配置
+                bucket_count = max(1, int(fishing_config.get("auto_bucket_count", 4)))
+                current_bucket = self._auto_bucket_tick % bucket_count
+
                 self.run_daily_maintenance_if_needed()
 
                 now = get_now()
@@ -1308,6 +1316,13 @@ class FishingService:
 
                 # 直接批量获取开启自动钓鱼的用户，避免 N+1 查询。
                 auto_users = self.user_repo.get_auto_fishing_users()
+
+                # 分桶：用 user_id 稳定哈希过滤出本轮值班的桶
+                if bucket_count > 1:
+                    auto_users = [
+                        u for u in auto_users
+                        if zlib.crc32(u.user_id.encode("utf-8")) % bucket_count == current_bucket
+                    ]
 
                 for user in auto_users:
                     user_id = user.user_id
@@ -1385,8 +1400,10 @@ class FishingService:
                     # else:
                     #      logger.info(f"用户 {user_id} 自动钓鱼失败: {result['message']}")
 
-                # 每轮检查间隔
-                time.sleep(40)
+                # 每轮检查间隔：分桶时缩短为 base_sleep / bucket_count，
+                # 让每个玩家被检查的总频率与不分桶时一致
+                self._auto_bucket_tick += 1
+                time.sleep(max(1.0, base_sleep / bucket_count))
 
             except Exception as e:
                 logger.error(f"自动钓鱼任务出错: {e}")

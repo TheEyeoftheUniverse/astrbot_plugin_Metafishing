@@ -148,8 +148,9 @@ class FishingPlugin(Star):
         
         self.game_config = {
             "fishing": {
-                "cost": config.get("fish_cost", 10), 
-                "cooldown_seconds": fishing_config.get("cooldown_seconds", 180)
+                "cost": config.get("fish_cost", 10),
+                "cooldown_seconds": fishing_config.get("cooldown_seconds", 180),
+                "auto_bucket_count": fishing_config.get("auto_bucket_count", 4)
             },
             "quality_bonus_max_chance": fishing_config.get("quality_bonus_max_chance", 0.35),
             "steal": {
