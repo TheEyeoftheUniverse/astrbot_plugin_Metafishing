@@ -21,6 +21,7 @@ class SqliteGachaRepository(AbstractGachaRepository):
             conn.row_factory = sqlite3.Row
             # 开启外键约束，确保奖池删除时，其下的物品也被删除
             conn.execute("PRAGMA foreign_keys = ON;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
             self._local.connection = conn
         return conn
 

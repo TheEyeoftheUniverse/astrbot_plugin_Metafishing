@@ -115,7 +115,7 @@ class FishingService:
 
         return self._go_fish_with_user(user)
 
-    def _go_fish_with_user(self, user, skip_daily_maintenance: bool = False) -> Dict[str, Any]:
+    def _go_fish_with_user(self, user, skip_daily_maintenance: bool = False, is_auto: bool = False) -> Dict[str, Any]:
         """对已加载的用户对象执行一次钓鱼动作。"""
         if not skip_daily_maintenance:
             self.run_daily_maintenance_if_needed()
@@ -489,7 +489,7 @@ class FishingService:
             accessory_instance_id=user.equipped_accessory_instance_id,
             bait_id=user.current_bait_id
         )
-        self.log_repo.add_fishing_record(record)
+        self.log_repo.add_fishing_record(record, log_to_records=not is_auto)
 
         # 8. 构建成功返回结果
         result = {
@@ -1358,7 +1358,7 @@ class FishingService:
                         continue
 
                     # 执行钓鱼
-                    result = self._go_fish_with_user(user, skip_daily_maintenance=True)
+                    result = self._go_fish_with_user(user, skip_daily_maintenance=True, is_auto=True)
                     
                     # 检查是否因为区域关闭被传送
                     if result and not result.get("success") and "已自动传送回" in result.get("message", ""):

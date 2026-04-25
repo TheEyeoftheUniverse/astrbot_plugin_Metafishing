@@ -22,6 +22,7 @@ class SqliteLogRepository(AbstractLogRepository):
             conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys = ON;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
             self._local.connection = conn
         return conn
 
@@ -72,30 +73,32 @@ class SqliteLogRepository(AbstractLogRepository):
         return TaxRecord(**row)
 
     # --- Fishing Log Methods ---
-    def add_fishing_record(self, record: FishingRecord) -> bool:
+    def add_fishing_record(self, record: FishingRecord, log_to_records: bool = True) -> bool:
+        # log_to_records=False 时跳过流水写入（仅自动钓鱼批量场景使用），
+        # 仍然 UPSERT user_fish_stats 以保证图鉴/最高纪录不丢。
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            # 1) 写入本次钓鱼记录
-            cursor.execute(
-                """
-                INSERT INTO fishing_records (
-                    user_id, fish_id, value, rod_instance_id,
-                    accessory_instance_id, bait_id, timestamp, is_king_size
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.user_id,
-                    record.fish_id,
-                    record.value,
-                    record.rod_instance_id,
-                    record.accessory_instance_id,
-                    record.bait_id,
-                    record.timestamp or datetime.now(self.UTC8),
-                    1 if record.is_king_size else 0,
-                ),
-            )
+            if log_to_records:
+                cursor.execute(
+                    """
+                    INSERT INTO fishing_records (
+                        user_id, fish_id, value, rod_instance_id,
+                        accessory_instance_id, bait_id, timestamp, is_king_size
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record.user_id,
+                        record.fish_id,
+                        record.value,
+                        record.rod_instance_id,
+                        record.accessory_instance_id,
+                        record.bait_id,
+                        record.timestamp or datetime.now(self.UTC8),
+                        1 if record.is_king_size else 0,
+                    ),
+                )
 
-            # 1.5) 更新用户鱼类聚合统计（UPSERT）
+            # 更新用户鱼类聚合统计（UPSERT）
             now_ts = record.timestamp or datetime.now(self.UTC8)
             cursor.execute(
                 """

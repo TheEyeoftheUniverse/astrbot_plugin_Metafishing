@@ -16,6 +16,7 @@ class SqliteExchangeRepository(AbstractExchangeRepository):
         """获取数据库连接"""
         if not hasattr(self._local, 'connection'):
             self._local.connection = sqlite3.connect(self.db_path)
+            self._local.connection.execute("PRAGMA synchronous = NORMAL;")
         return self._local.connection
 
     def get_all_commodities(self) -> List[Commodity]:

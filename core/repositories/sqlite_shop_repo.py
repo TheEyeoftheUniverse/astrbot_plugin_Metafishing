@@ -22,6 +22,7 @@ class SqliteShopRepository(AbstractShopRepository):
             )
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys = ON;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
             self._local.connection = conn
         return conn
 

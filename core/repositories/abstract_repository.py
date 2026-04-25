@@ -479,7 +479,7 @@ class AbstractLogRepository(ABC):
     """日志类数据仓储接口"""
     # 记录一条钓鱼日志
     @abstractmethod
-    def add_fishing_record(self, record: FishingRecord) -> bool: pass
+    def add_fishing_record(self, record: FishingRecord, log_to_records: bool = True) -> bool: pass
     # 获取用户已经解锁的鱼类
     @abstractmethod
     def get_unlocked_fish_ids(self, user_id: str) -> Dict[int, datetime]: pass

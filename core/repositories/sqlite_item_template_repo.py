@@ -19,6 +19,7 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
         if conn is None:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA synchronous = NORMAL;")
             self._local.connection = conn
         return conn
 
