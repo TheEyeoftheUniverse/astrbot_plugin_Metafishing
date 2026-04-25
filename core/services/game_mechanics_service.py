@@ -43,6 +43,38 @@ def weighted_random_choice(choices: list[tuple[any, any, float]]) -> tuple[any, 
 class GameMechanicsService:
     """封装特殊或独立的游戏机制"""
 
+    DIRECT_WIPE_BOMB_PAYOUT_CAP = 2.0
+
+    NORMAL_WIPE_BOMB_RANGES = [
+        (0.0, 0.3, 8000),       # 严重亏损
+        (0.3, 0.7, 24000),      # 普通亏损
+        (0.7, 0.99, 18000),     # 小亏损
+        (1.0, 1.0, 8000),       # 持平
+        (1.01, 1.2, 26000),     # 小赚
+        (1.2, 2.0, 13000),      # 中赚
+        (2.0, 3.0, 2500),       # 大赚
+        (3.0, 6.0, 400),        # 超大赚
+        (6.0, 15.0, 80),        # 高倍率
+        (15.0, 50.0, 15),       # 超级头奖
+        (50.0, 200.0, 4),       # 传说级奖励
+        (200.0, 1500.0, 1),     # 神话级奖励
+    ]
+
+    SUPPRESSED_WIPE_BOMB_RANGES = [
+        (0.0, 0.3, 8000),       # 严重亏损
+        (0.3, 0.7, 24000),      # 普通亏损
+        (0.7, 0.99, 18000),     # 小亏损
+        (1.0, 1.0, 8000),       # 持平
+        (1.01, 1.2, 26000),     # 小赚
+        (1.2, 2.0, 13200),      # 中赚
+        (2.0, 3.0, 2400),       # 大赚
+        (3.0, 6.0, 350),        # 超大赚
+        (6.0, 15.0, 50),        # 高倍率
+        (15.0, 50.0, 0),        # 超级头奖（禁用）
+        (50.0, 200.0, 0),       # 传说级奖励（禁用）
+        (200.0, 1500.0, 0),     # 神话级奖励（禁用）
+    ]
+
     FORTUNE_TIERS = {
         "kyokudaikichi": {"min": 200.0, "max": 1500.0, "label": "極大吉", "message": "🔮 沙漏中爆发出天界般的神圣光辉，预示着天降横财，这是上天的恩赐！"},
         "chodaikichi": {"min": 50.0, "max": 200.0, "label": "超大吉", "message": "🔮 沙漏中爆发出神迹般的光芒，预示着传说中的财富即将降临！这是千载难逢的机会！"},
@@ -100,6 +132,15 @@ class GameMechanicsService:
         if multiplier >= 2.0: return "shokichi"           # 小吉 (2-3倍)
         if multiplier >= 1.0: return "suekichi"           # 末吉 (1.0-2倍)
         return "kyo"                                       # 凶 (0-1倍)
+
+    @staticmethod
+    def _calculate_wipe_bomb_reward_amount(contribution_amount: int, reward_multiplier: float) -> int:
+        reward_amount = int(contribution_amount * reward_multiplier)
+        if reward_multiplier == 1.0:
+            return contribution_amount
+        if reward_multiplier > 1.0:
+            return max(contribution_amount + 1, reward_amount)
+        return min(contribution_amount - 1, reward_amount)
     
     def _parse_wipe_bomb_forecast(self, forecast_value: Optional[str]) -> Optional[Dict[str, Any]]:
         """解析存储在用户上的擦弹预测信息，兼容旧格式。"""
@@ -133,43 +174,12 @@ class GameMechanicsService:
         if user.wipe_bomb_forecast:
             return {"success": False, "message": "你已经预知过一次了，请先去擦弹吧！"}
 
-        # 模拟一次随机过程来决定结果
         wipe_bomb_config = self.config.get("wipe_bomb", {})
-        # 使用与 perform_wipe_bomb 相同的新配置以确保一致性
-        # 使用与perform_wipe_bomb相同的权重系统
-        normal_ranges = [
-            (0.0, 0.2, 10000),     # 严重亏损
-            (0.2, 0.5, 18000),     # 普通亏损
-            (0.5, 0.8, 15000),     # 小亏损
-            (0.8, 1.2, 25000),     # 小赚
-            (1.2, 2.0, 14100),     # 中赚（修正）
-            (2.0, 3.0, 4230),      # 大赚（修正）
-            (3.0, 6.0, 705),       # 超大赚（修正）
-            (6.0, 15.0, 106),      # 高倍率（修正）
-            (15.0, 50.0, 21),      # 超级头奖（修正）
-            (50.0, 200.0, 7),      # 传说级奖励（修正）
-            (200.0, 1500.0, 1),    # 神话级奖励（修正）
-        ]
-        
-        suppressed_ranges = [
-            (0.0, 0.2, 10000),     # 严重亏损
-            (0.2, 0.5, 18000),     # 普通亏损
-            (0.5, 0.8, 15000),     # 小亏损
-            (0.8, 1.2, 25000),     # 小赚
-            (1.2, 2.0, 20000),     # 中赚
-            (2.0, 3.0, 6000),      # 大赚
-            (3.0, 6.0, 1000),      # 超大赚
-            (6.0, 15.0, 150),      # 高倍率
-            (15.0, 50.0, 0),       # 超级头奖（禁用）
-            (50.0, 200.0, 0),      # 传说级奖励（禁用）
-            (200.0, 1500.0, 0),    # 神话级奖励（禁用）
-        ]
-        
         # 检查服务器级别的抑制状态
         suppressed = self._check_server_suppression()
         ranges = wipe_bomb_config.get(
             "suppressed_ranges" if suppressed else "normal_ranges",
-            suppressed_ranges if suppressed else normal_ranges
+            self.SUPPRESSED_WIPE_BOMB_RANGES if suppressed else self.NORMAL_WIPE_BOMB_RANGES
         )
         
         # 模拟一次抽奖来决定运势
@@ -272,47 +282,14 @@ class GameMechanicsService:
                 "message": f"你今天的擦弹次数已用完({user.wipe_bomb_attempts_today}/{total_max_attempts})，明天再来吧！"
             }
         
-        # 3. 计算随机奖励倍数 (使用加权随机)
-        # 默认奖励范围和权重: (min_multiplier, max_multiplier, weight)
-        # 专家建议配置：根据计算结果重新调整的权重分布
-        # 使用整数权重（放大1000倍）避免小数计算
-        normal_ranges = [
-            (0.0, 0.2, 10000),     # 严重亏损
-            (0.2, 0.5, 18000),     # 普通亏损
-            (0.5, 0.8, 15000),     # 小亏损
-            (0.8, 1.2, 25000),     # 小赚
-            (1.2, 2.0, 14100),     # 中赚（增加）
-            (2.0, 3.0, 4230),      # 大赚（增加）
-            (3.0, 6.0, 705),       # 超大赚（增加）
-            (6.0, 15.0, 106),      # 高倍率（增加）
-            (15.0, 50.0, 21),      # 超级头奖（维持）
-            (50.0, 200.0, 7),      # 传说级奖励（维持）
-            (200.0, 1500.0, 1),    # 神话级奖励（维持）
-        ]
-
-        # 抑制模式：当一天内已开出≥15x高倍率后，禁用高倍率区间
-        suppressed_ranges = [
-            (0.0, 0.2, 10000),     # 严重亏损
-            (0.2, 0.5, 18000),     # 普通亏损
-            (0.5, 0.8, 15000),     # 小亏损
-            (0.8, 1.2, 25000),     # 小赚
-            (1.2, 2.0, 20000),     # 中赚
-            (2.0, 3.0, 6000),      # 大赚
-            (3.0, 6.0, 1000),      # 超大赚
-            (6.0, 15.0, 150),      # 高倍率
-            (15.0, 50.0, 0),       # 超级头奖（禁用）
-            (50.0, 200.0, 0),      # 传说级奖励（禁用）
-            (200.0, 1500.0, 0),    # 神话级奖励（禁用）
-        ]
-
         # 检查服务器级别的抑制状态
         suppressed = self._check_server_suppression()
 
         # 根据抑制状态选择权重表
         if suppressed:
-            ranges = wipe_bomb_config.get("suppressed_ranges", suppressed_ranges)
+            ranges = wipe_bomb_config.get("suppressed_ranges", self.SUPPRESSED_WIPE_BOMB_RANGES)
         else:
-            ranges = wipe_bomb_config.get("normal_ranges", normal_ranges)
+            ranges = wipe_bomb_config.get("normal_ranges", self.NORMAL_WIPE_BOMB_RANGES)
 
         # 4. 处理预知结果 (使用详细逻辑)
         forecast_info = self._parse_wipe_bomb_forecast(user.wipe_bomb_forecast)
@@ -345,7 +322,7 @@ class GameMechanicsService:
             return {"success": False, "message": "擦弹失败，似乎时空发生了扭曲..."}
 
         # 6. 计算最终金额并执行事务
-        configured_reward_amount = int(contribution_amount * reward_multiplier)
+        configured_reward_amount = self._calculate_wipe_bomb_reward_amount(contribution_amount, reward_multiplier)
         configured_profit = configured_reward_amount - contribution_amount
         daily_reset_hour = int(self.config.get("daily_reset_hour", 0) or 0)
         jackpot_before = get_wipe_bomb_jackpot_amount(daily_reset_hour)
@@ -354,11 +331,21 @@ class GameMechanicsService:
         jackpot_notice = ""
 
         if configured_profit > 0:
-            jackpot_paid, jackpot_after = consume_wipe_bomb_jackpot(configured_profit, daily_reset_hour)
-            reward_amount = contribution_amount + jackpot_paid
-            profit = jackpot_paid
-            if jackpot_paid < configured_profit:
-                jackpot_notice = "奖池清空！"
+            if reward_multiplier <= self.DIRECT_WIPE_BOMB_PAYOUT_CAP:
+                reward_amount = configured_reward_amount
+                profit = configured_profit
+            else:
+                direct_reward_amount = self._calculate_wipe_bomb_reward_amount(
+                    contribution_amount,
+                    self.DIRECT_WIPE_BOMB_PAYOUT_CAP
+                )
+                direct_profit = direct_reward_amount - contribution_amount
+                jackpot_required = max(0, configured_profit - direct_profit)
+                jackpot_paid, jackpot_after = consume_wipe_bomb_jackpot(jackpot_required, daily_reset_hour)
+                profit = direct_profit + jackpot_paid
+                reward_amount = contribution_amount + profit
+                if jackpot_paid < jackpot_required:
+                    jackpot_notice = "奖池清空！"
         else:
             reward_amount = configured_reward_amount
             profit = configured_profit
