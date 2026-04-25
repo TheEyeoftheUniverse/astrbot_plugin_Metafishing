@@ -249,7 +249,7 @@ class FishingPlugin(Star):
         self.market_service = MarketService(self.market_repo, self.inventory_repo, self.user_repo, self.log_repo,
                                            self.item_template_repo, self.exchange_repo, self.game_config)
         self.achievement_service = AchievementService(self.achievement_repo, self.user_repo, self.inventory_repo,
-                                                     self.item_template_repo, self.log_repo)
+                                                     self.item_template_repo, self.log_repo, self.game_config)
         
         # 初始化科考服务
         from .core.services.expedition_service import ExpeditionService

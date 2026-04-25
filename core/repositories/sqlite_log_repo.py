@@ -114,31 +114,6 @@ class SqliteLogRepository(AbstractLogRepository):
                 ),
             )
 
-            # 2) 仅保留当前用户最近10条记录（按时间倒序，时间相同按record_id倒序）
-            cursor.execute(
-                """
-                DELETE FROM fishing_records
-                WHERE user_id = ?
-                  AND record_id NOT IN (
-                    SELECT record_id FROM fishing_records
-                    WHERE user_id = ?
-                    ORDER BY timestamp DESC, record_id DESC
-                    LIMIT 50
-                  )
-                """,
-                (record.user_id, record.user_id),
-            )
-
-            # 3) 清理30天前的历史记录（全局）
-            cutoff_time = datetime.now(self.UTC8) - timedelta(days=30)
-            cursor.execute(
-                """
-                DELETE FROM fishing_records
-                WHERE timestamp < ?
-                """,
-                (cutoff_time,),
-            )
-
             conn.commit()
             return True
 
@@ -171,6 +146,126 @@ class SqliteLogRepository(AbstractLogRepository):
             """, (user_id, limit))
             return [self._row_to_fishing_record(row) for row in cursor.fetchall()]
 
+    def cleanup_expired_records(self, retention_days: int = 30, per_user_limit: int = 50) -> Dict[str, int]:
+        cutoff_time = datetime.now(self.UTC8) - timedelta(days=retention_days)
+        cutoff_date = cutoff_time.date()
+        results: Dict[str, int] = {}
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                DELETE FROM fishing_records
+                WHERE timestamp < ?
+                """,
+                (cutoff_time,),
+            )
+            results["fishing_records_expired"] = cursor.rowcount
+
+            cursor.execute(
+                f"""
+                DELETE FROM fishing_records
+                WHERE record_id IN (
+                    SELECT record_id FROM (
+                        SELECT record_id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY user_id
+                                   ORDER BY timestamp DESC, record_id DESC
+                               ) AS row_num
+                        FROM fishing_records
+                    ) ranked
+                    WHERE row_num > {per_user_limit}
+                )
+                """
+            )
+            results["fishing_records_trimmed"] = cursor.rowcount
+
+            cursor.execute(
+                """
+                DELETE FROM gacha_records
+                WHERE timestamp < ?
+                """,
+                (cutoff_time,),
+            )
+            results["gacha_records_expired"] = cursor.rowcount
+
+            cursor.execute(
+                f"""
+                DELETE FROM gacha_records
+                WHERE record_id IN (
+                    SELECT record_id FROM (
+                        SELECT record_id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY user_id
+                                   ORDER BY timestamp DESC, record_id DESC
+                               ) AS row_num
+                        FROM gacha_records
+                    ) ranked
+                    WHERE row_num > {per_user_limit}
+                )
+                """
+            )
+            results["gacha_records_trimmed"] = cursor.rowcount
+
+            cursor.execute(
+                """
+                DELETE FROM wipe_bomb_log
+                WHERE timestamp < ?
+                """,
+                (cutoff_time,),
+            )
+            results["wipe_bomb_log_expired"] = cursor.rowcount
+
+            cursor.execute(
+                f"""
+                DELETE FROM wipe_bomb_log
+                WHERE log_id IN (
+                    SELECT log_id FROM (
+                        SELECT log_id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY user_id
+                                   ORDER BY timestamp DESC, log_id DESC
+                               ) AS row_num
+                        FROM wipe_bomb_log
+                    ) ranked
+                    WHERE row_num > {per_user_limit}
+                )
+                """
+            )
+            results["wipe_bomb_log_trimmed"] = cursor.rowcount
+
+            cursor.execute(
+                """
+                DELETE FROM check_ins
+                WHERE check_in_date < ?
+                """,
+                (cutoff_date,),
+            )
+            results["check_ins_expired"] = cursor.rowcount
+
+            cursor.execute(
+                f"""
+                DELETE FROM check_ins
+                WHERE rowid IN (
+                    SELECT rowid FROM (
+                        SELECT rowid,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY user_id
+                                   ORDER BY check_in_date DESC
+                               ) AS row_num
+                        FROM check_ins
+                    ) ranked
+                    WHERE row_num > {per_user_limit}
+                )
+                """
+            )
+            results["check_ins_trimmed"] = cursor.rowcount
+
+            conn.commit()
+
+        return results
+
     # --- Gacha Log Methods ---
     def add_gacha_record(self, record: GachaRecord) -> None:
         with self._get_connection() as conn:
@@ -193,31 +288,6 @@ class SqliteLogRepository(AbstractLogRepository):
                     record.rarity,
                     record.timestamp or datetime.now(self.UTC8),
                 ),
-            )
-
-            # 2) 仅保留当前用户最近10条抽卡记录
-            cursor.execute(
-                """
-                DELETE FROM gacha_records
-                WHERE user_id = ?
-                  AND record_id NOT IN (
-                    SELECT record_id FROM gacha_records
-                    WHERE user_id = ?
-                    ORDER BY timestamp DESC, record_id DESC
-                    LIMIT 50
-                  )
-                """,
-                (record.user_id, record.user_id),
-            )
-
-            # 3) 清理30天前的抽卡记录（全局）
-            cutoff_time = datetime.now(self.UTC8) - timedelta(days=30)
-            cursor.execute(
-                """
-                DELETE FROM gacha_records
-                WHERE timestamp < ?
-                """,
-                (cutoff_time,),
             )
 
             conn.commit()
@@ -250,31 +320,6 @@ class SqliteLogRepository(AbstractLogRepository):
                 (log.user_id, log.contribution_amount, log.reward_multiplier, log.reward_amount, timestamp),
             )
 
-            # 2) 仅保留当前用户最近10条擦弹日志
-            cursor.execute(
-                """
-                DELETE FROM wipe_bomb_log
-                WHERE user_id = ?
-                  AND log_id NOT IN (
-                    SELECT log_id FROM wipe_bomb_log
-                    WHERE user_id = ?
-                    ORDER BY timestamp DESC, log_id DESC
-                    LIMIT 50
-                  )
-                """,
-                (log.user_id, log.user_id),
-            )
-
-            # 3) 清理30天前的擦弹日志（全局）
-            cutoff_time = datetime.now(self.UTC8) - timedelta(days=30)
-            cursor.execute(
-                """
-                DELETE FROM wipe_bomb_log
-                WHERE timestamp < ?
-                """,
-                (cutoff_time,),
-            )
-
             conn.commit()
 
     # 查询时考虑时区
@@ -301,31 +346,6 @@ class SqliteLogRepository(AbstractLogRepository):
             cursor.execute(
                 "INSERT INTO check_ins (user_id, check_in_date) VALUES (?, ?)",
                 (user_id, check_in_date),
-            )
-
-            # 2) 仅保留当前用户最近10条签到记录（按日期倒序）
-            cursor.execute(
-                """
-                DELETE FROM check_ins
-                WHERE user_id = ?
-                  AND check_in_date NOT IN (
-                    SELECT check_in_date FROM check_ins
-                    WHERE user_id = ?
-                    ORDER BY check_in_date DESC
-                    LIMIT 50
-                  )
-                """,
-                (user_id, user_id),
-            )
-
-            # 3) 清理30天前的签到记录（全局）
-            cutoff_date = (datetime.now(self.UTC8) - timedelta(days=30)).date()
-            cursor.execute(
-                """
-                DELETE FROM check_ins
-                WHERE check_in_date < ?
-                """,
-                (cutoff_date,),
             )
 
             conn.commit()

@@ -56,9 +56,10 @@ class FishingService:
         self.tax_execution_lock = threading.Lock()  # 防止税收并发执行的锁
         self.tax_start_lock = threading.Lock()  # 防止重复创建税收线程的锁
         self.rare_fish_reset_lock = threading.Lock()  # 防止稀有鱼重置并发执行的锁
-        self.zone_pass_stay_duration = timedelta(hours=24)
-        self.zone_pass_check_interval_seconds = self.config.get("zone_pass_check_interval_seconds", 60)
-        self.last_zone_pass_check_ts = 0.0
+        self.log_cleanup_lock = threading.Lock()  # 防止日志清理并发执行的锁
+        self.zone_pass_reset_lock = threading.Lock()  # 防止通行证日检并发执行的锁
+        self.last_zone_pass_check_reset_time = None
+        self.last_log_cleanup_reset_time = None
         # 可选的消息通知回调：签名 (target: str, message: str) -> None，用于消息通知
         self._notifier = None
         # 通知目标可配置，默认群聊。可由 config['notifications']['relocation_target'] 覆盖
@@ -108,12 +109,18 @@ class FishingService:
         Returns:
             一个包含结果的字典。
         """
-        # 在执行钓鱼前，先检查并执行每日重置（如果需要）
-        self._reset_rare_fish_daily_quota()
-        
         user = self.user_repo.get_by_id(user_id)
         if not user:
             return {"success": False, "message": "用户不存在，无法钓鱼。"}
+
+        return self._go_fish_with_user(user)
+
+    def _go_fish_with_user(self, user, skip_daily_maintenance: bool = False) -> Dict[str, Any]:
+        """对已加载的用户对象执行一次钓鱼动作。"""
+        if not skip_daily_maintenance:
+            self.run_daily_maintenance_if_needed()
+
+        user_id = user.user_id
 
         # 1. 检查成本（从区域配置中读取）
         zone = self.inventory_repo.get_zone_by_id(user.fishing_zone_id)
@@ -862,9 +869,9 @@ class FishingService:
 
     def _consume_pass_and_extend_stay(self, user_id: str, zone: FishingZone, item_id: int, item_name: str):
         self.inventory_repo.decrease_item_quantity(user_id, item_id, 1)
-        expires_at = get_now() + self.zone_pass_stay_duration
+        expires_at = get_last_reset_time(self.daily_reset_hour) + timedelta(days=1)
         self.inventory_repo.upsert_user_zone_stay(user_id, zone.id, item_id, expires_at)
-        self.log_repo.add_log(user_id, "zone_stay_renewal", f"消耗 1 个 {item_name}，{zone.name} 驻留延长至 {expires_at.strftime('%Y-%m-%d %H:%M')}")
+        self.log_repo.add_log(user_id, "zone_stay_renewal", f"消耗 1 个 {item_name}，{zone.name} 授权延长至 {expires_at.strftime('%Y-%m-%d %H:%M')}")
         return expires_at
 
     def _ensure_current_zone_pass_or_relocate(self, user, zone: FishingZone) -> Dict[str, Any]:
@@ -1057,13 +1064,13 @@ class FishingService:
 
     def enforce_zone_pass_requirements_for_all_users(self) -> None:
         """
-        周期检查：消耗型通行证驻留到期后自动续票，无法续票则回传安全区域。
-        永久通行证不走驻留周期，只校验背包持有状态。
+        每日刷新检查：消耗型通行证到达新周期后自动续票，无法续票则回传安全区域。
+        永久通行证不走日周期授权，只校验背包持有状态。
         """
         logger.info("开始执行区域通行证驻留检查...")
         try:
-            all_user_ids = self.user_repo.get_all_user_ids()
-            logger.info(f"找到 {len(all_user_ids)} 个用户需要检查")
+            all_users = self.user_repo.get_all_users(limit=1000000, offset=0)
+            logger.info(f"找到 {len(all_users)} 个用户需要检查")
         except Exception as e:
             logger.error(f"获取用户列表失败: {e}")
             return
@@ -1071,11 +1078,9 @@ class FishingService:
         relocated_users = []
         renewed_count = 0
 
-        for user_id in all_user_ids:
+        for user in all_users:
             try:
-                user = self.user_repo.get_by_id(user_id)
-                if not user:
-                    continue
+                user_id = user.user_id
 
                 zone = self.inventory_repo.get_zone_by_id(user.fishing_zone_id)
                 if not zone or not getattr(zone, "requires_pass", False) or not getattr(zone, "required_item_id", None):
@@ -1103,6 +1108,22 @@ class FishingService:
         
         if relocated_users:
             logger.info(f"被传送用户详情：{relocated_users}")
+
+    def _enforce_zone_pass_requirements_if_needed(self, current_reset_time=None) -> bool:
+        """按每日刷新周期统一执行一次区域通行证检查。"""
+        if current_reset_time is None:
+            current_reset_time = get_last_reset_time(self.daily_reset_hour)
+        if current_reset_time == self.last_zone_pass_check_reset_time:
+            return False
+
+        with self.zone_pass_reset_lock:
+            current_reset_time = get_last_reset_time(self.daily_reset_hour)
+            if current_reset_time == self.last_zone_pass_check_reset_time:
+                return False
+
+            self.enforce_zone_pass_requirements_for_all_users()
+            self.last_zone_pass_check_reset_time = current_reset_time
+            return True
 
     def _reset_rare_fish_daily_quota(self) -> bool:
         """
@@ -1143,6 +1164,41 @@ class FishingService:
                 return True
         
         return False
+
+    def _cleanup_logs_if_needed(self, current_reset_time=None) -> bool:
+        """按每日刷新周期集中清理需要保留上限和过期时间的日志。"""
+        if current_reset_time is None:
+            current_reset_time = get_last_reset_time(self.daily_reset_hour)
+        if current_reset_time == self.last_log_cleanup_reset_time:
+            return False
+
+        with self.log_cleanup_lock:
+            current_reset_time = get_last_reset_time(self.daily_reset_hour)
+            if current_reset_time == self.last_log_cleanup_reset_time:
+                return False
+
+            cleanup_result = self.log_repo.cleanup_expired_records()
+            self.last_log_cleanup_reset_time = current_reset_time
+            logger.info(
+                f"日志每日清理完成，刷新周期起点：{current_reset_time}，结果：{cleanup_result}"
+            )
+            return True
+
+    def run_daily_maintenance_if_needed(self) -> bool:
+        """统一执行每日刷新点对齐的后台维护。"""
+        current_reset_time = get_last_reset_time(self.daily_reset_hour)
+        maintenance_ran = False
+
+        if self._enforce_zone_pass_requirements_if_needed(current_reset_time):
+            maintenance_ran = True
+
+        if current_reset_time != self.last_reset_time and self._reset_rare_fish_daily_quota():
+            maintenance_ran = True
+
+        if self._cleanup_logs_if_needed(current_reset_time):
+            maintenance_ran = True
+
+        return maintenance_ran
 
     def start_auto_fishing_task(self):
         """启动自动钓鱼的后台线程。"""
@@ -1240,43 +1296,38 @@ class FishingService:
         """自动钓鱼循环任务，由后台线程执行。"""
         fishing_config = self.config.get("fishing", {})
         cooldown = fishing_config.get("cooldown_seconds", 180)
-        cost = fishing_config.get("cost", 10)
 
         while self.auto_fishing_running:
             try:
-                # 检查并执行每日重置（如果需要）
-                if self._reset_rare_fish_daily_quota():
-                    logger.info("自动钓鱼线程检测到新的一天，已完成稀有鱼配额重置")
+                self.run_daily_maintenance_if_needed()
 
-                now_ts_for_pass_check = time.time()
-                if now_ts_for_pass_check - self.last_zone_pass_check_ts >= self.zone_pass_check_interval_seconds:
-                    self.last_zone_pass_check_ts = now_ts_for_pass_check
-                    self.enforce_zone_pass_requirements_for_all_users()
-                
-                # 获取所有开启自动钓鱼的用户
-                auto_users_ids = self.user_repo.get_all_user_ids(auto_fishing_only=True)
+                now = get_now()
+                now_ts = now.timestamp()
+                bait_template_cache = {}
+                zone_cache = {}
 
-                for user_id in auto_users_ids:
-                    user = self.user_repo.get_by_id(user_id)
-                    if not user:
-                        continue
+                # 直接批量获取开启自动钓鱼的用户，避免 N+1 查询。
+                auto_users = self.user_repo.get_auto_fishing_users()
+
+                for user in auto_users:
+                    user_id = user.user_id
 
                     # 检查CD
-                    now_ts = get_now().timestamp()
                     last_ts = 0
                     if user.last_fishing_time and user.last_fishing_time.year > 1:
                         last_ts = user.last_fishing_time.timestamp()
                     elif user.last_fishing_time and user.last_fishing_time.year <= 1:
                         # 若 last_fishing_time 被重置为极早时间，将时间设为当前时间减去冷却时间，
                         # 这样下一轮自动钓鱼就能正常工作了
-                        cooldown = fishing_config.get("cooldown_seconds", 180)
-                        user.last_fishing_time = get_now() - timedelta(seconds=cooldown)
+                        user.last_fishing_time = now - timedelta(seconds=cooldown)
                         self.user_repo.update(user)
                         last_ts = user.last_fishing_time.timestamp()
                     # 计算基于鱼饵星级的CD减少
                     _cooldown = cooldown
                     if user.current_bait_id:
-                        bait_template = self.item_template_repo.get_bait_by_id(user.current_bait_id)
+                        if user.current_bait_id not in bait_template_cache:
+                            bait_template_cache[user.current_bait_id] = self.item_template_repo.get_bait_by_id(user.current_bait_id)
+                        bait_template = bait_template_cache[user.current_bait_id]
                         if bait_template and bait_template.rarity >= 5:
                             # 5星开始，每星减少10%，上限60%（10星）
                             reduction_percent = min((bait_template.rarity - 4) * 0.1, 0.6)
@@ -1285,7 +1336,9 @@ class FishingService:
                         continue # CD中，跳过
 
                     # 检查成本（从区域配置中读取）
-                    zone = self.inventory_repo.get_zone_by_id(user.fishing_zone_id)
+                    if user.fishing_zone_id not in zone_cache:
+                        zone_cache[user.fishing_zone_id] = self.inventory_repo.get_zone_by_id(user.fishing_zone_id)
+                    zone = zone_cache[user.fishing_zone_id]
                     if not zone:
                         continue
                     access_result = self._ensure_current_zone_pass_or_relocate(user, zone)
@@ -1305,7 +1358,7 @@ class FishingService:
                         continue
 
                     # 执行钓鱼
-                    result = self.go_fish(user_id)
+                    result = self._go_fish_with_user(user, skip_daily_maintenance=True)
                     
                     # 检查是否因为区域关闭被传送
                     if result and not result.get("success") and "已自动传送回" in result.get("message", ""):

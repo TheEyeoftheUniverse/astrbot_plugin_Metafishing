@@ -17,6 +17,7 @@ from ..repositories.abstract_repository import (
 )
 from ..domain.models import User
 from ..achievements.base import BaseAchievement, UserContext
+from ..utils import get_last_reset_time
 
 class AchievementService:
     """实现可插拔的成就系统"""
@@ -27,18 +28,23 @@ class AchievementService:
         user_repo: AbstractUserRepository,
         inventory_repo: AbstractInventoryRepository,
         item_template_repo: AbstractItemTemplateRepository,
-        log_repo: AbstractLogRepository
+        log_repo: AbstractLogRepository,
+        config: Optional[Dict[str, Any]] = None,
     ):
         self.achievement_repo = achievement_repo
         self.user_repo = user_repo
         self.inventory_repo = inventory_repo
         self.item_template_repo = item_template_repo
         self.log_repo = log_repo
+        self.config = config or {}
+        self.daily_reset_hour = self.config.get("daily_reset_hour", 0)
 
         self.achievements: List[BaseAchievement] = self._load_achievements()
 
         self.achievement_check_thread: Optional[threading.Thread] = None
         self.achievement_check_running = False
+        self.achievement_check_lock = threading.Lock()
+        self.last_achievement_check_reset_time = None
 
     def _load_achievements(self) -> List[BaseAchievement]:
         """动态扫描并加载所有成就类。"""
@@ -204,17 +210,37 @@ class AchievementService:
             self.achievement_check_thread.join(timeout=1.0)
 
     def _achievement_check_loop(self):
-        """成就检查循环任务。"""
+        """成就检查循环任务，按每日刷新点统一执行。"""
         while self.achievement_check_running:
             try:
-                all_user_ids = self.user_repo.get_all_user_ids()
-                for user_id in all_user_ids:
-                    self._process_user_achievements(user_id)
-                time.sleep(600) # 10分钟检查一次
+                self.run_daily_achievement_check_if_needed()
+                time.sleep(3600)
             except Exception as e:
                 logger.error(f"成就检查任务出错: {e}")
                 logger.error("堆栈信息:", exc_info=True)
                 time.sleep(60)
+
+    def run_daily_achievement_check_if_needed(self) -> bool:
+        """
+        按每日刷新点执行一次成就全量检查。
+        插件重启后若当前刷新周期尚未检查，也会立即补做一次。
+        """
+        current_reset_time = get_last_reset_time(self.daily_reset_hour)
+        if current_reset_time == self.last_achievement_check_reset_time:
+            return False
+
+        with self.achievement_check_lock:
+            current_reset_time = get_last_reset_time(self.daily_reset_hour)
+            if current_reset_time == self.last_achievement_check_reset_time:
+                return False
+
+            logger.info(f"开始执行成就每日检查，刷新周期起点：{current_reset_time}")
+            all_user_ids = self.user_repo.get_all_user_ids()
+            for user_id in all_user_ids:
+                self._process_user_achievements(user_id)
+            self.last_achievement_check_reset_time = current_reset_time
+            logger.info(f"成就每日检查完成，本轮共检查 {len(all_user_ids)} 个用户")
+            return True
 
     def _process_user_achievements(self, user_id: str):
         """处理单个用户的成就检查和发放流程。"""

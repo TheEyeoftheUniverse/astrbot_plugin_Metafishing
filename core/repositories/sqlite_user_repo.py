@@ -159,6 +159,12 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute(query)
             return [row["user_id"] for row in cursor.fetchall()]
 
+    def get_auto_fishing_users(self) -> List[User]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE auto_fishing_enabled = 1")
+            return [self._row_to_user(row) for row in cursor.fetchall()]
+
     def _get_top_users_base_query(self, order_by_column: str, limit: int) -> List[User]:
         with self._get_connection() as conn:
             cursor = conn.cursor()

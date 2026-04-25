@@ -34,6 +34,9 @@ class AbstractUserRepository(ABC):
     # 获取所有用户ID
     @abstractmethod
     def get_all_user_ids(self, auto_fishing_only: bool = False) -> List[str]: pass
+    # 获取所有开启自动钓鱼的用户
+    @abstractmethod
+    def get_auto_fishing_users(self) -> List[User]: pass
 
     # 修改：用三个更具体的方法替换旧的 get_leaderboard_data
     @abstractmethod
@@ -483,6 +486,9 @@ class AbstractLogRepository(ABC):
     # 获取用户钓鱼日志
     @abstractmethod
     def get_fishing_records(self, user_id: str, limit: int) -> List[FishingRecord]: pass
+    # 清理需要保留上限和过期时间的日志数据
+    @abstractmethod
+    def cleanup_expired_records(self, retention_days: int = 30, per_user_limit: int = 50) -> Dict[str, int]: pass
     # 记录一条抽卡日志
     @abstractmethod
     def add_gacha_record(self, record: GachaRecord) -> None: pass
