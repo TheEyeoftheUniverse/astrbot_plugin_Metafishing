@@ -50,35 +50,14 @@ def format_large_number(number):
     else:
         return f"{number/1000000000:.1f}B".replace(".0B", "B")
 
-# --- 新增：格式化重量的函数 ---
-def format_weight(grams):
-    """将克(g)格式化为公斤(kg)字符串，大数值使用K、M等单位"""
-    if grams < 1000:
-        return f"{grams}g"
-    
-    kg = grams / 1000
-    
-    # 小于1000kg时，直接显示kg
-    if kg < 1000:
-        return f"{kg:.1f}kg".replace(".0kg", "kg")
-    # 大于等于1000kg时，使用K、M、B等单位
-    elif kg < 1000000:
-        return f"{kg/1000:.1f}Kkg".replace(".0Kkg", "Kkg")
-    elif kg < 1000000000:
-        return f"{kg/1000000:.1f}Mkg".replace(".0Mkg", "Mkg")
-    else:
-        return f"{kg/1000000000:.1f}Bkg".replace(".0Bkg", "Bkg")
-# --- 新增结束 ---
-
-
 def draw_fishing_ranking(user_data: List[Dict], output_path: str, ranking_type: str = "coins"):
     """
     绘制钓鱼排行榜图片
 
     参数:
-    user_data: 用户数据列表，每个用户是一个字典，包含昵称、称号、金币、钓鱼数量、总重量、鱼竿、饰品等信息
+    user_data: 用户数据列表，每个用户是一个字典，包含昵称、称号、金币、钓鱼数量、鱼竿、饰品等信息
     output_path: 输出图片路径
-    ranking_type: 排行榜类型 ('coins', 'max_coins', 'fish_count', 'total_weight_caught')
+    ranking_type: 排行榜类型 ('coins', 'max_coins', 'fish_count')
     """
     # 准备字体
     try:
@@ -115,8 +94,6 @@ def draw_fishing_ranking(user_data: List[Dict], output_path: str, ranking_type: 
         title_text = "金币历史最高 TOP10"
     elif ranking_type == "fish_count":
         title_text = "钓获数量排行榜 TOP10"
-    elif ranking_type == "total_weight_caught":
-        title_text = "钓获重量排行榜 TOP10"
     
     _, (title_width, title_height) = get_text_metrics(title_text, font_title, draw)
     title_x = (IMG_WIDTH - title_width) // 2
@@ -146,8 +123,6 @@ def draw_fishing_ranking(user_data: List[Dict], output_path: str, ranking_type: 
         fish_count = user.get("fish_count", 0)
         fishing_rod = user.get("fishing_rod", "普通鱼竿")
         accessory = user.get("accessory", "无饰品")
-        # --- 新增：获取总重量数据 ---
-        total_weight = user.get("total_weight_caught", 0)
 
         # 排名颜色
         rank_color = COLOR_TEXT_GOLD if idx == 0 else COLOR_TEXT_SILVER if idx == 1 else COLOR_TEXT_BRONZE if idx == 2 else COLOR_TEXT_DARK
@@ -197,8 +172,7 @@ def draw_fishing_ranking(user_data: List[Dict], output_path: str, ranking_type: 
         card_center = (card_left + card_right) // 2
 
         # 1. 钓获信息 - 左对齐
-        weight_str = format_weight(total_weight)
-        fish_text = f"钓获: {format_large_number(fish_count)}条 ({weight_str})"
+        fish_text = f"钓获: {format_large_number(fish_count)}条"
         fish_x = name_x
         draw.text((fish_x, bottom_line_y), fish_text, font=font_regular, fill=COLOR_FISH_COUNT)
 

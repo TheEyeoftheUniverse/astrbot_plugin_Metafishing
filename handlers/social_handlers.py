@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 async def ranking(plugin: "FishingPlugin", event: AstrMessageEvent):
     """
     查看排行榜。
-    支持按不同标准排序，例如：/排行榜 数量 或 /排行榜 重量 或 /排行榜 历史
+    支持按不同标准排序，例如：/排行榜 数量 或 /排行榜 历史
     默认按金币排名。
     """
     args = event.message_str.split()
@@ -25,8 +25,6 @@ async def ranking(plugin: "FishingPlugin", event: AstrMessageEvent):
         sort_key = args[1]
         if sort_key in ["数量", "钓获", "fish"]:
             ranking_type = "fish_count"
-        elif sort_key in ["重量", "weight"]:
-            ranking_type = "total_weight_caught"
         elif sort_key in ["历史", "最高", "max", "history", "历史最高"]:
             ranking_type = "max_coins"
 
@@ -48,7 +46,6 @@ async def ranking(plugin: "FishingPlugin", event: AstrMessageEvent):
             user_dict["title"] = "无称号"
             user_dict["fishing_rod"] = "无鱼竿"
             user_dict["accessory"] = "无饰品"
-            user_dict["total_weight_caught"] = user_dict.get("total_weight_caught", 0)
             continue
 
         # 获取鱼竿名称
@@ -78,9 +75,6 @@ async def ranking(plugin: "FishingPlugin", event: AstrMessageEvent):
             if title_info:
                 title_name = title_info.name
         user_dict["title"] = title_name
-
-        # 确保重量字段存在，以防万一
-        user_dict["total_weight_caught"] = user_dict.get("total_weight_caught", 0)
 
     # 3. 绘制并发送图片
     user_id_for_filename = plugin._get_effective_user_id(event)

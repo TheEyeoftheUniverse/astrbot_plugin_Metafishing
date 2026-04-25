@@ -2,28 +2,22 @@
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="stat-card">
             <div class="stat-label"><i class="fas fa-coins me-2"></i>金币</div>
             <div class="stat-value">{{ "{:,}".format(user.coins) }}</div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="stat-card">
             <div class="stat-label"><i class="fas fa-gem me-2"></i>高级货币</div>
             <div class="stat-value">{{ user.premium_currency }}</div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="stat-card">
             <div class="stat-label"><i class="fas fa-water me-2"></i>钓鱼次数</div>
             <div class="stat-value">{{ "{:,}".format(user.total_fishing_count) }}</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-label"><i class="fas fa-weight me-2"></i>总重量</div>
-            <div class="stat-value">{{ "{:,}".format(user.total_weight_caught) }}kg</div>
         </div>
     </div>
 </div>

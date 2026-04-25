@@ -158,8 +158,8 @@ async def delete_fish(fish_id):
 @admin_bp.route("/fish/csv/template")
 @login_required
 async def fish_csv_template():
-    header = ["name", "description", "rarity", "base_value", "min_weight", "max_weight", "icon_url"]
-    sample = ["示例鱼", "一条很普通的示例鱼", "1", "10", "100", "500", ""]
+    header = ["name", "description", "rarity", "base_value", "icon_url"]
+    sample = ["示例鱼", "一条很普通的示例鱼", "1", "10", ""]
     
     output = io.StringIO()
     writer = csv.writer(output)
@@ -189,9 +189,9 @@ async def import_fish_csv():
         content = file.read().decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(content))
         
-        required_cols = {"name", "rarity", "base_value", "min_weight", "max_weight"}
+        required_cols = {"name", "rarity", "base_value"}
         if not required_cols.issubset(set([c.strip() for c in reader.fieldnames or []])):
-            await flash("CSV列缺失，至少需要: name, rarity, base_value, min_weight, max_weight", "danger")
+            await flash("CSV列缺失，至少需要: name, rarity, base_value", "danger")
             return redirect(url_for("admin_bp.manage_fish"))
 
         item_template_service = current_app.config["ITEM_TEMPLATE_SERVICE"]
@@ -204,8 +204,6 @@ async def import_fish_csv():
                     "description": (row.get("description") or "").strip() or None,
                     "rarity": int(row.get("rarity") or 1),
                     "base_value": int(row.get("base_value") or 0),
-                    "min_weight": int(row.get("min_weight") or 1),
-                    "max_weight": int(row.get("max_weight") or 100),
                     "icon_url": (row.get("icon_url") or "").strip() or None,
                 }
                 if not data["name"]:
@@ -803,7 +801,6 @@ async def get_user_detail(user_id):
         "coins": result["user"].coins,
         "premium_currency": result["user"].premium_currency,
         "total_fishing_count": result["user"].total_fishing_count,
-        "total_weight_caught": result["user"].total_weight_caught,
         "total_coins_earned": result["user"].total_coins_earned,
         "consecutive_login_days": result["user"].consecutive_login_days,
         "fish_pond_capacity": result["user"].fish_pond_capacity,

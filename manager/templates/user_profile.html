@@ -41,13 +41,10 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <p><i class="fas fa-water me-2" style="color: #667eea;"></i><strong>钓鱼次数:</strong> {{ "{:,}".format(user.total_fishing_count) }}</p>
                     </div>
-                    <div class="col-md-4">
-                        <p><i class="fas fa-weight me-2" style="color: #667eea;"></i><strong>总重量:</strong> {{ "{:,}".format(user.total_weight_caught) }} kg</p>
-                    </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <p><i class="fas fa-coins me-2" style="color: #f39c12;"></i><strong>历史最高:</strong> {{ "{:,}".format(user.max_coins) }} 金币</p>
                     </div>
                 </div>

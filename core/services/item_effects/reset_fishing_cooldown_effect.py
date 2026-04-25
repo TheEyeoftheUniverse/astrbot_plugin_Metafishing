@@ -56,7 +56,6 @@ class ResetFishingCooldownEffect(AbstractItemEffect):
             message = (
                 f"🎣 恭喜你钓到了：{fish['name']}{quality_display}\n"
                 f"✨稀有度：{'★' * fish['rarity']} \n"
-                f"⚖️重量：{fish['weight']} 克\n"
                 f"💰价值：{fish['value']} 金币\n"
                 f"💸消耗：{fishing_cost} 金币/次"
             )

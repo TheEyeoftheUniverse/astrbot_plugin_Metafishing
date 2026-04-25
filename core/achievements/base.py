@@ -18,7 +18,6 @@ class UserContext:
     min_wipe_bomb_multiplier: Optional[float]
     owned_rod_rarities: Set[int]
     owned_accessory_rarities: Set[int]
-    has_heavy_fish: bool
 
 
 

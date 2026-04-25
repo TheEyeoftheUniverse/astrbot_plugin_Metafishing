@@ -57,33 +57,3 @@ class TotalFishCount1000(BaseAchievement):
 
     def check(self, context: UserContext) -> bool:
         return context.user.total_fishing_count >= self.target_value
-
-
-class TotalWeight10000kg(BaseAchievement):
-    id = 30
-    name = "初露锋芒"
-    description = "累计钓鱼总重量达到10,000公斤"
-    target_value = 10000 * 1000  # 目标值统一使用g作为单位
-    reward = ("title", 16, 1)
-
-    def get_progress(self, context: UserContext) -> int:
-        """返回用户总钓鱼重量作为当前进度。"""
-        return context.user.total_weight_caught
-
-    def check(self, context: UserContext) -> bool:
-        return context.user.total_weight_caught >= self.target_value
-
-
-class HeavyFishCaught(BaseAchievement):
-    id = 32
-    name = "庞然大物"
-    description = "单次钓上重量超过100公斤的鱼"
-    target_value = True  # 对于布尔类型的检查，目标值可以设为True
-    reward = ("bait", 14, 1)
-
-    def get_progress(self, context: UserContext) -> int:
-        """对于布尔类型的成就，返回1代表已完成，0代表未完成。"""
-        return 1 if context.has_heavy_fish else 0
-
-    def check(self, context: UserContext) -> bool:
-        return context.has_heavy_fish is self.target_value

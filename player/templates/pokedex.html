@@ -156,18 +156,6 @@
                                 <span><i class="fas fa-fish"></i> 捕获次数:</span>
                                 <strong>{{ fish.total_caught }}</strong>
                             </div>
-                            {% if fish.max_weight %}
-                            <div class="d-flex justify-content-between mb-1">
-                                <span><i class="fas fa-weight-hanging"></i> 最大重量:</span>
-                                <strong>{{ "%.2f"|format(fish.max_weight / 1000) }}kg</strong>
-                            </div>
-                            {% endif %}
-                            {% if fish.min_weight %}
-                            <div class="d-flex justify-content-between">
-                                <span><i class="fas fa-weight-hanging"></i> 最小重量:</span>
-                                <strong>{{ "%.2f"|format(fish.min_weight / 1000) }}kg</strong>
-                            </div>
-                            {% endif %}
                         </div>
                         
                         <div class="mt-auto">

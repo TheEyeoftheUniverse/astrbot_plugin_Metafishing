@@ -12,16 +12,14 @@ def up(cursor: sqlite3.Cursor):
             description TEXT,
             rarity INTEGER NOT NULL CHECK (rarity >= 1),
             base_value INTEGER NOT NULL,
-            min_weight INTEGER NOT NULL CHECK (min_weight >= 0),
-            max_weight INTEGER NOT NULL CHECK (max_weight > min_weight),
             icon_url TEXT
         )
     """)
     
     # 复制旧表数据到新表
     cursor.execute("""
-        INSERT INTO fish_new (fish_id, name, description, rarity, base_value, min_weight, max_weight, icon_url)
-        SELECT fish_id, name, description, rarity, base_value, min_weight, max_weight, icon_url
+        INSERT INTO fish_new (fish_id, name, description, rarity, base_value, icon_url)
+        SELECT fish_id, name, description, rarity, base_value, icon_url
         FROM fish
     """)
     
@@ -43,16 +41,14 @@ def down(cursor: sqlite3.Cursor):
             description TEXT,
             rarity INTEGER NOT NULL CHECK (rarity >= 1 AND rarity <= 5),
             base_value INTEGER NOT NULL,
-            min_weight INTEGER NOT NULL CHECK (min_weight >= 0),
-            max_weight INTEGER NOT NULL CHECK (max_weight > min_weight),
             icon_url TEXT
         )
     """)
     
     # 复制数据，但只复制1-5星的鱼（6+星的鱼会被丢弃）
     cursor.execute("""
-        INSERT INTO fish_old (fish_id, name, description, rarity, base_value, min_weight, max_weight, icon_url)
-        SELECT fish_id, name, description, rarity, base_value, min_weight, max_weight, icon_url
+        INSERT INTO fish_old (fish_id, name, description, rarity, base_value, icon_url)
+        SELECT fish_id, name, description, rarity, base_value, icon_url
         FROM fish
         WHERE rarity <= 5
     """)

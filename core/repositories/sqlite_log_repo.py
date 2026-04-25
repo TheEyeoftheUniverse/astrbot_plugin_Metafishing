@@ -31,14 +31,30 @@ class SqliteLogRepository(AbstractLogRepository):
             return None
         # 数据库中的 is_king_size 是 INTEGER，需要转为 bool
         data = dict(row)
-        data["is_king_size"] = bool(data.get("is_king_size", 0))
-        return FishingRecord(**data)
+        return FishingRecord(
+            record_id=data["record_id"],
+            user_id=data["user_id"],
+            fish_id=data["fish_id"],
+            value=data["value"],
+            timestamp=data["timestamp"],
+            rod_instance_id=data.get("rod_instance_id"),
+            accessory_instance_id=data.get("accessory_instance_id"),
+            bait_id=data.get("bait_id"),
+            location_id=data.get("location_id"),
+            is_king_size=bool(data.get("is_king_size", 0)),
+        )
 
     def _row_to_user_fish_stat(self, row: sqlite3.Row) -> Optional[UserFishStat]:
         if not row:
             return None
         data = dict(row)
-        return UserFishStat(**data)
+        return UserFishStat(
+            user_id=data["user_id"],
+            fish_id=data["fish_id"],
+            first_caught_at=data.get("first_caught_at"),
+            last_caught_at=data.get("last_caught_at"),
+            total_caught=data["total_caught"],
+        )
 
     def _row_to_gacha_record(self, row: sqlite3.Row) -> Optional[GachaRecord]:
         if not row:
@@ -63,14 +79,13 @@ class SqliteLogRepository(AbstractLogRepository):
             cursor.execute(
                 """
                 INSERT INTO fishing_records (
-                    user_id, fish_id, weight, value, rod_instance_id,
+                    user_id, fish_id, value, rod_instance_id,
                     accessory_instance_id, bait_id, timestamp, is_king_size
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.user_id,
                     record.fish_id,
-                    record.weight,
                     record.value,
                     record.rod_instance_id,
                     record.accessory_instance_id,
@@ -85,23 +100,17 @@ class SqliteLogRepository(AbstractLogRepository):
             cursor.execute(
                 """
                 INSERT INTO user_fish_stats (
-                    user_id, fish_id, first_caught_at, last_caught_at, max_weight, min_weight, total_caught, total_weight
-                ) VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                    user_id, fish_id, first_caught_at, last_caught_at, total_caught
+                ) VALUES (?, ?, ?, ?, 1)
                 ON CONFLICT(user_id, fish_id) DO UPDATE SET
                     last_caught_at = excluded.last_caught_at,
-                    max_weight = CASE WHEN excluded.max_weight > max_weight THEN excluded.max_weight ELSE max_weight END,
-                    min_weight = CASE WHEN excluded.min_weight < min_weight THEN excluded.min_weight ELSE min_weight END,
-                    total_caught = total_caught + 1,
-                    total_weight = total_weight + excluded.total_weight
+                    total_caught = total_caught + 1
                 """,
                 (
                     record.user_id,
                     record.fish_id,
                     now_ts,
                     now_ts,
-                    record.weight,
-                    record.weight,
-                    record.weight,
                 ),
             )
 
@@ -499,7 +508,7 @@ class SqliteLogRepository(AbstractLogRepository):
             cursor.execute(
                 """
                 SELECT user_id, fish_id, first_caught_at, last_caught_at,
-                       max_weight, min_weight, total_caught, total_weight
+                       total_caught
                 FROM user_fish_stats
                 WHERE user_id = ?
                 ORDER BY last_caught_at DESC
@@ -514,7 +523,7 @@ class SqliteLogRepository(AbstractLogRepository):
             cursor.execute(
                 """
                 SELECT user_id, fish_id, first_caught_at, last_caught_at,
-                       max_weight, min_weight, total_caught, total_weight
+                       total_caught
                 FROM user_fish_stats
                 WHERE user_id = ? AND fish_id = ?
                 LIMIT 1

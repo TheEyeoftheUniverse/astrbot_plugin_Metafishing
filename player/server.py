@@ -559,13 +559,11 @@ def _get_leaderboard_data(user_repo, item_template_repo, top_n=10):
 
         coins_leaderboard = _build_rank_list(all_users, lambda u: u.coins, 'coins')
         fishing_leaderboard = _build_rank_list(all_users, lambda u: u.total_fishing_count, 'total_fishing_count')
-        weight_leaderboard = _build_rank_list(all_users, lambda u: u.total_weight_caught, 'total_weight_caught')
         earned_leaderboard = _build_rank_list(all_users, lambda u: u.total_coins_earned, 'total_coins_earned')
 
         return {
             "coins": coins_leaderboard,
             "fishing": fishing_leaderboard,
-            "weight": weight_leaderboard,
             "earned": earned_leaderboard
         }
     except Exception as e:
@@ -573,7 +571,6 @@ def _get_leaderboard_data(user_repo, item_template_repo, top_n=10):
         return {
             "coins": [],
             "fishing": [],
-            "weight": [],
             "earned": []
         }
 
@@ -591,7 +588,7 @@ def _get_or_create_daily_exhibition(exhibition_file, user_repo, aquarium_service
     else:
         exhibition_data = {"date": "", "featured_user": None, "comments": {}}
 
-    # 如果文件中已经有今日的展览数据，确保其中的鱼类条目包含 description/min_weight/max_weight/actual_value 等字段。
+    # 如果文件中已经有今日的展览数据，确保其中的鱼类条目包含 description/actual_value 等字段。
     if exhibition_data.get("featured_user") and exhibition_data.get("date"):
         try:
             featured = exhibition_data.get("featured_user")
@@ -599,7 +596,7 @@ def _get_or_create_daily_exhibition(exhibition_file, user_repo, aquarium_service
             for idx, fish in enumerate(fishes):
                 if not isinstance(fish, dict):
                     continue
-                # 如果缺少描述或重量信息，从模板仓储补充
+                # 如果缺少描述信息，从模板仓储补充
                 try:
                     fish_template = item_template_repo.get_fish_by_id(fish.get("fish_id"))
                 except Exception:
@@ -608,10 +605,6 @@ def _get_or_create_daily_exhibition(exhibition_file, user_repo, aquarium_service
                 if fish_template:
                     if not fish.get("description"):
                         fish["description"] = fish_template.description or "暂无描述"
-                    if not fish.get("min_weight") and hasattr(fish_template, 'min_weight'):
-                        fish["min_weight"] = fish_template.min_weight
-                    if not fish.get("max_weight") and hasattr(fish_template, 'max_weight'):
-                        fish["max_weight"] = fish_template.max_weight
                     if not fish.get("actual_value"):
                         fish["actual_value"] = fish_template.base_value * (1 + fish.get("quality_level", 0))
 
@@ -709,12 +702,6 @@ def _get_or_create_daily_exhibition(exhibition_file, user_repo, aquarium_service
                     enhanced_fish["description"] = fish_template.description or "一条神秘的鱼"
                     enhanced_fish["base_value"] = fish_template.base_value
                     
-                    # 重量信息（参考图鉴页格式，使用min_weight和max_weight）
-                    if hasattr(fish_template, 'min_weight') and fish_template.min_weight:
-                        enhanced_fish["min_weight"] = fish_template.min_weight
-                    if hasattr(fish_template, 'max_weight') and fish_template.max_weight:
-                        enhanced_fish["max_weight"] = fish_template.max_weight
-                        
                 enhanced_fishes.append(enhanced_fish)
             
             exhibition_data = {
@@ -2152,8 +2139,6 @@ async def pokedex():
     for stat in fish_stats:
         caught_fish_map[stat.fish_id] = {
             "total_caught": stat.total_caught,
-            "max_weight": stat.max_weight,
-            "min_weight": stat.min_weight,
             "first_caught_at": stat.first_caught_at,
             "last_caught_at": stat.last_caught_at
         }

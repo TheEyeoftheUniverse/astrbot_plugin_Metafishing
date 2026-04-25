@@ -13,16 +13,6 @@ from .styles import (
     COLOR_ACCENT, COLOR_SUCCESS, COLOR_WARNING, COLOR_GOLD, COLOR_RARE
 )
 
-def format_weight(g):
-    """将克转换为更易读的单位 (kg, t)"""
-    if g is None:
-        return "0g"
-    if g >= 1000000:
-        return f"{g / 1000000:.2f}t"
-    if g >= 1000:
-        return f"{g / 1000:.2f}kg"
-    return f"{g}g"
-
 # --- 布局 ---
 HEADER_HEIGHT = 120
 FISH_CARD_HEIGHT = 80   # 大幅减小高度以适应20个项目
@@ -158,16 +148,9 @@ async def draw_pokedex(pokedex_data: Dict[str, Any], user_info: Dict[str, Any], 
         # 右侧统计信息 - 进一步向右移动
         stats_x = PADDING + 440
         stats_y = card_y1 + 15
-        # 重量纪录 - 使用更醒目的深金色
-        min_w = fish.get('min_weight', 0)
-        max_w = fish.get('max_weight', 0)
-        weight_text = f"● 重量纪录: 最小 {format_weight(min_w)} / 最大 {format_weight(max_w)}"
-        draw.text((stats_x, stats_y), weight_text, font=FONT_REGULAR, fill=(218, 165, 32))  # 深金色
-        
         # 累计捕获 - 使用深蓝色
-        total_w = fish.get('total_weight', 0)
-        caught_text = f"◆ 累计捕获: {fish.get('total_caught', 0)} 条 ({format_weight(total_w)})"
-        draw.text((stats_x, stats_y + 18), caught_text, font=FONT_REGULAR, fill=(25, 118, 210))  # 深蓝色
+        caught_text = f"◆ 累计捕获: {fish.get('total_caught', 0)} 条"
+        draw.text((stats_x, stats_y), caught_text, font=FONT_REGULAR, fill=(25, 118, 210))  # 深蓝色
 
         # 首次捕获 - 使用深绿色
         first_caught_time = fish.get('first_caught_time')
@@ -175,7 +158,7 @@ async def draw_pokedex(pokedex_data: Dict[str, Any], user_info: Dict[str, Any], 
             first_caught_text = f"★ 首次捕获: {first_caught_time.strftime('%Y-%m-%d %H:%M')}"
         else:
             first_caught_text = f"★ 首次捕获: {str(first_caught_time).split('.')[0] if first_caught_time else '未知'}"
-        draw.text((stats_x, stats_y + 36), first_caught_text, font=FONT_REGULAR, fill=(46, 125, 50))  # 深绿色
+        draw.text((stats_x, stats_y + 18), first_caught_text, font=FONT_REGULAR, fill=(46, 125, 50))  # 深绿色
         # 描述 - 调整位置适应更小的卡片，使用背包颜色
         desc_y = card_y1 + FISH_CARD_HEIGHT - 20
         draw.text((left_pane_x, desc_y), fish.get("description", ""), font=FONT_SMALL, fill=text_muted)

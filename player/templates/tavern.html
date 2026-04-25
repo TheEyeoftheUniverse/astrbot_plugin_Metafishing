@@ -66,12 +66,6 @@
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="weight-tab" data-bs-toggle="tab" 
-                                    data-bs-target="#weight-leaderboard" type="button" role="tab">
-                                <i class="fas fa-weight-hanging text-primary"></i> 总重量榜
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
                             <button class="nav-link" id="earned-tab" data-bs-toggle="tab" 
                                     data-bs-target="#earned-leaderboard" type="button" role="tab">
                                 <i class="fas fa-chart-line text-success"></i> 累计收入榜
@@ -159,48 +153,6 @@
                                                 {% endif %}
                                             </td>
                                             <td><strong class="text-info">{{ rank.total_fishing_count | default(0) }}</strong></td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- 总重量榜 -->
-                        <div class="tab-pane fade" id="weight-leaderboard" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>排名</th>
-                                            <th>钓鱼佬</th>
-                                            <th>总重量 (kg)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for rank in leaderboard.weight %}
-                                        <tr {% if rank.user_id == current_user_id %}class="table-primary"{% endif %}>
-                                            <td>
-                                                {% if rank.rank == 1 %}
-                                                <i class="fas fa-crown text-warning"></i>
-                                                {% elif rank.rank == 2 %}
-                                                <i class="fas fa-medal text-secondary"></i>
-                                                {% elif rank.rank == 3 %}
-                                                <i class="fas fa-medal" style="color: #cd7f32;"></i>
-                                                {% else %}
-                                                {{ rank.rank }}
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {{ rank.nickname or '渔夫' + rank.user_id[-4:] }}
-                                                {% if rank.title and rank.title != '无称号' %}
-                                                <span class="badge bg-success" style="font-size: 0.75rem;">{{ rank.title }}</span>
-                                                {% endif %}
-                                                {% if rank.user_id == current_user_id %}
-                                                <span class="badge bg-primary">你</span>
-                                                {% endif %}
-                                            </td>
-                                            <td><strong class="text-primary">{{ (rank.total_weight_caught | default(0) / 1000) | round(2) }}</strong></td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -585,22 +537,6 @@
                                     <p class="card-text mb-2 text-muted" style="font-size: 0.8rem; height: 60px; overflow-y: auto;">
                                         {{ fish.description | default('暂无描述') }}
                                     </p>
-                                    
-                                    <!-- 统计数据（已隐藏重量，仅保留占位以保持布局一致） -->
-                                    <div class="small text-muted mb-2" style="display:none;">
-                                        {% if fish.max_weight %}
-                                        <div class="d-flex justify-content-between mb-1">
-                                            <span><i class="fas fa-weight-hanging"></i> 最大重量:</span>
-                                            <strong>{{ "%.2f"|format(fish.max_weight / 1000) }}kg</strong>
-                                        </div>
-                                        {% endif %}
-                                        {% if fish.min_weight %}
-                                        <div class="d-flex justify-content-between mb-1">
-                                            <span><i class="fas fa-weight-hanging"></i> 最小重量:</span>
-                                            <strong>{{ "%.2f"|format(fish.min_weight / 1000) }}kg</strong>
-                                        </div>
-                                        {% endif %}
-                                    </div>
                                     
                                     <!-- 价值信息（参考图鉴页，左对齐） -->
                                     <div class="mb-2">

@@ -51,11 +51,6 @@ class AbstractUserRepository(ABC):
         """按历史最高金币数获取排行榜用户列表。"""
         raise NotImplementedError
 
-    @abstractmethod
-    def get_top_users_by_weight(self, limit: int) -> List[User]:
-        """按总重量获取排行榜用户列表。"""
-        raise NotImplementedError
-
     # 获取资产超过阈值的用户列表
     @abstractmethod
     def get_high_value_users(self, threshold: int) -> List[User]: pass
@@ -558,9 +553,6 @@ class AbstractAchievementRepository(ABC):
     # 获取用户钓到的垃圾物品总数
     @abstractmethod
     def get_user_garbage_count(self, user_id: str) -> int: pass
-    # 检查是否钓到过超过特定重量的鱼
-    @abstractmethod
-    def has_caught_heavy_fish(self, user_id: str, weight: int) -> bool: pass
     # 检查擦弹是否达到过特定倍率
     @abstractmethod
     def has_wipe_bomb_multiplier(self, user_id: str, multiplier: float) -> bool: pass

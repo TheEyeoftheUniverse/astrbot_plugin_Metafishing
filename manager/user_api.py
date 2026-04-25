@@ -970,7 +970,6 @@ async def get_user_info():
                 "coins": user.coins,
                 "premium_currency": user.premium_currency,
                 "total_fishing_count": user.total_fishing_count,
-                "total_weight_caught": user.total_weight_caught,
                 "consecutive_login_days": user.consecutive_login_days,
                 "fish_pond_capacity": user.fish_pond_capacity,
                 "fishing_zone_id": int(getattr(user, "fishing_zone_id", 1) or 1),
@@ -2488,7 +2487,6 @@ async def get_fish_templates():
                     "name": fish.name,
                     "description": fish.description or "",
                     "quality_level": fish.quality_level or 1,
-                    "weight": fish.weight or 0,
                     "drop_rate": fish.drop_rate or 0,
                     "zones": fish.zones or "",
                 })

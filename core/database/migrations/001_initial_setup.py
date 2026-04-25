@@ -14,7 +14,6 @@ def up(cursor: sqlite3.Cursor):
         CREATE TABLE IF NOT EXISTS fish (
             fish_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT,
             rarity INTEGER NOT NULL CHECK (rarity >= 1 AND rarity <= 5), base_value INTEGER NOT NULL,
-            min_weight INTEGER NOT NULL CHECK (min_weight >= 0), max_weight INTEGER NOT NULL CHECK (max_weight > min_weight),
             icon_url TEXT
         )
     """)
@@ -76,7 +75,7 @@ def up(cursor: sqlite3.Cursor):
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY, nickname TEXT, coins INTEGER DEFAULT 200,
             premium_currency INTEGER DEFAULT 0, total_fishing_count INTEGER DEFAULT 0,
-            total_weight_caught INTEGER DEFAULT 0, total_coins_earned INTEGER DEFAULT 0,
+            total_coins_earned INTEGER DEFAULT 0,
             equipped_rod_instance_id INTEGER, equipped_accessory_instance_id INTEGER,
             current_bait_id INTEGER, bait_start_time DATETIME, current_title_id INTEGER,
             auto_fishing_enabled INTEGER DEFAULT 0, last_fishing_time DATETIME,
@@ -150,7 +149,7 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS fishing_records (
             record_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, fish_id INTEGER NOT NULL,
-            weight INTEGER NOT NULL, value INTEGER NOT NULL, rod_instance_id INTEGER,
+            value INTEGER NOT NULL, rod_instance_id INTEGER,
             accessory_instance_id INTEGER, bait_id INTEGER, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             location_id INTEGER, is_king_size INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,

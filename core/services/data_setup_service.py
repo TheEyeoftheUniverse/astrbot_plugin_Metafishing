@@ -61,9 +61,7 @@ class DataSetupService:
                 "description": fish[1],
                 "rarity": fish[2],
                 "base_value": fish[3],
-                "min_weight": fish[4],
-                "max_weight": fish[5],
-                "icon_url": fish[6]
+                "icon_url": fish[4]
             })
 
         # 填充鱼饵数据
@@ -338,4 +336,3 @@ class DataSetupService:
             logger.info("新道具添加完成。")
         else:
             logger.info("没有发现新的道具需要添加。")
-

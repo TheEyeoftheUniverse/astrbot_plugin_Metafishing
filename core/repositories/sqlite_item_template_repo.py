@@ -26,7 +26,15 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
     def _row_to_fish(self, row: sqlite3.Row) -> Optional[Fish]:
         if not row:
             return None
-        return Fish(**row)
+        data = dict(row)
+        return Fish(
+            fish_id=data["fish_id"],
+            name=data["name"],
+            rarity=data["rarity"],
+            base_value=data["base_value"],
+            description=data.get("description"),
+            icon_url=data.get("icon_url"),
+        )
 
     def _row_to_rod(self, row: sqlite3.Row) -> Optional[Rod]:
         if not row:
@@ -268,8 +276,8 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO fish (name, description, rarity, base_value, min_weight, max_weight, icon_url)
-                VALUES (:name, :description, :rarity, :base_value, :min_weight, :max_weight, :icon_url)
+                INSERT INTO fish (name, description, rarity, base_value, icon_url)
+                VALUES (:name, :description, :rarity, :base_value, :icon_url)
             """, {**data, "icon_url": data.get("icon_url")})
             conn.commit()
 
@@ -280,8 +288,7 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
             cursor.execute("""
                 UPDATE fish SET
                     name = :name, description = :description, rarity = :rarity,
-                    base_value = :base_value, min_weight = :min_weight,
-                    max_weight = :max_weight, icon_url = :icon_url
+                    base_value = :base_value, icon_url = :icon_url
                 WHERE fish_id = :fish_id
             """, {**data, "icon_url": data.get("icon_url")})
             conn.commit()

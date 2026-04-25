@@ -58,7 +58,6 @@ class SqliteUserRepository(AbstractUserRepository):
             coins=row["coins"],
             premium_currency=row["premium_currency"],
             total_fishing_count=row["total_fishing_count"],
-            total_weight_caught=row["total_weight_caught"],
             total_coins_earned=row["total_coins_earned"],
             max_coins=row["max_coins"] if "max_coins" in row_keys else 0,
             consecutive_login_days=row["consecutive_login_days"],
@@ -163,7 +162,7 @@ class SqliteUserRepository(AbstractUserRepository):
     def _get_top_users_base_query(self, order_by_column: str, limit: int) -> List[User]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            if order_by_column not in ["total_fishing_count", "coins", "total_weight_caught", "max_coins"]:
+            if order_by_column not in ["total_fishing_count", "coins", "max_coins"]:
                 raise ValueError("Invalid order by column")
             
             query = f"SELECT * FROM users ORDER BY {order_by_column} DESC LIMIT ?"
@@ -179,9 +178,6 @@ class SqliteUserRepository(AbstractUserRepository):
     def get_top_users_by_max_coins(self, limit: int) -> List[User]:
         """获取历史最高金币排行榜"""
         return self._get_top_users_base_query("max_coins", limit)
-
-    def get_top_users_by_weight(self, limit: int) -> List[User]:
-        return self._get_top_users_base_query("total_weight_caught", limit)
 
     def get_high_value_users(self, threshold: int) -> List[User]:
         with self._get_connection() as conn:

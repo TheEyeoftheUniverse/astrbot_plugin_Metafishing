@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
             userData['auto_fishing_enabled'] = autoFishingCheckbox ? autoFishingCheckbox.checked : false;
 
             // 转换数字字段
-            const numberFields = ['coins', 'premium_currency', 'total_fishing_count', 'total_weight_caught', 
+            const numberFields = ['coins', 'premium_currency', 'total_fishing_count',
                                  'total_coins_earned', 'consecutive_login_days', 'fish_pond_capacity', 'fishing_zone_id'];
             numberFields.forEach(field => {
                 if (userData[field] !== undefined) {
@@ -192,7 +192,6 @@ document.addEventListener('DOMContentLoaded', function() {
         addStatRow('金币:', user.coins, true, 'bg-warning text-dark');
         addStatRow('高级货币:', user.premium_currency, true, 'bg-info');
         addStatRow('钓鱼次数:', user.total_fishing_count);
-        addStatRow('总重量:', user.total_weight_caught + 'g');
         addStatRow('总赚取金币:', user.total_coins_earned);
         addStatRow('连续登录:', user.consecutive_login_days + ' 天');
         col2.appendChild(table2);
@@ -381,7 +380,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('coins').value = user.coins;
                 document.getElementById('premium_currency').value = user.premium_currency;
                 document.getElementById('total_fishing_count').value = user.total_fishing_count;
-                document.getElementById('total_weight_caught').value = user.total_weight_caught;
                 document.getElementById('total_coins_earned').value = user.total_coins_earned;
                 document.getElementById('consecutive_login_days').value = user.consecutive_login_days;
                 document.getElementById('fish_pond_capacity').value = user.fish_pond_capacity;

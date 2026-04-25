@@ -13,8 +13,6 @@ class Fish:
     name: str
     rarity: int
     base_value: int
-    min_weight: int
-    max_weight: int
     description: Optional[str] = None
     icon_url: Optional[str] = None
 
@@ -207,7 +205,6 @@ class User:
     coins: int = 0
     premium_currency: int = 0
     total_fishing_count: int = 0
-    total_weight_caught: int = 0
     total_coins_earned: int = 0
     max_coins: int = 0  # 历史最高金币数
     consecutive_login_days: int = 0
@@ -283,7 +280,6 @@ class FishingRecord:
     record_id: int
     user_id: str
     fish_id: int
-    weight: int
     value: int
     timestamp: datetime
     rod_instance_id: Optional[int] = None
@@ -426,10 +422,7 @@ class UserFishStat:
     fish_id: int
     first_caught_at: Optional[datetime]
     last_caught_at: Optional[datetime]
-    max_weight: int
-    min_weight: int
     total_caught: int
-    total_weight: int
 
 # ---------------------------------
 # 商店实体 (Shop Entities) - 新设计

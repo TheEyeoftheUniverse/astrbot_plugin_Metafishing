@@ -98,7 +98,7 @@ class UserService:
 
         allowed_fields = {
             'nickname', 'coins', 'premium_currency', 'total_fishing_count',
-            'total_weight_caught', 'total_coins_earned', 'consecutive_login_days',
+            'total_coins_earned', 'consecutive_login_days',
             'fish_pond_capacity', 'fishing_zone_id', 'auto_fishing_enabled'
         }
         updates = {k: v for k, v in data.items() if k in allowed_fields}
@@ -111,7 +111,7 @@ class UserService:
         获取排行榜数据，支持按不同标准排序。
 
         Args:
-            sort_by: 排序标准 ('coins', 'max_coins', 'fish_count', 'total_weight_caught')
+            sort_by: 排序标准 ('coins', 'max_coins', 'fish_count')
             limit: 返回的用户数量限制
 
         Returns:
@@ -120,8 +120,6 @@ class UserService:
         top_users = []
         if sort_by == "fish_count":
             top_users = self.user_repo.get_top_users_by_fish_count(limit)
-        elif sort_by == "total_weight_caught":
-            top_users = self.user_repo.get_top_users_by_weight(limit)
         elif sort_by == "max_coins":
             top_users = self.user_repo.get_top_users_by_max_coins(limit)
         else: # 默认按金币排序
@@ -138,7 +136,6 @@ class UserService:
                 "coins": user.coins,
                 "max_coins": user.max_coins,  # 添加历史最高金币
                 "fish_count": user.total_fishing_count,
-                "total_weight_caught": user.total_weight_caught,
                 "current_title_id": user.current_title_id, # <--- 添加 current_title_id
             })
         # --- [修复结束] ---
@@ -636,14 +633,14 @@ class UserService:
         
         allowed_fields = [
             'nickname', 'coins', 'premium_currency', 'total_fishing_count',
-            'total_weight_caught', 'total_coins_earned', 'consecutive_login_days',
+            'total_coins_earned', 'consecutive_login_days',
             'fish_pond_capacity', 'fishing_zone_id', 'auto_fishing_enabled'
         ]
         
         # 定义关键字段的校验逻辑
         def is_valid(field: str, value: Any) -> bool:
             numeric_non_negative = {
-                'coins', 'premium_currency', 'total_fishing_count', 'total_weight_caught',
+                'coins', 'premium_currency', 'total_fishing_count',
                 'total_coins_earned', 'consecutive_login_days', 'fish_pond_capacity'
             }
             if field in numeric_non_negative:

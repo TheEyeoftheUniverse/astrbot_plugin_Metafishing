@@ -30,7 +30,6 @@
                         <th>名称</th>
                         <th>稀有度</th>
                         <th>价值</th>
-                        <th>重量范围 (g)</th>
                         <th>描述</th>
                         <th class="text-end">操作</th>
                     </tr>
@@ -42,7 +41,6 @@
                         <td>{{ item.name }}</td>
                         <td>{{ '★' * item.rarity }}</td>
                         <td>{{ item.base_value }}</td>
-                        <td>{{ item.min_weight }} - {{ item.max_weight }}</td>
                         <td>{{ item.description or '无' }}</td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-info edit-btn"
@@ -88,17 +86,9 @@
                              <label for="description" class="form-label">描述</label>
                              <textarea id="description" name="description" class="form-control" rows="2"></textarea>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-8">
                             <label for="base_value" class="form-label">基础价值</label>
                             <input type="number" id="base_value" name="base_value" class="form-control" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="min_weight" class="form-label">最小重量 (g)</label>
-                            <input type="number" id="min_weight" name="min_weight" class="form-control" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="max_weight" class="form-label">最大重量 (g)</label>
-                            <input type="number" id="max_weight" name="max_weight" class="form-control" required>
                         </div>
                          <div class="col-12">
                             <label for="icon_url" class="form-label">图标URL (可选)</label>

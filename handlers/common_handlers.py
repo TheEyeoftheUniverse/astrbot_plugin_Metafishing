@@ -63,7 +63,7 @@ async def fishing_log(self: "FishingPlugin", event: AstrMessageEvent):
             message = "【📜 钓鱼记录】：\n"
             for record in records:
                 message += (f" - {record['fish_name']} ({'★' * record['fish_rarity']})\n"
-                            f" - ⚖️重量: {record['fish_weight']} 克 - 💰价值: {record['fish_value']} 金币\n"
+                            f" - 💰价值: {record['fish_value']} 金币\n"
                             f" - 🔧装备： {record['accessory']} & {record['rod']} | 🎣鱼饵: {record['bait']}\n"
                             f" - 钓鱼时间: {safe_datetime_handler(record['timestamp'])}\n")
             yield event.plain_result(message)
