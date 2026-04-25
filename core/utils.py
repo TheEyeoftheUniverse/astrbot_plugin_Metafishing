@@ -37,41 +37,53 @@ def get_last_reset_time(reset_hour: int = 0) -> datetime:
         # 否则返回昨天的刷新时间点
         return today_reset - timedelta(days=1)
 
-def get_fish_template(new_fish_list, coins_chance):
+def get_fish_template(new_fish_list, value_bonus):
     """
-    使用标准的加权随机算法从鱼类列表中选择一个模板。
-    - 解决了旧算法中存在的边界问题和行为异常的Bug。
-    - 逻辑清晰，行为可预测：价值越高的鱼，被选中的基础概率越大。
-    - coins_chance > 0 时，会放大高价值鱼的概率优势。
+    按同星级价值池规则抽取鱼模板。
+    - 同星级内不再直接按 base_value 加权。
+    - 先按 base_value 划分低/中/高三档价值池。
+    - 默认池概率为 20% / 60% / 20%。
+    - 价值加成只允许把中价值池概率转移给高价值池。
+    - 低价值池概率始终保留，避免任务鱼/低价值鱼绝迹。
     """
-    # 边界情况处理：如果列表为空，返回None
     if not new_fish_list:
         return None
-        
-    # 边界情况处理：如果列表只有一个元素，直接返回，避免不必要的计算
+
     if len(new_fish_list) == 1:
         return new_fish_list[0]
 
-    # 1. 为列表中的每一条鱼计算其抽选权重
-    weights = []
-    for fish in new_fish_list:
-        # 保证基础权重至少为1，以防鱼的价值为0或负数
-        base_weight = max(fish.base_value, 1)
-        
-        # 应用 coins_chance 加成。
-        # (1 + coins_chance) 是一个简单的放大系数，确保了加成效果。
-        # 例如，如果 coins_chance 是 0.5 (50%)，则权重会乘以 1.5
-        final_weight = base_weight * (1 + coins_chance) 
-        weights.append(final_weight)
+    sorted_fish = sorted(new_fish_list, key=lambda fish: (fish.base_value, fish.fish_id))
+    total_count = len(sorted_fish)
 
-    # 2. 使用Python标准库的 random.choices 函数进行加权随机抽样
-    #   - new_fish_list: 从这个列表中抽样
-    #   - weights: 对应的权重列表
-    #   - k=1: 只抽取一个结果
-    #   [0]：因为 choices 返回的是一个列表，我们取出其中的第一个（也是唯一一个）元素
-    chosen_fish = random.choices(new_fish_list, weights=weights, k=1)[0]
-    
-    return chosen_fish
+    low_end = max(1, (total_count + 4) // 5)
+    high_start = min(total_count - 1, (total_count * 4) // 5)
+    if high_start < low_end:
+        high_start = low_end
+
+    pools = {
+        "low": sorted_fish[:low_end],
+        "mid": sorted_fish[low_end:high_start],
+        "high": sorted_fish[high_start:],
+    }
+    pool_weights = {
+        "low": 0.2,
+        "mid": 0.6 - min(max(value_bonus, 0.0), 0.6),
+        "high": 0.2 + min(max(value_bonus, 0.0), 0.6),
+    }
+
+    available_pools = [
+        fish_pool
+        for pool_name, fish_pool in pools.items()
+        if fish_pool and pool_weights[pool_name] > 0
+    ]
+    available_weights = [
+        pool_weights[pool_name]
+        for pool_name, fish_pool in pools.items()
+        if fish_pool and pool_weights[pool_name] > 0
+    ]
+
+    chosen_pool = random.choices(available_pools, weights=available_weights, k=1)[0]
+    return random.choice(chosen_pool)
 
 def calculate_after_refine(before_value: float, refine_level: int, rarity: int = None) -> float:
     """

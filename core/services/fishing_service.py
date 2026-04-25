@@ -1,5 +1,4 @@
 import json
-import math
 import random
 import threading
 import time
@@ -145,10 +144,10 @@ class FishingService:
 
         # 2. 计算各种加成和修正值
         base_success_rate = 0.7 # 基础成功率70%
-        quality_modifier = 1.0 # 品质加成
-        quantity_modifier = 1.0 # 数量加成
+        quality_bonus_total = 0.0 # 品质加成（加法累计）
+        quantity_bonus_total = 0.0 # 数量加成（加法累计）
         rare_chance = 0.0 # 稀有鱼出现几率
-        coins_chance = 0.0 # 增加同稀有度高金币出现几率
+        value_bonus = 0.0 # 同星级价值池加成
 
         # --- 新增：应用 Buff 效果 ---
         active_buffs = self.buff_repo.get_all_active_by_user(user_id)
@@ -173,18 +172,48 @@ class FishingService:
         if equipped_rod_instance:
             rod_template = self.item_template_repo.get_rod_by_id(equipped_rod_instance.rod_id)
             if rod_template:
-                quality_modifier *= calculate_after_refine(rod_template.bonus_fish_quality_modifier, refine_level= equipped_rod_instance.refine_level, rarity=rod_template.rarity)
-                quantity_modifier *= calculate_after_refine(rod_template.bonus_fish_quantity_modifier, refine_level= equipped_rod_instance.refine_level, rarity=rod_template.rarity)
+                quality_bonus_total += self._get_additive_modifier_bonus(
+                    calculate_after_refine(
+                        rod_template.bonus_fish_quality_modifier,
+                        refine_level=equipped_rod_instance.refine_level,
+                        rarity=rod_template.rarity,
+                    )
+                )
+                quantity_bonus_total += self._get_additive_modifier_bonus(
+                    calculate_after_refine(
+                        rod_template.bonus_fish_quantity_modifier,
+                        refine_level=equipped_rod_instance.refine_level,
+                        rarity=rod_template.rarity,
+                    )
+                )
                 rare_chance += calculate_after_refine(rod_template.bonus_rare_fish_chance, refine_level= equipped_rod_instance.refine_level, rarity=rod_template.rarity)
         # 获取装备饰品并应用加成
         equipped_accessory_instance = self.inventory_repo.get_user_equipped_accessory(user.user_id)
         if equipped_accessory_instance:
             acc_template = self.item_template_repo.get_accessory_by_id(equipped_accessory_instance.accessory_id)
             if acc_template:
-                quality_modifier *= calculate_after_refine(acc_template.bonus_fish_quality_modifier, refine_level= equipped_accessory_instance.refine_level, rarity=acc_template.rarity)
-                quantity_modifier *= calculate_after_refine(acc_template.bonus_fish_quantity_modifier, refine_level= equipped_accessory_instance.refine_level, rarity=acc_template.rarity)
+                quality_bonus_total += self._get_additive_modifier_bonus(
+                    calculate_after_refine(
+                        acc_template.bonus_fish_quality_modifier,
+                        refine_level=equipped_accessory_instance.refine_level,
+                        rarity=acc_template.rarity,
+                    )
+                )
+                quantity_bonus_total += self._get_additive_modifier_bonus(
+                    calculate_after_refine(
+                        acc_template.bonus_fish_quantity_modifier,
+                        refine_level=equipped_accessory_instance.refine_level,
+                        rarity=acc_template.rarity,
+                    )
+                )
                 rare_chance += calculate_after_refine(acc_template.bonus_rare_fish_chance, refine_level= equipped_accessory_instance.refine_level, rarity=acc_template.rarity)
-                coins_chance += calculate_after_refine(acc_template.bonus_coin_modifier, refine_level= equipped_accessory_instance.refine_level, rarity=acc_template.rarity)
+                value_bonus += self._get_additive_modifier_bonus(
+                    calculate_after_refine(
+                        acc_template.bonus_coin_modifier,
+                        refine_level=equipped_accessory_instance.refine_level,
+                        rarity=acc_template.rarity,
+                    )
+                )
         # 获取鱼饵并应用加成
         cur_bait_id = user.current_bait_id
         garbage_reduction_modifier = None
@@ -257,11 +286,11 @@ class FishingService:
             bait_template = self.item_template_repo.get_bait_by_id(user.current_bait_id)
             # logger.info(f"鱼饵信息: {bait_template}")
             if bait_template:
-                quantity_modifier *= bait_template.quantity_modifier
+                quantity_bonus_total += self._get_additive_modifier_bonus(bait_template.quantity_modifier)
                 rare_chance += bait_template.rare_chance_modifier
                 base_success_rate += bait_template.success_rate_modifier
                 garbage_reduction_modifier = bait_template.garbage_reduction_modifier
-                coins_chance += bait_template.value_modifier
+                value_bonus += self._get_additive_modifier_bonus(bait_template.value_modifier)
         # 3. 判断是否成功钓到
         if random.random() >= base_success_rate:
             # 失败逻辑
@@ -311,7 +340,7 @@ class FishingService:
             # 1-5星直接对应
             rarity = rarity_index + 1
             
-        fish_template = self._get_fish_template(rarity, zone, coins_chance)
+        fish_template = self._get_fish_template(rarity, zone, value_bonus)
 
         if not fish_template:
              return {"success": False, "message": "错误：当前条件下没有可钓的鱼！"}
@@ -321,54 +350,39 @@ class FishingService:
             # 根据垃圾鱼减少修正值决定是否重新选择一次
             if random.random() < garbage_reduction_modifier:
                 # 重新选择一条鱼
-                new_rarity = random.choices(range(1, len(rarity_distribution) + 1), weights=rarity_distribution, k=1)[0]
-                new_fish_template = self._get_fish_template(new_rarity, zone, coins_chance)
+                new_rarity_index = random.choices(
+                    range(len(adjusted_distribution)),
+                    weights=adjusted_distribution,
+                    k=1,
+                )[0]
+                if new_rarity_index == 5:
+                    new_rarity = self._get_random_high_rarity(zone)
+                else:
+                    new_rarity = new_rarity_index + 1
+                new_fish_template = self._get_fish_template(new_rarity, zone, value_bonus)
 
                 if new_fish_template:
                     fish_template = new_fish_template
 
         # 计算最终属性
-        weight = random.randint(fish_template.min_weight, fish_template.max_weight)
         value = fish_template.base_value
 
-        # 4.2 按品质加成给予额外品质（重量/价值）奖励
-        # 品质加成来自：鱼竿 × 饰品 × 鱼饵（乘法累积）
-        # 使用对数压缩避免概率过高，保持高品质鱼的稀有性
+        # 4.2 按品质加成给予额外品质价值奖励
+        # 品质加成来自：鱼竿 + 饰品 + 鱼饵（加法累计）
         quality_bonus = False
         quality_level = 0  # 默认普通品质
-        if quality_modifier > 1.0:
-            # 对数压缩公式：处理乘法累积的品质加成
-            # log2(x) 特性：log2(1)=0, log2(2)=1, log2(4)=2
-            # 天然适合处理乘法累积：log2(a×b) = log2(a) + log2(b)
-            log_value = math.log2(quality_modifier)
-            
-            # 从配置获取高品质鱼最大触发概率，默认35%
-            max_quality_chance = self.config.get("quality_bonus_max_chance", 0.35)
-            
-            # 缩放到配置的上限，让 quality_modifier=4.0 时达到上限
-            # 缩放系数 = max_chance / 2（因为 log2(4) = 2）
-            scale_factor = max_quality_chance / 2.0
-            adjusted_chance = log_value * scale_factor
-            
-            # 确保不超过配置的上限，避免高品质鱼过于常见
-            final_chance = min(adjusted_chance, max_quality_chance)
-            
-            quality_bonus = random.random() <= final_chance
+        quality_chance = max(0.0, quality_bonus_total) * self._get_quality_decay_factor(fish_template.rarity)
+        if quality_chance > 0:
+            quality_bonus = random.random() < quality_chance
         if quality_bonus:
-            extra_weight = random.randint(fish_template.min_weight, fish_template.max_weight)
-            weight += extra_weight
             # 标记为高品质鱼，价值在出售时按2倍计算
             quality_level = 1
 
         # 4.3 按数量加成决定额外渔获数量
         total_catches = 1
-        if quantity_modifier > 1.0:
-            # 整数部分-1 为保证的额外数量；小数部分为额外+1的概率
-            guaranteed_extra = max(0, int(quantity_modifier) - 1)
-            total_catches += guaranteed_extra
-            fractional = quantity_modifier - int(quantity_modifier)
-            if fractional > 0 and random.random() < fractional:
-                total_catches += 1
+        extra_catch_chance = max(0.0, quantity_bonus_total) * self._get_quantity_decay_factor(fish_template.rarity)
+        if extra_catch_chance > 0 and random.random() < extra_catch_chance:
+            total_catches += 1
 
         # 5. 处理鱼塘容量（在确定总渔获量后）
         user_fish_inventory = self.inventory_repo.get_fish_inventory(user.user_id)
@@ -406,7 +420,6 @@ class FishingService:
 
         # 更新用户统计数据
         user.total_fishing_count += total_catches
-        user.total_weight_caught += weight
         # 高品质鱼的统计价值按双倍计算
         if quality_level == 1:
             user.total_coins_earned += fish_template.base_value * total_catches * 2
@@ -456,7 +469,6 @@ class FishingService:
             record_id=0, # DB自增
             user_id=user.user_id,
             fish_id=fish_template.fish_id,
-            weight=weight,
             value=value,
             timestamp=user.last_fishing_time,
             rod_instance_id=user.equipped_rod_instance_id,
@@ -471,7 +483,6 @@ class FishingService:
             "fish": {
                 "name": fish_template.name,
                 "rarity": fish_template.rarity,
-                "weight": weight,
                 "value": value * 2 if quality_level == 1 else value,  # 高品质鱼双倍价值
                 "quality_level": quality_level,  # 添加品质等级
                 "quality_label": "✨高品质" if quality_level == 1 else "普通"  # 添加品质标签
@@ -508,10 +519,7 @@ class FishingService:
                     "icon_url": fish_template.icon_url,
                     "first_caught_time": stat.first_caught_at,
                     "last_caught_time": stat.last_caught_at,
-                    "max_weight": stat.max_weight,
-                    "min_weight": stat.min_weight,
                     "total_caught": stat.total_caught,
-                    "total_weight": stat.total_weight,
                 })
         # 将图鉴按稀有度从大到小排序
         pokedex.sort(key=lambda x: x["rarity"], reverse=True)
@@ -549,7 +557,6 @@ class FishingService:
             fish_details.append({
                 "fish_name": fish_template.name if fish_template else "未知鱼类",
                 "fish_rarity": fish_template.rarity if fish_template else "未知稀有度",
-                "fish_weight": record.weight,
                 "fish_value": record.value,
                 "timestamp": record.timestamp,
                 "rod": rod_instance.name if rod_instance else "未装备鱼竿",
@@ -616,13 +623,14 @@ class FishingService:
         - 通过从低星转移权重到中高星，确保概率总和始终为 1
         
         实现原理：
-        1. 从 1-3 星的总权重中，按 rare_chance 比例转移部分权重
-        2. 将转移的权重分配给 4-5 星，按其原始比例分配
-        3. 6+ 星的概率保持不变，保证超稀有鱼的珍贵性
+        1. 从 1-3 星的总权重中，按稀有度加成转移一部分权重。
+        2. 对 rare_chance 做温和压缩，避免多来源叠加后 5 星膨胀。
+        3. 将转移权重分配给 4-5 星，并轻微偏向 4 星。
+        4. 6+ 星的概率保持不变，保证超稀有鱼的珍贵性。
         
         示例效果（rare_chance = 0.46）：
-        - 原始: 1-3星 60%, 4-5星 38%, 6+星 2%
-        - 调整后: 1-3星 32%, 4-5星 66%, 6+星 2%（不变）
+        - 原始: 1-3星为主要来源，4-5星为提升目标，6+星保持独立
+        - 调整后: 1-3星下降，4星提升更明显，5星温和提升，6+星维持不变
         
         Args:
             distribution: 原始稀有度分布列表 [1星, 2星, 3星, 4星, 5星, 6+星]
@@ -632,59 +640,40 @@ class FishingService:
             调整后的稀有度分布列表，概率总和为 1
         """
         if len(distribution) < 6:
-            # 安全检查：如果分布数组长度不足，直接返回副本
             return distribution.copy()
-        
-        # 转换系数：1.0 表示 rare_chance 直接作为权重转移比例
-        # 例如 rare_chance=0.46 → 从低星转移 46% 的权重到中高星
-        TRANSFER_FACTOR = 1.0
-        
-        actual_boost = rare_chance * TRANSFER_FACTOR
-        
-        # 限制上限为 0.8，防止低星概率被转移到接近 0 导致游戏体验失衡
-        actual_boost = min(actual_boost, 0.8)
-        
+
         new_distribution = distribution.copy()
-        
-        # 分组计算：
-        # - 低星（1-3星，索引 0-2）：普通鱼，作为权重来源
-        # - 中高星（4-5星，索引 3-4）：稀有鱼，接收权重转移
-        # - 超稀有（6+星，索引 5）：传说鱼，不参与计算以保持稀有性
         low_star_total = sum(new_distribution[:3])
         mid_high_star_total = sum(new_distribution[3:5])
-        
-        # 边界情况：如果某一组概率为 0，则无法进行权重转移
+
         if mid_high_star_total <= 0 or low_star_total <= 0:
             return new_distribution
-        
-        # 计算转移量：从低星总权重中按比例转移
-        # 例如：低星总权重 60%，rare_chance 46% → 转移 27.6% 的绝对权重
-        transfer_amount = low_star_total * actual_boost
-        
-        # 步骤 1：从低星（1-3星）按原始比例扣减权重
-        # 保持各低星之间的相对比例不变，整体权重减少
+
+        effective_rare_chance = max(0.0, rare_chance)
+        transfer_ratio = min((effective_rare_chance / (1.0 + effective_rare_chance)) * 0.6, 0.35)
+        transfer_amount = low_star_total * transfer_ratio
+
         for i in range(3):
             if low_star_total > 0:
                 ratio = new_distribution[i] / low_star_total
                 new_distribution[i] = max(0, new_distribution[i] - transfer_amount * ratio)
-        
-        # 步骤 2：向中高星（4-5星）按原始比例分配转移的权重
-        # 保持 4星和 5星之间的相对比例不变，整体权重增加
-        for i in range(3, 5):
-            if mid_high_star_total > 0:
-                ratio = new_distribution[i] / mid_high_star_total
-                new_distribution[i] = new_distribution[i] + transfer_amount * ratio
-        
-        # 步骤 3：6+星（索引 5）完全不参与上述计算，保持原值
-        # 这确保了超稀有鱼的概率不受装备影响，维持其珍贵性和神秘感
-        
-        # 归一化处理：确保所有概率之和精确为 1.0
-        # 这是必要的，因为浮点运算可能产生微小误差
-        new_distribution = [x / sum(new_distribution) for x in new_distribution]
-        
+
+        four_star_weight = new_distribution[3]
+        five_star_weight = new_distribution[4] * 0.6
+        target_total = four_star_weight + five_star_weight
+        if target_total <= 0:
+            return distribution.copy()
+
+        new_distribution[3] += transfer_amount * (four_star_weight / target_total)
+        new_distribution[4] += transfer_amount * (five_star_weight / target_total)
+
+        total = sum(new_distribution)
+        if total <= 0:
+            return distribution.copy()
+        new_distribution = [x / total for x in new_distribution]
         return new_distribution
 
-    def _get_fish_template(self, rarity: int, zone: FishingZone, coins_chance: float):
+    def _get_fish_template(self, rarity: int, zone: FishingZone, value_bonus: float):
         """根据稀有度和区域配置获取鱼类模板"""
         
         # 检查 FishingZone 对象是否有 'specific_fish_ids' 属性
@@ -702,7 +691,34 @@ class FishingService:
             # 如果限定鱼或全局鱼列表为空，则从所有鱼中随机抽取一条
             return self.item_template_repo.get_random_fish(rarity)
 
-        return get_fish_template(fish_list, coins_chance)
+        return get_fish_template(fish_list, value_bonus)
+
+    @staticmethod
+    def _get_additive_modifier_bonus(modifier: float) -> float:
+        """将以 1.0 为基线的模板倍率转换为加法语义下的增量。"""
+        if modifier is None:
+            return 0.0
+        return modifier - 1.0
+
+    @staticmethod
+    def _get_quality_decay_factor(rarity: int) -> float:
+        if rarity <= 3:
+            return 1.0
+        if rarity == 4:
+            return 0.6
+        if rarity == 5:
+            return 0.3
+        return 0.1
+
+    @staticmethod
+    def _get_quantity_decay_factor(rarity: int) -> float:
+        if rarity <= 3:
+            return 1.0
+        if rarity == 4:
+            return 0.7
+        if rarity == 5:
+            return 0.4
+        return 0.0
 
     def _get_random_high_rarity(self, zone: FishingZone = None) -> int:
         """从6星及以上鱼类中随机选择一个稀有度，兼容区域限定鱼"""
