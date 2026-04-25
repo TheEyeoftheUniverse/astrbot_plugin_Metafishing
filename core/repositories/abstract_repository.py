@@ -242,6 +242,15 @@ class AbstractInventoryRepository(ABC):
     # 更新用户的道具数量
     @abstractmethod
     def update_item_quantity(self, user_id: str, item_id: int, delta: int) -> None: pass
+
+    def get_user_zone_stay(self, user_id: str, zone_id: int) -> Optional[Dict[str, Any]]: pass
+
+    def upsert_user_zone_stay(self, user_id: str, zone_id: int, pass_item_id: int, expires_at) -> None: pass
+
+    def delete_user_zone_stay(self, user_id: str, zone_id: int) -> None: pass
+
+    def get_expired_zone_stays(self, now) -> List[Dict[str, Any]]: pass
+
     # 获取用户的所有鱼竿实例
     @abstractmethod
     def get_user_rod_instances(self, user_id: str) -> List[UserRodInstance]: pass

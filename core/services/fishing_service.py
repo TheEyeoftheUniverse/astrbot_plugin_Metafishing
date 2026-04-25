@@ -56,6 +56,9 @@ class FishingService:
         self.tax_execution_lock = threading.Lock()  # 防止税收并发执行的锁
         self.tax_start_lock = threading.Lock()  # 防止重复创建税收线程的锁
         self.rare_fish_reset_lock = threading.Lock()  # 防止稀有鱼重置并发执行的锁
+        self.zone_pass_stay_duration = timedelta(hours=24)
+        self.zone_pass_check_interval_seconds = self.config.get("zone_pass_check_interval_seconds", 60)
+        self.last_zone_pass_check_ts = 0.0
         # 可选的消息通知回调：签名 (target: str, message: str) -> None，用于消息通知
         self._notifier = None
         # 通知目标可配置，默认群聊。可由 config['notifications']['relocation_target'] 覆盖
@@ -134,6 +137,10 @@ class FishingService:
             first_zone = self.inventory_repo.get_zone_by_id(1)
             first_zone_name = first_zone.name if first_zone else "初始区域"
             return {"success": False, "message": f"该钓鱼区域已于 {zone.available_until.strftime('%Y-%m-%d %H:%M')} 关闭，已自动传送回{first_zone_name}"}
+
+        access_result = self._ensure_current_zone_pass_or_relocate(user, zone)
+        if not access_result.get("success", False):
+            return access_result
         
         fishing_cost = zone.fishing_cost
         if not user.can_afford(fishing_cost):
@@ -817,6 +824,115 @@ class FishingService:
         except Exception:
             return (None, None, 0)
 
+    @staticmethod
+    def _is_stay_active(stay: Optional[Dict[str, Any]], now) -> bool:
+        if not stay:
+            return False
+        expires_at = stay.get("expires_at")
+        return bool(expires_at and expires_at > now)
+
+    def _get_safe_zone_after_pass_expiry(self) -> Optional[FishingZone]:
+        for zone_id in (2, 1):
+            try:
+                zone = self.inventory_repo.get_zone_by_id(zone_id)
+            except Exception:
+                continue
+            if zone_id == 2 and (not zone.is_active or getattr(zone, "requires_pass", False)):
+                continue
+            return zone
+        return None
+
+    def _relocate_user_for_missing_zone_pass(self, user, zone: FishingZone, item_name: str) -> Dict[str, Any]:
+        target_zone = self._get_safe_zone_after_pass_expiry()
+        target_zone_id = target_zone.id if target_zone else 1
+        target_zone_name = target_zone.name if target_zone else "区域一"
+
+        self.inventory_repo.delete_user_zone_stay(user.user_id, zone.id)
+        user.fishing_zone_id = target_zone_id
+        self.user_repo.update(user)
+        self.log_repo.add_log(
+            user.user_id,
+            "zone_relocation",
+            f"缺少 {item_name}，已被传送至 {target_zone_name}",
+        )
+        return {
+            "success": False,
+            "message": f"区域通行证已失效且缺少 {item_name}，已传送至{target_zone_name}",
+        }
+
+    def _consume_pass_and_extend_stay(self, user_id: str, zone: FishingZone, item_id: int, item_name: str):
+        self.inventory_repo.decrease_item_quantity(user_id, item_id, 1)
+        expires_at = get_now() + self.zone_pass_stay_duration
+        self.inventory_repo.upsert_user_zone_stay(user_id, zone.id, item_id, expires_at)
+        self.log_repo.add_log(user_id, "zone_stay_renewal", f"消耗 1 个 {item_name}，{zone.name} 驻留延长至 {expires_at.strftime('%Y-%m-%d %H:%M')}")
+        return expires_at
+
+    def _ensure_current_zone_pass_or_relocate(self, user, zone: FishingZone) -> Dict[str, Any]:
+        if not getattr(zone, "requires_pass", False) or not getattr(zone, "required_item_id", None):
+            self.inventory_repo.delete_user_zone_stay(user.user_id, zone.id)
+            return {"success": True}
+
+        matched_item_id, matched_tpl, matched_qty = self._find_matching_pass_for_zone(user.user_id, zone)
+        item_template = self.item_template_repo.get_item_by_id(zone.required_item_id)
+        required_item_name = item_template.name if item_template else f"道具ID{zone.required_item_id}"
+
+        if matched_item_id:
+            matched_item_name = matched_tpl.name if matched_tpl and getattr(matched_tpl, "name", None) else f"道具ID{matched_item_id}"
+            is_consumable = getattr(matched_tpl, "is_consumable", True) if matched_tpl else True
+            if not is_consumable:
+                self.inventory_repo.delete_user_zone_stay(user.user_id, zone.id)
+                return {"success": True}
+        else:
+            matched_item_name = required_item_name
+            is_consumable = True
+
+        now = get_now()
+        stay = self.inventory_repo.get_user_zone_stay(user.user_id, zone.id)
+        if self._is_stay_active(stay, now):
+            return {"success": True}
+
+        if matched_item_id and matched_qty > 0 and is_consumable:
+            expires_at = self._consume_pass_and_extend_stay(user.user_id, zone, matched_item_id, matched_item_name)
+            return {"success": True, "renewed_until": expires_at}
+
+        return self._relocate_user_for_missing_zone_pass(user, zone, matched_item_name)
+
+    def _enter_zone_with_pass(self, user, zone: FishingZone) -> Dict[str, Any]:
+        if not getattr(zone, "requires_pass", False) or not getattr(zone, "required_item_id", None):
+            return {"success": True, "message_suffix": ""}
+
+        matched_item_id, matched_tpl, matched_qty = self._find_matching_pass_for_zone(user.user_id, zone)
+        if not matched_item_id:
+            item_template = self.item_template_repo.get_item_by_id(zone.required_item_id)
+            item_name = item_template.name if item_template else f"道具ID{zone.required_item_id}"
+            return {
+                "success": False,
+                "message": f"❌ 进入该区域需要 {item_name}，您当前拥有 0 个",
+            }
+
+        item_name = matched_tpl.name if matched_tpl and getattr(matched_tpl, "name", None) else f"道具ID{matched_item_id}"
+        is_consumable = getattr(matched_tpl, "is_consumable", True) if matched_tpl else True
+        if not is_consumable:
+            self.inventory_repo.delete_user_zone_stay(user.user_id, zone.id)
+            self.log_repo.add_log(user.user_id, "zone_entry", f"使用不消耗通行证({item_name})进入 {zone.name}")
+            return {
+                "success": True,
+                "message_suffix": f"\nℹ️ 提示：欢迎入驻！您使用的 {item_name} 为该区域永久通行证！",
+            }
+
+        if matched_qty <= 0:
+            return {
+                "success": False,
+                "message": f"❌ 进入该区域需要 {item_name}，您当前拥有 0 个",
+            }
+
+        expires_at = self._consume_pass_and_extend_stay(user.user_id, zone, matched_item_id, item_name)
+        self.log_repo.add_log(user.user_id, "zone_entry", f"使用通行证({item_name})进入 {zone.name}")
+        return {
+            "success": True,
+            "message_suffix": f"\n🔑 已消耗 1 个 {item_name}\n⏳ 本次驻留有效至 {expires_at.strftime('%Y-%m-%d %H:%M')}",
+        }
+
     def set_user_fishing_zone(self, user_id: str, zone_id: int) -> Dict[str, Any]:
         """
         设置用户的钓鱼区域。
@@ -848,47 +964,25 @@ class FishingService:
         if zone.available_until and now > zone.available_until:
             return {"success": False, "message": f"该钓鱼区域已于 {zone.available_until.strftime('%Y-%m-%d %H:%M')} 关闭"}
 
-        # 检查通行证要求（从数据库读取） - 使用模糊匹配并考虑是否可被消耗
-        pass_consumed = False
-        consumed_item_name = None
-        non_consumable_used = False
-        if zone.requires_pass and zone.required_item_id:
-            matched_item_id, matched_tpl, matched_qty = self._find_matching_pass_for_zone(user_id, zone)
-
-            # 如果未找到匹配的通行证
-            if not matched_item_id:
-                # 获取道具名称用于显示（以区域配置的模板为准）
-                item_template = self.item_template_repo.get_item_by_id(zone.required_item_id)
-                item_name = item_template.name if item_template else f"道具ID{zone.required_item_id}"
-                return {
-                    "success": False,
-                    "message": f"❌ 进入该区域需要 {item_name}，您当前拥有 0 个"
-                }
-
-            # 找到匹配道具，判断是否应被消耗
-            consumed_item_name = matched_tpl.name if matched_tpl and getattr(matched_tpl, "name", None) else f"道具ID{matched_item_id}"
-            is_consumable = getattr(matched_tpl, "is_consumable", True) if matched_tpl else True
-
-            if is_consumable:
-                # 扣除一个
-                self.inventory_repo.decrease_item_quantity(user_id, matched_item_id, 1)
-                pass_consumed = True
-                # 记录日志
-                self.log_repo.add_log(user_id, "zone_entry", f"使用通行证({consumed_item_name})进入 {zone.name}")
-            else:
-                # 不消耗，记录一次访问检查
-                non_consumable_used = True
-                self.log_repo.add_log(user_id, "zone_entry", f"使用不消耗通行证({consumed_item_name})进入 {zone.name}")
+        old_zone_id = user.fishing_zone_id
+        if old_zone_id == zone.id:
+            access_result = self._ensure_current_zone_pass_or_relocate(user, zone)
+            if not access_result.get("success", False):
+                return access_result
+            message_suffix = ""
+        else:
+            access_result = self._enter_zone_with_pass(user, zone)
+            if not access_result.get("success", False):
+                return access_result
+            message_suffix = access_result.get("message_suffix", "")
 
         user.fishing_zone_id = zone.id
         self.user_repo.update(user)
+        if old_zone_id != zone.id:
+            self.inventory_repo.delete_user_zone_stay(user_id, old_zone_id)
 
         # 构建成功消息
-        success_message = f"✅已将钓鱼区域设置为 {zone.name}"
-        if pass_consumed and consumed_item_name:
-            success_message += f"\n🔑 已消耗 1 个 {consumed_item_name}"
-        if non_consumable_used and consumed_item_name:
-            success_message += f"\nℹ️ 提示：欢迎入驻！您使用的 {consumed_item_name} 为该区域永久通行证！"
+        success_message = f"✅已将钓鱼区域设置为 {zone.name}{message_suffix}"
 
         return {"success": True, "message": success_message}
 
@@ -963,10 +1057,10 @@ class FishingService:
 
     def enforce_zone_pass_requirements_for_all_users(self) -> None:
         """
-        每日检查：若用户当前所在钓鱼区域需要通行证，但其背包中已无对应道具，
-        则将用户传送回 1 号钓鱼地，并通过群聊@通知相关玩家。
+        周期检查：消耗型通行证驻留到期后自动续票，无法续票则回传安全区域。
+        永久通行证不走驻留周期，只校验背包持有状态。
         """
-        logger.info("开始执行每日区域通行证检查...")
+        logger.info("开始执行区域通行证驻留检查...")
         try:
             all_user_ids = self.user_repo.get_all_user_ids()
             logger.info(f"找到 {len(all_user_ids)} 个用户需要检查")
@@ -974,7 +1068,8 @@ class FishingService:
             logger.error(f"获取用户列表失败: {e}")
             return
 
-        relocated_users = []  # 存储被传送的用户信息
+        relocated_users = []
+        renewed_count = 0
 
         for user_id in all_user_ids:
             try:
@@ -986,53 +1081,26 @@ class FishingService:
                 if not zone or not getattr(zone, "requires_pass", False) or not getattr(zone, "required_item_id", None):
                     continue
 
-                # 使用模糊匹配查找用户持有的通行证（支持名称模糊匹配和 exact id）
-                matched_item_id, matched_tpl, matched_qty = self._find_matching_pass_for_zone(user_id, zone)
-
-                if not matched_item_id or matched_qty < 1:
-                    # 用户没有匹配的通行证，传送到区域2（若不存在则回退到1）
-                    target_zone = self.inventory_repo.get_zone_by_id(2) or self.inventory_repo.get_zone_by_id(1)
-                    target_zone_id = target_zone.id if target_zone else 1
-                    user.fishing_zone_id = target_zone_id
-                    self.user_repo.update(user)
-
-                    # 记录日志
-                    try:
-                        item_template = self.item_template_repo.get_item_by_id(zone.required_item_id)
-                        item_name = item_template.name if item_template else f"道具ID{zone.required_item_id}"
-                    except Exception:
-                        item_name = f"道具ID{zone.required_item_id}"
-                    self.log_repo.add_log(user_id, "zone_relocation", f"缺少 {item_name}，已被传送至 {target_zone.name if target_zone else target_zone_id} 号钓鱼地")
-
-                    # 收集被传送用户信息
+                before_zone_id = user.fishing_zone_id
+                result = self._ensure_current_zone_pass_or_relocate(user, zone)
+                if not result.get("success", False):
+                    item_template = self.item_template_repo.get_item_by_id(zone.required_item_id)
+                    item_name = item_template.name if item_template else f"道具ID{zone.required_item_id}"
                     relocated_users.append({
                         "user_id": user_id,
                         "nickname": user.nickname,
                         "zone_name": zone.name,
                         "item_name": item_name
                     })
-                else:
-                    # 找到匹配道具，若为可消耗则扣除一件；否则仅记录检查并保留在原地
-                    is_consumable = getattr(matched_tpl, "is_consumable", True) if matched_tpl else True
-                    item_name = matched_tpl.name if matched_tpl and getattr(matched_tpl, "name", None) else f"道具ID{matched_item_id}"
-                    if is_consumable:
-                        try:
-                            self.inventory_repo.decrease_item_quantity(user_id, matched_item_id, 1)
-                            self.log_repo.add_log(user_id, "zone_access_check", f"消耗 1 个 {item_name}，继续留在 {zone.name}")
-                        except Exception:
-                            # 若扣除失败，记录并当作无通行证处理（移回安全区）
-                            self.log_repo.add_log(user_id, "zone_access_check", f"尝试消耗 {item_name} 失败，稍后将进行回传处理")
-                    else:
-                        # 不消耗
-                        self.log_repo.add_log(user_id, "zone_access_check", f"检测到不消耗通行证 {item_name}，继续留在 {zone.name}")
-            except Exception:
+                elif result.get("renewed_until") and before_zone_id == zone.id:
+                    renewed_count += 1
+            except Exception as e:
                 # 单个用户异常不影响其他用户
+                logger.error(f"区域通行证驻留检查失败: {user_id}, {e}")
                 continue
 
-        # 记录检查结果
-        logger.info(f"每日检查完成：{len(relocated_users)} 个用户被传送（缺少通行证）")
+        logger.info(f"区域通行证驻留检查完成：续票 {renewed_count} 人，回传 {len(relocated_users)} 人")
         
-        # 记录被传送用户信息（不发送通知，避免凌晨打扰玩家）
         if relocated_users:
             logger.info(f"被传送用户详情：{relocated_users}")
 
@@ -1178,12 +1246,11 @@ class FishingService:
             try:
                 # 检查并执行每日重置（如果需要）
                 if self._reset_rare_fish_daily_quota():
-                    # 如果执行了重置，说明是新的一天，执行其他每日任务
-                    logger.info("自动钓鱼线程检测到新的一天，开始执行每日任务...")
-                    
-                    # 注意：每日税收已由独立的税收线程处理，不再在此执行
-                    
-                    # 每日检查：需要通行证的区域玩家是否仍持有通行证
+                    logger.info("自动钓鱼线程检测到新的一天，已完成稀有鱼配额重置")
+
+                now_ts_for_pass_check = time.time()
+                if now_ts_for_pass_check - self.last_zone_pass_check_ts >= self.zone_pass_check_interval_seconds:
+                    self.last_zone_pass_check_ts = now_ts_for_pass_check
                     self.enforce_zone_pass_requirements_for_all_users()
                 
                 # 获取所有开启自动钓鱼的用户
@@ -1220,6 +1287,14 @@ class FishingService:
                     # 检查成本（从区域配置中读取）
                     zone = self.inventory_repo.get_zone_by_id(user.fishing_zone_id)
                     if not zone:
+                        continue
+                    access_result = self._ensure_current_zone_pass_or_relocate(user, zone)
+                    if not access_result.get("success", False):
+                        try:
+                            if self._notifier:
+                                self._notifier(user_id, f"🔑 {access_result.get('message', '区域通行证已失效')}")
+                        except Exception:
+                            pass
                         continue
                     fishing_cost = zone.fishing_cost
                     if not user.can_afford(fishing_cost):

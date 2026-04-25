@@ -359,6 +359,66 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
             cursor.execute("DELETE FROM user_items WHERE user_id = ? AND quantity <= 0", (user_id,))
             conn.commit()
 
+    def _row_to_zone_stay(self, row: sqlite3.Row) -> Optional[Dict[str, Any]]:
+        if not row:
+            return None
+        data = dict(row)
+        expires_at = data.get("expires_at")
+        if isinstance(expires_at, str) and expires_at.strip():
+            try:
+                dt = datetime.fromisoformat(expires_at)
+                if dt.tzinfo is None:
+                    from datetime import timezone, timedelta
+                    dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
+                data["expires_at"] = dt
+            except ValueError:
+                data["expires_at"] = None
+        return data
+
+    def get_user_zone_stay(self, user_id: str, zone_id: int) -> Optional[Dict[str, Any]]:
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM user_zone_stays WHERE user_id = ? AND zone_id = ?",
+                (user_id, zone_id),
+            )
+            return self._row_to_zone_stay(cursor.fetchone())
+
+    def upsert_user_zone_stay(self, user_id: str, zone_id: int, pass_item_id: int, expires_at: datetime) -> None:
+        now = datetime.now().isoformat()
+        expires_at_text = expires_at.isoformat()
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO user_zone_stays (user_id, zone_id, pass_item_id, expires_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, zone_id) DO UPDATE SET
+                    pass_item_id = excluded.pass_item_id,
+                    expires_at = excluded.expires_at,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, zone_id, pass_item_id, expires_at_text, now, now),
+            )
+            conn.commit()
+
+    def delete_user_zone_stay(self, user_id: str, zone_id: int) -> None:
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM user_zone_stays WHERE user_id = ? AND zone_id = ?",
+                (user_id, zone_id),
+            )
+            conn.commit()
+
+    def get_expired_zone_stays(self, now: datetime) -> List[Dict[str, Any]]:
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM user_zone_stays WHERE expires_at <= ?",
+                (now.isoformat(),),
+            )
+            return [self._row_to_zone_stay(row) for row in cursor.fetchall()]
 
     # --- Rod Inventory Methods ---
     def get_user_rod_instances(self, user_id: str) -> List[UserRodInstance]:
