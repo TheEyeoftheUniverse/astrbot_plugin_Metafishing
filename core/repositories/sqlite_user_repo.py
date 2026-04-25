@@ -90,18 +90,6 @@ class SqliteUserRepository(AbstractUserRepository):
             last_wipe_bomb_date=row["last_wipe_bomb_date"] if "last_wipe_bomb_date" in row_keys else None,
             # =========================================================
 
-            # --- [关键修复] 添加所有命运之轮字段的读取 ---
-            in_wheel_of_fate=bool(row["in_wheel_of_fate"]) if "in_wheel_of_fate" in row_keys else False,
-            wof_current_level=row["wof_current_level"] if "wof_current_level" in row_keys else 0,
-            wof_current_prize=row["wof_current_prize"] if "wof_current_prize" in row_keys else 0,
-            wof_entry_fee=row["wof_entry_fee"] if "wof_entry_fee" in row_keys else 0,
-            last_wof_play_time=parse_datetime(row["last_wof_play_time"]) if "last_wof_play_time" in row_keys else None,
-            wof_last_action_time=parse_datetime(row["wof_last_action_time"]) if "wof_last_action_time" in row_keys else None,
-            wof_plays_today=row["wof_plays_today"] if "wof_plays_today" in row_keys else 0,
-            last_wof_date=row["last_wof_date"] if "last_wof_date" in row_keys else None,
-            # --- [新功能] 添加骰宝冷却字段的读取 ---
-            last_sicbo_time=parse_datetime(row["last_sicbo_time"]) if "last_sicbo_time" in row_keys else None,
-            
             # --- [新功能] 添加交易所账户状态字段的读取 ---
             exchange_account_status=bool(row["exchange_account_status"]) if "exchange_account_status" in row_keys else False,
         )

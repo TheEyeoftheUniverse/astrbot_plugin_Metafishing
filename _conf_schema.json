@@ -214,12 +214,6 @@
         "hint": "每日重置鱼塘配额、税收等的时间点（小时，0-23），默认为0表示0点刷新",
         "default": 0
       },
-      "wheel_of_fate_daily_limit": {
-        "description": "命运轮盘每日次数限制",
-        "type": "int",
-        "hint": "每个用户每天可以玩命运轮盘的最大次数",
-        "default": 3
-      },
       "wipe_bomb_attempts": {
         "description": "擦弹炸弹每日次数",
         "type": "int",

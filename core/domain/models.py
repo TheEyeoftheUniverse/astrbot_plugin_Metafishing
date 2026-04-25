@@ -237,19 +237,6 @@ class User:
     last_stolen_at: Optional[datetime] = None
     wipe_bomb_forecast: Optional[str] = None  # 'good' or 'bad'
 
-    # --- 新增：用于“命运之轮”游戏的状态字段 ---
-    in_wheel_of_fate: bool = False
-    wof_current_level: int = 0
-    wof_current_prize: int = 0
-    wof_entry_fee: int = 0
-    last_wof_play_time: datetime | None = None
-    wof_last_action_time: datetime | None = None
-    wof_plays_today: int = 0
-    last_wof_date: Optional[str] = None # YYYY-MM-DD 格式
-    
-    # --- 新增：用于“骰宝”游戏冷却 ---
-    last_sicbo_time: Optional[datetime] = None
-    
     # --- 新增：用于每日擦弹次数追踪 ---
     wipe_bomb_attempts_today: int = 0
     last_wipe_bomb_date: Optional[str] = None # YYYY-MM-DD 格式
@@ -562,33 +549,3 @@ class ShopOfferReward:
     item_id: int
     quantity: int
     refine_level: Optional[int] = None
-
-
-# ---------------------------------
-# 红包系统实体 (Red Packet Entities)
-# ---------------------------------
-
-@dataclass
-class RedPacket:
-    """红包实体"""
-    packet_id: int
-    sender_id: str
-    group_id: str
-    packet_type: str  # 'normal' 普通红包, 'lucky' 拼手气红包, 'password' 口令红包
-    total_amount: int
-    total_count: int
-    remaining_amount: int
-    remaining_count: int
-    password: Optional[str] = None  # 口令红包的口令
-    created_at: datetime = None
-    expires_at: datetime = None
-    is_expired: bool = False
-
-@dataclass
-class RedPacketRecord:
-    """红包领取记录"""
-    record_id: int
-    packet_id: int
-    user_id: str
-    amount: int
-    claimed_at: datetime = None
