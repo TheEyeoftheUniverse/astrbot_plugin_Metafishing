@@ -1,6 +1,6 @@
 import random
 from typing import Dict, Any, Optional
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta
 
 # 导入仓储接口和领域模型
 from ..repositories.abstract_repository import (
@@ -12,7 +12,7 @@ from ..repositories.abstract_repository import (
 )
 from .gacha_service import GachaService
 from ..domain.models import User, TaxRecord
-from ..utils import get_now, get_today
+from ..utils import get_now, get_current_daily_marker
 
 
 class UserService:
@@ -145,6 +145,9 @@ class UserService:
             "leaderboard": leaderboard
         }
 
+    def _get_daily_reset_hour(self) -> int:
+        return int(self.config.get("daily_reset_hour", 0) or 0)
+
     def daily_sign_in(self, user_id: str) -> Dict[str, Any]:
         """
         处理用户每日签到。
@@ -153,61 +156,37 @@ class UserService:
         if not user:
             return {"success": False, "message": "请先注册才能签到"}
 
-        today = get_today()
-        if self.log_repo.has_checked_in(user_id, today):
+        current_marker = get_current_daily_marker(self._get_daily_reset_hour())
+        if self.log_repo.has_checked_in(user_id, current_marker):
             return {"success": False, "message": "你今天已经签到过了，明天再来吧！"}
 
-        yesterday = today - timedelta(days=1)
-        if not self.log_repo.has_checked_in(user_id, yesterday):
+        previous_marker = current_marker - timedelta(days=1)
+        if not self.log_repo.has_checked_in(user_id, previous_marker):
             user.consecutive_login_days = 0
 
-        signin_config = self.config.get("signin", {})
-        min_reward = signin_config.get("min_reward", 100)
-        max_reward = signin_config.get("max_reward", 300)
-        coins_reward = random.randint(min_reward, max_reward)
-
-        # 1. 增加金币和高级货币
-        premium_currency_reward = 1
-        user.coins += coins_reward
-        user.premium_currency += premium_currency_reward 
-
-        # 2. 更新连续签到和最后登录时间
         user.consecutive_login_days += 1
+        base_coins_reward = random.randint(100, 300)
+        coins_reward = base_coins_reward * user.consecutive_login_days
+        premium_currency_reward = user.consecutive_login_days
+
+        user.coins += coins_reward
+        user.premium_currency += premium_currency_reward
         user.last_login_time = get_now()
 
-        bonus_coins = 0
-        consecutive_bonuses = signin_config.get("consecutive_bonuses", {})
-        if str(user.consecutive_login_days) in consecutive_bonuses:
-            bonus_coins = consecutive_bonuses[str(user.consecutive_login_days)]
-            user.coins += bonus_coins
-
         self.user_repo.update(user)
-        self.log_repo.add_check_in(user_id, today)
+        self.log_repo.add_check_in(user_id, current_marker)
 
-        # 3. 构建包含两种奖励的消息
-        message = f"签到成功！获得 {coins_reward} 金币和 {premium_currency_reward} 高级货币。"
-        if bonus_coins > 0:
-            message += f" 连续签到 {user.consecutive_login_days} 天，额外奖励 {bonus_coins} 金币！"
-
-        free_gacha_reward_msg = ""
-        free_pool = self.gacha_service.get_daily_free_pool()
-        if free_pool:
-            gacha_result = self.gacha_service.perform_draw(user.user_id, free_pool.gacha_pool_id, 1)
-            if gacha_result.get("success"):
-                reward = gacha_result.get("results", [])[0]
-                reward_name = reward.get("name", "神秘奖励")
-                if reward.get("type") == "coins":
-                    reward_name = f"{reward.get('quantity', 0)} 金币"
-                free_gacha_reward_msg = f"\n🎁 每日补给: 你获得了 {reward_name}！"
-            else:
-                fail_reason = gacha_result.get("message", "未能领取每日补给")
-                free_gacha_reward_msg = f"\nℹ️ {fail_reason}"
+        message = (
+            f"签到成功！连续签到 {user.consecutive_login_days} 天，"
+            f"获得 {coins_reward} 金币和 {premium_currency_reward} 高级货币。"
+        )
 
         return {
             "success": True,
-            "message": message + free_gacha_reward_msg,
+            "message": message,
             "coins_reward": coins_reward,
-            "bonus_coins": bonus_coins,
+            "premium_currency_reward": premium_currency_reward,
+            "bonus_coins": 0,
             "consecutive_days": user.consecutive_login_days
         }
 

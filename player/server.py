@@ -2045,7 +2045,7 @@ async def index():
     
     # 使用与游戏中状态显示相同的数据获取函数
     from ..draw.state import get_user_state_data
-    from ..core.utils import get_now
+    from ..core.utils import get_current_daily_marker, get_now
     
     game_config = current_app.config.get("FISHING_SERVICE").config if fishing_service else {}
     user_state = get_user_state_data(
@@ -2090,10 +2090,9 @@ async def index():
     
     user_state['fishing_cooldown_remaining'] = fishing_cooldown_remaining
     
-    # 检查今日是否已签到
-    from ..core.utils import get_today
-    today = get_today()
-    has_checked_in_today = log_repo.has_checked_in(user_id, today)
+    # 检查当前刷新周期是否已签到
+    reset_hour = int(game_config.get("daily_reset_hour", 0) or 0)
+    has_checked_in_today = log_repo.has_checked_in(user_id, get_current_daily_marker(reset_hour))
     
     stats = {
         "coins": user.coins,

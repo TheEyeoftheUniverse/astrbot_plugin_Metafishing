@@ -12,6 +12,7 @@ from quart import (
     Blueprint, current_app, jsonify
 )
 from astrbot.api import logger
+from ..core.utils import get_current_daily_marker
 
 # 导入用户API蓝图
 from .user_api import user_api_bp
@@ -290,9 +291,11 @@ async def dashboard(user):
         if title:
             current_title = title.name
     
-    # 检查今日是否签到
-    today = datetime.now().date()
-    today_signed = user.last_login_time and user.last_login_time.date() == today
+    # 检查当前刷新周期是否签到
+    log_repo = current_app.config["LOG_REPO"]
+    game_config = current_app.config.get("FISHING_SERVICE").config if current_app.config.get("FISHING_SERVICE") else {}
+    reset_hour = int(game_config.get("daily_reset_hour", 0) or 0)
+    today_signed = log_repo.has_checked_in(user.user_id, get_current_daily_marker(reset_hour))
     
     return await render_template(
         "user_dashboard.html",
@@ -373,11 +376,14 @@ async def exchange(user):
     return await render_template("user_exchange.html", user=user)
 
 
-@user_bp.route("/sign_in", methods=["POST"])
+@user_bp.route("/sign_in", methods=["GET", "POST"])
 @user_context
 async def sign_in(user):
     """签到"""
-    return jsonify({"success": False, "message": "功能开发中"})
+    user_service = current_app.config["USER_SERVICE"]
+    result = user_service.daily_sign_in(user.user_id)
+    await flash(result.get("message", "签到失败"), "success" if result.get("success") else "warning")
+    return redirect(url_for("user_bp.dashboard"))
 
 
 # 密钥存储方案（使用JSON文件持久化 + 内存缓存）

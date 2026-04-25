@@ -37,6 +37,14 @@ def get_last_reset_time(reset_hour: int = 0) -> datetime:
         # 否则返回昨天的刷新时间点
         return today_reset - timedelta(days=1)
 
+def get_current_daily_marker(reset_hour: int = 0) -> date:
+    """
+    获取当前日常刷新周期的日期标记。
+
+    例如 reset_hour=6 时，凌晨5点仍属于前一个刷新周期，返回昨天日期。
+    """
+    return get_last_reset_time(reset_hour).date()
+
 def get_fish_template(new_fish_list, value_bonus):
     """
     按同星级价值池规则抽取鱼模板。

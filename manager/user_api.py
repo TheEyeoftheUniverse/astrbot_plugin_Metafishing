@@ -15,7 +15,7 @@ from ..core.services.wipe_bomb_daily_service import (
     load_wipe_bomb_daily_state,
     save_wipe_bomb_daily_state,
 )
-from ..core.utils import get_last_reset_time, get_today
+from ..core.utils import get_current_daily_marker, get_last_reset_time, get_today
 
 
 user_api_bp = Blueprint(
@@ -207,7 +207,7 @@ def _get_home_status_payload(user_id: str):
 
     has_checked_in_today = False
     try:
-        has_checked_in_today = bool(log_repo.has_checked_in(user_id, get_today()))
+        has_checked_in_today = bool(log_repo.has_checked_in(user_id, _get_signin_daily_marker()))
     except Exception as exception:
         logger.warning(f"读取用户 {user_id} 签到状态失败: {exception}")
 
@@ -471,6 +471,10 @@ def _get_daily_reset_hour() -> int:
     service = current_app.config.get("GAME_MECHANICS_SERVICE") or current_app.config.get("FISHING_SERVICE")
     config = getattr(service, "config", {}) if service else {}
     return int(config.get("daily_reset_hour", 0) or 0)
+
+
+def _get_signin_daily_marker():
+    return get_current_daily_marker(_get_daily_reset_hour())
 
 
 def _get_wipe_bomb_config() -> dict:
@@ -1535,7 +1539,7 @@ async def sign_in():
     
     try:
         result = user_service.daily_sign_in(user_id)
-        has_checked_in_today = bool(current_app.config["LOG_REPO"].has_checked_in(user_id, get_today()))
+        has_checked_in_today = bool(current_app.config["LOG_REPO"].has_checked_in(user_id, _get_signin_daily_marker()))
         
         logger.info(f"[WebUI] 签到成功: {user_id}")
         
@@ -1564,7 +1568,7 @@ async def home_sign_in():
 
     try:
         result = user_service.daily_sign_in(user_id)
-        has_checked_in_today = bool(log_repo.has_checked_in(user_id, get_today()))
+        has_checked_in_today = bool(log_repo.has_checked_in(user_id, _get_signin_daily_marker()))
 
         return jsonify({
             "success": result.get("success", False),

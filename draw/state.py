@@ -497,7 +497,7 @@ def get_user_state_data(user_repo, inventory_repo, item_template_repo, log_repo,
     Returns:
         包含用户状态信息的字典，如果用户不存在则返回None
     """
-    from ..core.utils import get_now, get_today
+    from ..core.utils import get_current_daily_marker, get_now, get_today
     
     # 获取用户基本信息
     user = user_repo.get_by_id(user_id)
@@ -626,12 +626,13 @@ def get_user_state_data(user_repo, inventory_repo, item_template_repo, log_repo,
     # steal_total_value = getattr(user, 'steal_total_value', 0)
     steal_total_value = '0' # 似乎没有偷鱼总价值字段？
 
-    # 检查今日是否签到
+    # 检查当前刷新周期是否签到
     signed_in_today = False
-    if hasattr(user, 'last_login_time') and user.last_login_time:
-        today = get_now().date()
-        last_login_date = user.last_login_time.date() if hasattr(user.last_login_time, 'date') else user.last_login_time
-        signed_in_today = (last_login_date == today)
+    try:
+        reset_hour = int(game_config.get("daily_reset_hour", 0) or 0)
+        signed_in_today = log_repo.has_checked_in(user_id, get_current_daily_marker(reset_hour))
+    except Exception:
+        signed_in_today = False
     
     # 计算擦弹剩余次数
     wipe_bomb_remaining = 0
