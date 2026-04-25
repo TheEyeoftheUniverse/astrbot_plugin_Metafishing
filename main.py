@@ -321,14 +321,9 @@ class FishingPlugin(Star):
         
         # --- 5. 初始化核心游戏数据 ---
         data_setup_service = DataSetupService(
-            self.item_template_repo, self.gacha_repo, self.shop_repo
+            self.item_template_repo, self.gacha_repo, self.shop_repo, db_path
         )
         data_setup_service.setup_initial_data()
-        # 确保初始道具存在（在已有数据库上也可幂等执行）
-        try:
-            data_setup_service.create_initial_items()
-        except Exception:
-            pass
 
         # 商店完全由后台管控，不再自动种子化
 

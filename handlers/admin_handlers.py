@@ -414,13 +414,13 @@ async def stop_admin(plugin: "FishingPlugin", event: AstrMessageEvent):
 
 
 async def sync_initial_data(plugin: "FishingPlugin", event: AstrMessageEvent):
-    """从 initial_data.py 同步所有初始设定（道具、商店等）。"""
+    """同步所有内置种子数据。"""
     try:
         plugin.data_setup_service.sync_all_initial_data()
-        yield event.plain_result("✅ 所有初始设定数据同步成功！")
+        yield event.plain_result("✅ 所有内置种子数据同步成功！")
     except Exception as e:
-        logger.error(f"同步初始设定数据时出错: {e}")
-        yield event.plain_result(f"❌ 同步初始设定数据失败: {e}")
+        logger.error(f"同步内置种子数据时出错: {e}")
+        yield event.plain_result(f"❌ 同步内置种子数据失败: {e}")
 
 
 async def impersonate_start(plugin: "FishingPlugin", event: AstrMessageEvent):
