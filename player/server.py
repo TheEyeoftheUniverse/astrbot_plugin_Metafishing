@@ -5,7 +5,7 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 import json
 import secrets
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
 import requests
 
@@ -228,11 +228,6 @@ def _sanitize_unity_device_code(value: Any) -> str:
     return device_code
 
 
-def _is_loopback_host(hostname: str) -> bool:
-    host = str(hostname or "").strip().lower().strip("[]")
-    return host in {"localhost", "127.0.0.1", "::1"}
-
-
 def _resolve_linuxdo_login_flow_from_request() -> str:
     if "flow" in request.args:
         return _normalize_linuxdo_login_flow(request.args.get("flow"))
@@ -240,20 +235,7 @@ def _resolve_linuxdo_login_flow_from_request() -> str:
 
 
 def _resolve_linuxdo_redirect_uri(oauth_config: Dict[str, Any]) -> str:
-    configured_uri = str(oauth_config.get("redirect_uri", "") or "").strip()
-    if not configured_uri:
-        return ""
-
-    try:
-        configured_host = (urlsplit(configured_uri).hostname or "").strip().lower()
-    except Exception:
-        configured_host = ""
-
-    request_host = (request.host or "").split(":", 1)[0].strip().lower().strip("[]")
-    if _is_loopback_host(configured_host) and request_host and not _is_loopback_host(request_host):
-        return f"{request.url_root.rstrip('/')}{url_for('player_bp.linuxdo_oauth_callback')}"
-
-    return configured_uri
+    return str(oauth_config.get("redirect_uri", "") or "").strip()
 
 
 def _cleanup_pending_unity_linuxdo_oauth():
