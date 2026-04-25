@@ -376,8 +376,9 @@ async def exchange(user):
 @user_bp.route("/sicbo")
 @user_context
 async def sicbo(user):
-    """骰宝游戏页面"""
-    return await render_template("user_sicbo.html", user=user)
+    """骰宝系统已下线，重定向回用户主页"""
+    await flash("骰宝系统已下线", "warning")
+    return redirect(url_for("user_bp.dashboard"))
 
 
 @user_bp.route("/sign_in", methods=["POST"])

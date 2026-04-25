@@ -2,7 +2,7 @@ import os
 import asyncio
 
 from astrbot.api import logger, AstrBotConfig
-from astrbot.api.event import AstrMessageEvent, filter, MessageChain
+from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
 from astrbot.core.star.filter.permission import PermissionType
 
@@ -19,7 +19,6 @@ from .core.repositories.sqlite_log_repo import SqliteLogRepository
 from .core.repositories.sqlite_achievement_repo import SqliteAchievementRepository
 from .core.repositories.sqlite_user_buff_repo import SqliteUserBuffRepository
 from .core.repositories.sqlite_exchange_repo import SqliteExchangeRepository # 新增交易所Repo
-from .core.repositories.sqlite_red_packet_repo import SqliteRedPacketRepository # 新增红包Repo
 
 from .core.services.data_setup_service import DataSetupService
 from .core.services.item_template_service import ItemTemplateService
@@ -34,8 +33,6 @@ from .core.services.game_mechanics_service import GameMechanicsService
 from .core.services.effect_manager import EffectManager
 from .core.services.fishing_zone_service import FishingZoneService
 from .core.services.exchange_service import ExchangeService # 新增交易所Service
-from .core.services.sicbo_service import SicboService # 新增骰宝Service
-from .core.services.red_packet_service import RedPacketService # 新增红包Service
 
 from .core.database.migration import run_migrations
 from .utils import _is_port_available, kill_processes_on_port
@@ -52,8 +49,6 @@ from .handlers import (
     social_handlers, 
     gacha_handlers, 
     aquarium_handlers, 
-    sicbo_handlers,
-    red_packet_handlers,
 )
 from .handlers.fishing_handlers import FishingHandlers
 from .handlers.exchange_handlers import ExchangeHandlers
@@ -294,16 +289,6 @@ class FishingPlugin(Star):
         # 初始化交易所服务
         self.exchange_service = ExchangeService(self.user_repo, self.exchange_repo, self.game_config, self.log_repo, self.market_service)
         
-        # 初始化骰宝服务
-        self.sicbo_service = SicboService(self.user_repo, self.log_repo, self.game_config)
-        
-        # 设置骰宝服务的消息发送回调
-        self.sicbo_service.set_message_callback(self._send_sicbo_announcement)
-        
-        # 初始化红包服务
-        self.red_packet_repo = SqliteRedPacketRepository(db_path)
-        self.red_packet_service = RedPacketService(self.red_packet_repo, self.user_repo)
-        
         # 初始化交易所处理器
         self.exchange_handlers = ExchangeHandlers(self)
         
@@ -337,11 +322,6 @@ class FishingPlugin(Star):
         self.achievement_service.start_achievement_check_task()
         self.exchange_service.start_daily_price_update_task() # 启动交易所后台任务
         
-        # 启动红包清理任务
-        self._red_packet_cleanup_task = asyncio.create_task(self._red_packet_cleanup_scheduler())
-        
-
-
         # --- 5. 初始化核心游戏数据 ---
         data_setup_service = DataSetupService(
             self.item_template_repo, self.gacha_repo, self.shop_repo
@@ -395,126 +375,6 @@ class FishingPlugin(Star):
 
         # 管理员扮演功能
         self.impersonation_map = {}
-
-    async def _send_sicbo_announcement(self, session_info: dict, result_data: dict):
-        """发送骰宝游戏结果公告 - 使用主动发送机制"""
-        try:
-            # 使用传入的会话信息主动发送
-            if session_info and result_data.get("success"):
-                try:
-                    if self.sicbo_service.is_image_mode():
-                        # 图片模式：生成骰宝结果图片
-                        from .draw.sicbo import draw_sicbo_result, save_image_to_temp
-                        
-                        dice = result_data.get("dice", [1, 1, 1])
-                        settlement = result_data.get("settlement", [])
-                        
-                        # 按用户统计总盈亏
-                        user_profits = {}
-                        for info in settlement:
-                            user_id = info["user_id"]
-                            profit = info["profit"]
-                            if user_id not in user_profits:
-                                user_profits[user_id] = 0
-                            user_profits[user_id] += profit
-                        
-                        # 转换为图片所需的格式
-                        player_results = []
-                        for user_id, total_profit in user_profits.items():
-                            user = self.user_repo.get_by_id(user_id)
-                            username = user.nickname if user and user.nickname else "未知玩家"
-                            player_results.append({
-                                "username": username,
-                                "profit": total_profit
-                            })
-                        
-                        # 生成图片
-                        image = draw_sicbo_result(dice[0], dice[1], dice[2], [], player_results)
-                        image_path = save_image_to_temp(image, "sicbo_result", self.data_dir)
-                        
-                        # 发送图片消息
-                        success = await self._send_initiative_image(session_info, image_path)
-                        if success:
-                            logger.info(f"🎲 骰宝结果公告图片已主动发送")
-                            return
-                    else:
-                        # 文本模式：发送文本消息
-                        message = result_data.get("message", "开奖失败")
-                        success = await self._send_initiative_message(session_info, message)
-                        if success:
-                            logger.info(f"🎲 骰宝结果公告文本已主动发送")
-                            return
-                except Exception as e:
-                    logger.error(f"发送骰宝结果失败: {e}")
-                    # 回退到文本消息
-                    message = result_data.get("message", "开奖失败")
-                    success = await self._send_initiative_message(session_info, message)
-                    if success:
-                        logger.info(f"🎲 骰宝结果公告文本已主动发送（回退）")
-                        return
-            
-            logger.warning("无法发送骰宝公告：缺少会话信息")
-            
-        except Exception as e:
-            logger.error(f"发送骰宝公告失败: {e}")
-
-    async def _send_initiative_image(self, session_info: dict, image_path: str) -> bool:
-        """主动发送图片消息到指定会话"""
-        try:
-            # 获取保存的 unified_msg_origin
-            umo = session_info.get('unified_msg_origin')
-            
-            if not umo:
-                logger.error("缺少 unified_msg_origin，无法发送主动图片消息")
-                return False
-            
-            # 构造图片消息链
-            message_chain = MessageChain().file_image(image_path)
-            
-            # 使用 context.send_message 发送消息
-            await self.context.send_message(umo, message_chain)
-            logger.info(f"主动发送图片消息成功: {image_path}")
-            return True
-                
-        except Exception as e:
-            logger.error(f"主动发送图片消息时发生错误: {e}")
-            return False
-
-    async def _send_initiative_message(self, session_info: dict, message: str) -> bool:
-        """主动发送消息到指定会话"""
-        try:
-            # 获取保存的 unified_msg_origin
-            umo = session_info.get('unified_msg_origin')
-            
-            if not umo:
-                logger.error("缺少 unified_msg_origin，无法发送主动消息")
-                return False
-            
-            # 构造消息链
-            message_chain = MessageChain().message(message)
-            
-            # 使用 context.send_message 发送消息
-            await self.context.send_message(umo, message_chain)
-            logger.info(f"主动发送消息成功: {message[:50]}...")
-            return True
-                
-        except Exception as e:
-            logger.error(f"主动发送消息时发生错误: {e}")
-            return False
-    
-    async def _red_packet_cleanup_scheduler(self):
-        """红包清理调度器 - 每小时清理一次过期红包"""
-        while True:
-            try:
-                await asyncio.sleep(3600)  # 每小时执行一次
-                cleaned_count = self.red_packet_service.cleanup_expired_packets()
-                if cleaned_count > 0:
-                    logger.info(f"定时清理了 {cleaned_count} 个过期红包")
-            except asyncio.CancelledError:
-                logger.info("红包清理任务已取消")
-                break
-            except Exception as e:
-                logger.error(f"红包清理任务出错: {e}")
 
     def _get_effective_user_id(self, event: AstrMessageEvent):
         """获取在当前上下文中应当作为指令执行者的用户ID。
@@ -864,50 +724,6 @@ class FishingPlugin(Star):
         async for r in gacha_handlers.wipe_bomb_history(self, event):
             yield r
 
-    @filter.command("命运之轮", alias={"wof", "命运"})
-    async def wheel_of_fate_start(self, event: AstrMessageEvent):
-        """开始命运之轮游戏"""
-        async for r in gacha_handlers.start_wheel_of_fate(self, event):
-            yield r
-        
-    @filter.command("继续")
-    async def wheel_of_fate_continue(self, event: AstrMessageEvent):
-        """在命运之轮游戏中选择继续冒险"""
-        async for r in gacha_handlers.continue_wheel_of_fate(self, event):
-            yield r
-
-    @filter.command("放弃")
-    async def wheel_of_fate_stop(self, event: AstrMessageEvent):
-        """在命运之轮游戏中选择放弃并结算奖励"""
-        async for r in gacha_handlers.stop_wheel_of_fate(self, event):
-            yield r
-
-    # =========== 红包系统 ==========
-
-    @filter.command("发红包", alias={"发放红包"})
-    async def send_red_packet(self, event: AstrMessageEvent):
-        """发送红包。用法：发红包 [金额] [数量] [类型] [口令]"""
-        async for r in red_packet_handlers.send_red_packet(self, event):
-            yield r
-
-    @filter.command("领红包", alias={"抢红包", "拿红包", "取红包", "领取红包"})
-    async def claim_red_packet(self, event: AstrMessageEvent):
-        """领取红包。用法：领红包 [口令]"""
-        async for r in red_packet_handlers.claim_red_packet(self, event):
-            yield r
-
-    @filter.command("红包列表", alias={"红包", "查看红包列表"})
-    async def list_red_packets(self, event: AstrMessageEvent):
-        """查看当前群组可领取的红包列表"""
-        async for r in red_packet_handlers.list_red_packets(self, event):
-            yield r
-
-    @filter.command("红包详情", alias={"查看红包"})
-    async def red_packet_details(self, event: AstrMessageEvent):
-        """查看红包详情。用法：红包详情 [红包ID]"""
-        async for r in red_packet_handlers.red_packet_details(self, event):
-            yield r
-
     # =========== 科考系统 ==========
 
     @filter.command("发起科考")
@@ -965,194 +781,6 @@ class FishingPlugin(Star):
         handlers = ExpeditionHandlers(self.expedition_service)
         result = await handlers.test_expedition(self, event)
         yield event.plain_result(result["message"])
-
-    @filter.command("撤回红包", alias={"撤销红包", "取消红包"})
-    async def revoke_red_packet(self, event: AstrMessageEvent):
-        """撤回红包并退还未领取的金额。用法：撤回红包 [红包ID]"""
-        async for r in red_packet_handlers.revoke_red_packet(self, event):
-            yield r
-
-    # =========== 骰宝游戏 ==========
-
-    @filter.command("开庄")
-    async def start_sicbo(self, event: AstrMessageEvent):
-        """开启骰宝游戏，倒计时120秒供玩家下注"""
-        async for r in sicbo_handlers.start_sicbo_game(self, event):
-            yield r
-
-    @filter.command("鸭大")
-    async def bet_big(self, event: AstrMessageEvent):
-        """鸭大（总点数11-17）。用法：鸭大 金额"""
-        async for r in sicbo_handlers.bet_big(self, event):
-            yield r
-
-    @filter.command("鸭小")
-    async def bet_small(self, event: AstrMessageEvent):
-        """鸭小（总点数4-10）。用法：鸭小 金额"""
-        async for r in sicbo_handlers.bet_small(self, event):
-            yield r
-
-    @filter.command("鸭单")
-    async def bet_odd(self, event: AstrMessageEvent):
-        """鸭单（总点数为奇数）。用法：鸭单 金额"""
-        async for r in sicbo_handlers.bet_odd(self, event):
-            yield r
-
-    @filter.command("鸭双")
-    async def bet_even(self, event: AstrMessageEvent):
-        """鸭双（总点数为偶数）。用法：鸭双 金额"""
-        async for r in sicbo_handlers.bet_even(self, event):
-            yield r
-
-    @filter.command("鸭豹子")
-    async def bet_triple(self, event: AstrMessageEvent):
-        """鸭豹子（三个骰子相同）。用法：鸭豹子 金额"""
-        async for r in sicbo_handlers.bet_triple(self, event):
-            yield r
-
-    @filter.command("鸭一点")
-    async def bet_one_point(self, event: AstrMessageEvent):
-        """鸭一点（骰子出现1）。用法：鸭一点 金额"""
-        async for r in sicbo_handlers.bet_one_point(self, event):
-            yield r
-
-    @filter.command("鸭二点")
-    async def bet_two_point(self, event: AstrMessageEvent):
-        """鸭二点（骰子出现2）。用法：鸭二点 金额"""
-        async for r in sicbo_handlers.bet_two_point(self, event):
-            yield r
-
-    @filter.command("鸭三点")
-    async def bet_three_point(self, event: AstrMessageEvent):
-        """鸭三点（骰子出现3）。用法：鸭三点 金额"""
-        async for r in sicbo_handlers.bet_three_point(self, event):
-            yield r
-
-    @filter.command("鸭四点")
-    async def bet_four_point(self, event: AstrMessageEvent):
-        """鸭四点（骰子出现4）。用法：鸭四点 金额"""
-        async for r in sicbo_handlers.bet_four_point(self, event):
-            yield r
-
-    @filter.command("鸭五点")
-    async def bet_five_point(self, event: AstrMessageEvent):
-        """鸭五点（骰子出现5）。用法：鸭五点 金额"""
-        async for r in sicbo_handlers.bet_five_point(self, event):
-            yield r
-
-    @filter.command("鸭六点")
-    async def bet_six_point(self, event: AstrMessageEvent):
-        """鸭六点（骰子出现6）。用法：鸭六点 金额"""
-        async for r in sicbo_handlers.bet_six_point(self, event):
-            yield r
-
-    @filter.command("鸭4点")
-    async def bet_4_points(self, event: AstrMessageEvent):
-        """鸭总点数4点。用法：鸭4点 金额"""
-        async for r in sicbo_handlers.bet_4_points(self, event):
-            yield r
-
-    @filter.command("鸭5点")
-    async def bet_5_points(self, event: AstrMessageEvent):
-        """鸭总点数5点。用法：鸭5点 金额"""
-        async for r in sicbo_handlers.bet_5_points(self, event):
-            yield r
-
-    @filter.command("鸭6点")
-    async def bet_6_points(self, event: AstrMessageEvent):
-        """鸭总点数6点。用法：鸭6点 金额"""
-        async for r in sicbo_handlers.bet_6_points(self, event):
-            yield r
-
-    @filter.command("鸭7点")
-    async def bet_7_points(self, event: AstrMessageEvent):
-        """鸭总点数7点。用法：鸭7点 金额"""
-        async for r in sicbo_handlers.bet_7_points(self, event):
-            yield r
-
-    @filter.command("鸭8点")
-    async def bet_8_points(self, event: AstrMessageEvent):
-        """押总点数8点。用法：押8点 金额"""
-        async for r in sicbo_handlers.bet_8_points(self, event):
-            yield r
-
-    @filter.command("鸭9点")
-    async def bet_9_points(self, event: AstrMessageEvent):
-        """押总点数9点。用法：押9点 金额"""
-        async for r in sicbo_handlers.bet_9_points(self, event):
-            yield r
-
-    @filter.command("鸭10点")
-    async def bet_10_points(self, event: AstrMessageEvent):
-        """押总点数10点。用法：押10点 金额"""
-        async for r in sicbo_handlers.bet_10_points(self, event):
-            yield r
-
-    @filter.command("鸭11点")
-    async def bet_11_points(self, event: AstrMessageEvent):
-        """押总点数11点。用法：押11点 金额"""
-        async for r in sicbo_handlers.bet_11_points(self, event):
-            yield r
-
-    @filter.command("鸭12点")
-    async def bet_12_points(self, event: AstrMessageEvent):
-        """押总点数12点。用法：押12点 金额"""
-        async for r in sicbo_handlers.bet_12_points(self, event):
-            yield r
-
-    @filter.command("鸭13点")
-    async def bet_13_points(self, event: AstrMessageEvent):
-        """押总点数13点。用法：押13点 金额"""
-        async for r in sicbo_handlers.bet_13_points(self, event):
-            yield r
-
-    @filter.command("鸭14点")
-    async def bet_14_points(self, event: AstrMessageEvent):
-        """押总点数14点。用法：押14点 金额"""
-        async for r in sicbo_handlers.bet_14_points(self, event):
-            yield r
-
-    @filter.command("鸭15点")
-    async def bet_15_points(self, event: AstrMessageEvent):
-        """押总点数15点。用法：押15点 金额"""
-        async for r in sicbo_handlers.bet_15_points(self, event):
-            yield r
-
-    @filter.command("鸭16点")
-    async def bet_16_points(self, event: AstrMessageEvent):
-        """押总点数16点。用法：押16点 金额"""
-        async for r in sicbo_handlers.bet_16_points(self, event):
-            yield r
-
-    @filter.command("鸭17点")
-    async def bet_17_points(self, event: AstrMessageEvent):
-        """押总点数17点。用法：押17点 金额"""
-        async for r in sicbo_handlers.bet_17_points(self, event):
-            yield r
-
-    @filter.command("骰宝状态", alias={"游戏状态"})
-    async def sicbo_status(self, event: AstrMessageEvent):
-        """查看当前骰宝游戏状态"""
-        async for r in sicbo_handlers.sicbo_status(self, event):
-            yield r
-
-    @filter.command("我的下注", alias={"下注情况"})
-    async def my_bets(self, event: AstrMessageEvent):
-        """查看本局游戏中的下注情况"""
-        async for r in sicbo_handlers.my_bets(self, event):
-            yield r
-
-    @filter.command("骰宝帮助", alias={"骰宝说明"})
-    async def sicbo_help(self, event: AstrMessageEvent):
-        """查看骰宝游戏帮助"""
-        async for r in sicbo_handlers.sicbo_help(self, event):
-            yield r
-
-    @filter.command("骰宝赔率", alias={"骰宝赔率表", "赔率"})
-    async def sicbo_odds(self, event: AstrMessageEvent):
-        """查看骰宝赔率详情"""
-        async for r in sicbo_handlers.sicbo_odds(self, event):
-            yield r
 
     # =========== 社交 ==========
 
@@ -1378,34 +1006,6 @@ class FishingPlugin(Star):
         async for r in admin_handlers.replenish_fish_pools(self, event):
             yield r
 
-    @filter.permission_type(PermissionType.ADMIN)
-    @filter.command("清理红包")
-    async def cleanup_red_packets(self, event: AstrMessageEvent):
-        """[管理员] 清理红包。用法：/清理红包 [所有]（不带参数清理当前群，带"所有"清理全局）"""
-        async for r in red_packet_handlers.cleanup_red_packets(self, event):
-            yield r
-
-    @filter.permission_type(PermissionType.ADMIN)
-    @filter.command("骰宝结算")
-    async def force_settle_sicbo(self, event: AstrMessageEvent):
-        """[管理员] 跳过倒计时直接结算当前骰宝游戏"""
-        async for r in sicbo_handlers.force_settle_sicbo(self, event):
-            yield r
-
-    @filter.permission_type(PermissionType.ADMIN)
-    @filter.command("骰宝倒计时")
-    async def set_sicbo_countdown(self, event: AstrMessageEvent):
-        """[管理员] 设置骰宝游戏倒计时时间"""
-        async for r in sicbo_handlers.set_sicbo_countdown(self, event):
-            yield r
-
-    @filter.permission_type(PermissionType.ADMIN)
-    @filter.command("骰宝模式")
-    async def set_sicbo_mode(self, event: AstrMessageEvent):
-        """[管理员] 设置骰宝消息模式（图片/文本）"""
-        async for r in sicbo_handlers.set_sicbo_mode(self, event):
-            yield r
-
     async def _check_port_active(self):
         """验证端口是否实际已激活"""
         try:
@@ -1425,19 +1025,6 @@ class FishingPlugin(Star):
         self.fishing_service.stop_daily_tax_task()  # 终止独立的税收线程
         self.achievement_service.stop_achievement_check_task()
         self.exchange_service.stop_daily_price_update_task() # 终止交易所后台任务
-
-        # 取消红包清理任务
-        if hasattr(self, '_red_packet_cleanup_task') and self._red_packet_cleanup_task:
-            if not self._red_packet_cleanup_task.done():
-                self._red_packet_cleanup_task.cancel()
-            try:
-                await self._red_packet_cleanup_task
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:
-                logger.warning(f"等待红包清理任务结束时发生错误: {e}")
-            finally:
-                self._red_packet_cleanup_task = None
 
         await self._shutdown_server_task(
             "web_player_task",
