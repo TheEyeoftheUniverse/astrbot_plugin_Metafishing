@@ -60,8 +60,6 @@ CREATE TABLE "fish" (
             description TEXT,
             rarity INTEGER NOT NULL CHECK (rarity >= 1),
             base_value INTEGER NOT NULL,
-            min_weight INTEGER NOT NULL DEFAULT 1,
-            max_weight INTEGER NOT NULL DEFAULT 100,
             icon_url TEXT
         );
 
