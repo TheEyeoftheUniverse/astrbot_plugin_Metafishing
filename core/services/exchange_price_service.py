@@ -2,7 +2,7 @@ import random
 import threading
 import time
 from datetime import datetime, timedelta, time as dt_time
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 from astrbot.api import logger
 
@@ -29,51 +29,155 @@ class ExchangePriceService:
         self._price_update_thread: Optional[threading.Thread] = None
         self._price_update_running = False
 
+    def _get_initial_prices(self) -> Dict[str, int]:
+        return self.config.get("initial_prices", {
+            "dried_fish": 6000,
+            "fish_roe": 12000,
+            "fish_oil": 10000
+        })
+
+    def _build_latest_price_snapshot(self, prices: List[Exchange]) -> Dict[str, int]:
+        snapshot: Dict[str, int] = {}
+        for price in sorted(prices, key=lambda item: item.time):
+            snapshot[price.commodity_id] = price.price
+        return snapshot
+
+    def _build_snapshot_for_time(self, prices: List[Exchange], cutoff_time: str) -> Dict[str, int]:
+        snapshot: Dict[str, int] = {}
+        for price in sorted(prices, key=lambda item: item.time):
+            if price.time <= cutoff_time:
+                snapshot[price.commodity_id] = price.price
+        return snapshot
+
+    def _get_current_and_previous_snapshots(
+        self,
+        today_prices: List[Exchange],
+        fallback_prices: List[Exchange],
+    ) -> Tuple[Dict[str, int], Dict[str, int]]:
+        initial_prices = self._get_initial_prices()
+
+        if today_prices:
+            current_snapshot = self._build_latest_price_snapshot(today_prices)
+            unique_times = sorted({price.time for price in today_prices})
+            if len(unique_times) >= 2:
+                previous_snapshot = self._build_snapshot_for_time(today_prices, unique_times[-2])
+            elif fallback_prices:
+                previous_snapshot = self._build_latest_price_snapshot(fallback_prices)
+            else:
+                previous_snapshot = dict(initial_prices)
+            return current_snapshot, previous_snapshot
+
+        if fallback_prices:
+            current_snapshot = self._build_latest_price_snapshot(fallback_prices)
+            unique_times = sorted({price.time for price in fallback_prices})
+            if len(unique_times) >= 2:
+                previous_snapshot = self._build_snapshot_for_time(fallback_prices, unique_times[-2])
+            else:
+                previous_snapshot = dict(initial_prices)
+            return current_snapshot, previous_snapshot
+
+        return dict(initial_prices), dict(initial_prices)
+
+    def _calculate_market_descriptors(
+        self,
+        current_prices: Dict[str, int],
+        previous_prices: Dict[str, int],
+    ) -> Dict[str, str]:
+        changes: List[float] = []
+        rising = 0
+        falling = 0
+
+        for commodity_id in self.commodities.keys():
+            current_price = float(current_prices.get(commodity_id, 0) or 0)
+            previous_price = float(previous_prices.get(commodity_id, 0) or 0)
+            if current_price <= 0 or previous_price <= 0:
+                continue
+            change_pct = ((current_price - previous_price) / previous_price) * 100
+            changes.append(change_pct)
+            if change_pct > 0.5:
+                rising += 1
+            elif change_pct < -0.5:
+                falling += 1
+
+        if not changes:
+            return {
+                "market_sentiment": "中性观望",
+                "price_trend": "稳定",
+                "supply_demand": "基本平衡",
+            }
+
+        average_change = sum(changes) / len(changes)
+        average_abs_change = sum(abs(change) for change in changes) / len(changes)
+
+        if average_change >= 5:
+            price_trend = "显著上涨"
+        elif average_change >= 1:
+            price_trend = "小幅上涨"
+        elif average_change <= -5:
+            price_trend = "显著下跌"
+        elif average_change <= -1:
+            price_trend = "小幅下跌"
+        else:
+            price_trend = "稳定"
+
+        if average_change >= 4 and rising >= 2:
+            market_sentiment = "市场乐观"
+        elif average_change >= 1:
+            market_sentiment = "偏乐观"
+        elif average_change <= -4 and falling >= 2:
+            market_sentiment = "市场悲观"
+        elif average_change <= -1:
+            market_sentiment = "偏悲观"
+        elif average_abs_change >= 6:
+            market_sentiment = "分歧加剧"
+        else:
+            market_sentiment = "中性观望"
+
+        try:
+            all_commodities = self.exchange_repo.get_all_user_commodities()
+        except Exception as e:
+            logger.warning(f"读取交易所持仓失败，供需状态回退为默认值: {e}")
+            all_commodities = []
+
+        total_quantity = sum(item.quantity for item in all_commodities)
+        holder_count = len({item.user_id for item in all_commodities if item.quantity > 0})
+        average_holding = (total_quantity / holder_count) if holder_count > 0 else 0
+
+        if holder_count == 0 or total_quantity == 0:
+            supply_demand = "需求低迷"
+        elif average_holding >= 120:
+            supply_demand = "供过于求"
+        elif average_holding >= 45:
+            supply_demand = "供给充足"
+        elif average_holding <= 8 and holder_count >= 3:
+            supply_demand = "需求旺盛"
+        else:
+            supply_demand = "基本平衡"
+
+        return {
+            "market_sentiment": market_sentiment,
+            "price_trend": price_trend,
+            "supply_demand": supply_demand,
+        }
+
     def get_market_status(self) -> Dict[str, Any]:
         """获取市场状态"""
         try:
             today_str = datetime.now().strftime("%Y-%m-%d")
             prices = self.exchange_repo.get_prices_for_date(today_str)
-            
-            if not prices:
-                # 如果没有今日价格，尝试获取昨日价格
-                yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-                y_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
-                if y_prices:
-                    price_data = {p.commodity_id: p.price for p in y_prices}
-                    return {
-                        "success": True,
-                        "prices": price_data,
-                        "commodities": self.commodities,
-                        "market_sentiment": "neutral",
-                        "price_trend": "stable",
-                        "supply_demand": "平衡",
-                        "date": today_str
-                    }
-                # 昨日也没有则返回初始价格
-                initial_prices = self.config.get("initial_prices", {
-                    "dried_fish": 6000,
-                    "fish_roe": 12000,
-                    "fish_oil": 10000
-                })
-                return {
-                    "success": True,
-                    "prices": initial_prices,
-                    "commodities": self.commodities,
-                    "market_sentiment": "neutral",
-                    "price_trend": "stable",
-                    "supply_demand": "平衡",
-                    "date": today_str
-                }
+            yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            y_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
 
-            price_data = {p.commodity_id: p.price for p in prices}
+            current_prices, previous_prices = self._get_current_and_previous_snapshots(prices, y_prices)
+            market_descriptors = self._calculate_market_descriptors(current_prices, previous_prices)
+
             return {
                 "success": True,
-                "prices": price_data,
+                "prices": current_prices,
                 "commodities": self.commodities,
-                "market_sentiment": "neutral",
-                "price_trend": "stable",
-                "supply_demand": "平衡",
+                "market_sentiment": market_descriptors["market_sentiment"],
+                "price_trend": market_descriptors["price_trend"],
+                "supply_demand": market_descriptors["supply_demand"],
                 "date": today_str
             }
         except Exception as e:

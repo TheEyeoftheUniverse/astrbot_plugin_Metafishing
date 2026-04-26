@@ -227,6 +227,26 @@
         "type": "int",
         "hint": "每个用户每天可以使用擦弹炸弹的最大次数",
         "default": 3
+      },
+      "wipe_bomb_record_upload_enabled": {
+        "description": "是否启用擦弹记录上报",
+        "type": "bool",
+        "hint": "将擦弹结果上报到外部接口。默认关闭，避免因 DNS 或外网问题刷错误日志。",
+        "default": false
+      },
+      "wipe_bomb_record_upload_url": {
+        "description": "擦弹记录上报地址",
+        "type": "string",
+        "hint": "留空则使用默认地址；仅在启用擦弹记录上报时生效。",
+        "default": "http://veyu.me/api/record"
+      },
+      "wipe_bomb_record_upload_timeout_seconds": {
+        "description": "擦弹记录上报超时秒数",
+        "type": "int",
+        "hint": "外部上报请求超时时间，超过后直接放弃，避免后台线程长时间阻塞。",
+        "default": 3,
+        "min": 1,
+        "max": 30
       }
     }
   },

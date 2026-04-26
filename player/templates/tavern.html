@@ -3,7 +3,7 @@
 {% block title %}酒馆 - 钓鱼插件{% endblock %}
 
 {% block content %}
-<div class="row mb-4" id="leaderboardRow">
+<div class="row mb-4" id="pageHeaderRow">
     <div class="col-12">
         <h2><i class="fas fa-beer"></i> 渔夫酒馆</h2>
         <p class="text-muted">空军渔夫在线发牌 🎴</p>
@@ -32,7 +32,7 @@
 </div>
 
 <!-- 排行榜 -->
-<div class="row mb-4">
+<div class="row mb-4" id="leaderboardRow">
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-success text-white">
@@ -1034,7 +1034,13 @@ function renderWipeBombNotice(prefix, notice) {
     }
     if (multiplierNode) {
         const multiplier = Number(notice && notice.multiplier ? notice.multiplier : 0);
-        multiplierNode.textContent = hasRecord ? `${multiplier.toFixed(multiplier < 0.01 ? 4 : 2)}x` : '--';
+        let digits = 2;
+        if (multiplier < 0.01) {
+            digits = 4;
+        } else if (multiplier >= 0.95 && multiplier <= 1.05) {
+            digits = 3;
+        }
+        multiplierNode.textContent = hasRecord ? `${multiplier.toFixed(digits)}x` : '--';
     }
     if (profitNode) {
         if (!hasRecord) {

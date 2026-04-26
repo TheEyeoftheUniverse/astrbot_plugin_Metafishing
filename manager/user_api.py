@@ -651,7 +651,12 @@ def _format_wipe_bomb_result_text(result: dict) -> str:
     reward = int(result.get("reward", 0) or 0)
     profit = int(result.get("profit", 0) or 0)
     remaining_today = int(result.get("remaining_today", 0) or 0)
-    multiplier_formatted = f"{multiplier:.4f}" if multiplier < 0.01 else f"{multiplier:.2f}"
+    if multiplier < 0.01:
+        multiplier_formatted = f"{multiplier:.4f}"
+    elif 0.95 <= multiplier <= 1.05:
+        multiplier_formatted = f"{multiplier:.3f}"
+    else:
+        multiplier_formatted = f"{multiplier:.2f}"
 
     if multiplier >= 3:
         message = (

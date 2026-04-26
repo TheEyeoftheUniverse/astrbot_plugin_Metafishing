@@ -163,7 +163,12 @@ class FishingPlugin(Star):
                 "failure_penalty_max_rate": electric_fish_config.get("failure_penalty_max_rate", 0.5)
             },
             "wipe_bomb": {
-                "max_attempts_per_day": game_global_config.get("wipe_bomb_attempts", 3)
+                "max_attempts_per_day": game_global_config.get("wipe_bomb_attempts", 3),
+                "record_upload": {
+                    "enabled": game_global_config.get("wipe_bomb_record_upload_enabled", False),
+                    "url": game_global_config.get("wipe_bomb_record_upload_url", "http://veyu.me/api/record"),
+                    "timeout_seconds": game_global_config.get("wipe_bomb_record_upload_timeout_seconds", 3),
+                },
             },
             "daily_reset_hour": game_global_config.get("daily_reset_hour", 0),
             "user": {

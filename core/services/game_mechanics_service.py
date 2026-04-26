@@ -49,7 +49,7 @@ class GameMechanicsService:
         (0.0, 0.3, 8000),       # 严重亏损
         (0.3, 0.7, 24000),      # 普通亏损
         (0.7, 0.99, 18000),     # 小亏损
-        (1.0, 1.0, 8000),       # 持平
+        (0.95, 1.05, 8000),     # 近乎持平
         (1.01, 1.2, 26000),     # 小赚
         (1.2, 2.0, 13000),      # 中赚
         (2.0, 3.0, 2500),       # 大赚
@@ -64,7 +64,7 @@ class GameMechanicsService:
         (0.0, 0.3, 8000),       # 严重亏损
         (0.3, 0.7, 24000),      # 普通亏损
         (0.7, 0.99, 18000),     # 小亏损
-        (1.0, 1.0, 8000),       # 持平
+        (0.95, 1.05, 8000),     # 近乎持平
         (1.01, 1.2, 26000),     # 小赚
         (1.2, 2.0, 13200),      # 中赚
         (2.0, 3.0, 2400),       # 大赚
@@ -102,6 +102,9 @@ class GameMechanicsService:
         self.item_template_repo = item_template_repo
         self.buff_repo = buff_repo
         self.config = config
+        self.wipe_bomb_upload_config = (
+            self.config.get("wipe_bomb", {}).get("record_upload", {})
+        )
         # 服务器级别的抑制状态
         self._server_suppressed = False
         self._last_suppression_date = None
@@ -384,6 +387,9 @@ class GameMechanicsService:
 
         # 上传非敏感数据到服务器
         def upload_data_async():
+            if not self.wipe_bomb_upload_config.get("enabled", False):
+                return
+
             upload_data = {
                 "user_id": user_id,
                 "contribution_amount": contribution_amount,
@@ -392,13 +398,14 @@ class GameMechanicsService:
                 "profit": profit,
                 "timestamp": log_entry.timestamp.isoformat()
             }
-            api_url = "http://veyu.me/api/record"
+            api_url = self.wipe_bomb_upload_config.get("url", "http://veyu.me/api/record")
+            timeout_seconds = self.wipe_bomb_upload_config.get("timeout_seconds", 3)
             try:
-                response = requests.post(api_url, json=upload_data)
+                response = requests.post(api_url, json=upload_data, timeout=timeout_seconds)
                 if response.status_code != 200:
-                    logger.info(f"上传数据失败: {response.text}")
-            except Exception as e:
-                logger.error(f"上传数据时发生错误: {e}")
+                    logger.warning(f"上传擦弹记录失败: HTTP {response.status_code} - {response.text}")
+            except requests.RequestException as e:
+                logger.warning(f"上传擦弹记录已跳过: {e}")
 
         # 启动异步线程进行数据上传，不阻塞主流程
         self.thread_pool.submit(upload_data_async)

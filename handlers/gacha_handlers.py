@@ -320,6 +320,9 @@ async def wipe_bomb(self: "FishingPlugin", event: AstrMessageEvent):
             if multiplier < 0.01:
                 # 当倍率小于0.01时，显示4位小数以避免混淆
                 multiplier_formatted = f"{multiplier:.4f}"
+            elif 0.95 <= multiplier <= 1.05:
+                # 接近 1 倍时保留 3 位，避免 1.004 之类被误看成精确 1 倍
+                multiplier_formatted = f"{multiplier:.3f}"
             else:
                 # 正常情况下保留两位小数
                 multiplier_formatted = f"{multiplier:.2f}"
