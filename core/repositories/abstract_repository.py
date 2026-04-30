@@ -11,7 +11,7 @@ from ..domain.models import (
     FishingRecord, GachaRecord, WipeBombLog, MarketListing, TaxRecord,
     GachaPool, GachaPoolItem, FishingZone, UserBuff, AquariumUpgrade,
     ShopOffer, ShopOfferCost, ShopOfferReward,
-    Commodity, Exchange, UserCommodity  # 新增交易所模型导入
+    Commodity, Exchange, UserCommodity, PokedexRewardClaim  # 新增交易所模型导入
 )
 
 # 定义用户成就进度的数据结构
@@ -543,6 +543,21 @@ class AbstractLogRepository(ABC):
 
     @abstractmethod
     def get_user_fish_stat(self, user_id: str, fish_id: int) -> Optional["UserFishStat"]:
+        pass
+
+    @abstractmethod
+    def get_user_pokedex_reward_claims(self, user_id: str) -> List[PokedexRewardClaim]:
+        pass
+
+    @abstractmethod
+    def claim_pokedex_reward(
+        self,
+        user_id: str,
+        milestone_percent: int,
+        reward_premium: int,
+        unlocked_fish_count: int,
+        total_fish_count: int,
+    ) -> bool:
         pass
 
 class AbstractAchievementRepository(ABC):

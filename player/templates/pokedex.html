@@ -12,6 +12,71 @@
     </div>
 </div>
 
+{% set reward_status = pokedex_reward_status if pokedex_reward_status and pokedex_reward_status.success else None %}
+{% set next_reward = reward_status.next_milestone if reward_status else None %}
+
+{% if reward_status %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning shadow-sm">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-lg-8">
+                        <h5 class="card-title mb-3"><i class="fas fa-gem text-warning"></i> 图鉴奖励</h5>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="small text-muted">当前可领取</div>
+                                <div class="fw-bold fs-5 text-warning">{{ reward_status.claimable_reward_total }} 钻石</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-muted">累计已领取</div>
+                                <div class="fw-bold fs-5">{{ reward_status.total_claimed_premium }} / {{ reward_status.total_reward_amount }} 钻石</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-muted">已领取节点</div>
+                                <div class="fw-bold">{{ reward_status.claimed_count }} / {{ reward_status.total_milestones }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-muted">当前高级货币</div>
+                                <div class="fw-bold">{{ reward_status.current_premium_currency }}</div>
+                            </div>
+                        </div>
+                        <hr>
+                        {% if next_reward %}
+                        <p class="mb-1">
+                            <strong>下一奖励：</strong>{{ next_reward.milestone_percent }}% 节点
+                            <span class="text-muted">({{ next_reward.reward_premium }} 钻石)</span>
+                        </p>
+                        <p class="mb-0 text-muted">
+                            还需 {{ next_reward.remaining_fish_count }} 种鱼
+                            · 目标 {{ next_reward.required_fish_count }} / {{ reward_status.total_fish_count }}
+                        </p>
+                        {% else %}
+                        <p class="mb-0 text-success"><strong>全部图鉴奖励已领取完毕。</strong></p>
+                        {% endif %}
+                    </div>
+                    <div class="col-lg-4">
+                        <form method="post" action="{{ url_for('player_bp.claim_pokedex_reward') }}" class="d-grid gap-2">
+                            <button type="submit" class="btn btn-warning btn-lg" {% if reward_status.claimable_reward_total <= 0 %}disabled{% endif %}>
+                                <i class="fas fa-gift"></i>
+                                {% if reward_status.claimable_reward_total > 0 %}
+                                    领取 {{ reward_status.claimable_reward_total }} 钻石
+                                {% else %}
+                                    暂无可领取奖励
+                                {% endif %}
+                            </button>
+                            <div class="small text-muted text-center">
+                                命令端也可使用 <code>/图鉴奖励</code> 领取或查看进度
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- 统计信息 -->
 <div class="row mb-4">
     <div class="col-md-6">

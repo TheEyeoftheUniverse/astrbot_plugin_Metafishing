@@ -4,7 +4,14 @@ from typing import Optional, List, Dict
 from datetime import date, datetime, timedelta, timezone
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractLogRepository
-from ..domain.models import FishingRecord, GachaRecord, WipeBombLog, TaxRecord, UserFishStat
+from ..domain.models import (
+    FishingRecord,
+    GachaRecord,
+    WipeBombLog,
+    TaxRecord,
+    UserFishStat,
+    PokedexRewardClaim,
+)
 
 class SqliteLogRepository(AbstractLogRepository):
     """日志类数据仓储的SQLite实现"""
@@ -55,6 +62,19 @@ class SqliteLogRepository(AbstractLogRepository):
             first_caught_at=data.get("first_caught_at"),
             last_caught_at=data.get("last_caught_at"),
             total_caught=data["total_caught"],
+        )
+
+    def _row_to_pokedex_reward_claim(self, row: sqlite3.Row) -> Optional[PokedexRewardClaim]:
+        if not row:
+            return None
+        data = dict(row)
+        return PokedexRewardClaim(
+            user_id=data["user_id"],
+            milestone_percent=data["milestone_percent"],
+            reward_premium=data["reward_premium"],
+            claimed_unlocked_fish_count=data["claimed_unlocked_fish_count"],
+            claimed_total_fish_count=data["claimed_total_fish_count"],
+            claimed_at=data.get("claimed_at"),
         )
 
     def _row_to_gacha_record(self, row: sqlite3.Row) -> Optional[GachaRecord]:
@@ -555,3 +575,74 @@ class SqliteLogRepository(AbstractLogRepository):
             )
             row = cursor.fetchone()
             return self._row_to_user_fish_stat(row) if row else None
+
+    def get_user_pokedex_reward_claims(self, user_id: str) -> List[PokedexRewardClaim]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT user_id, milestone_percent, reward_premium,
+                       claimed_unlocked_fish_count, claimed_total_fish_count, claimed_at
+                FROM user_pokedex_reward_claims
+                WHERE user_id = ?
+                ORDER BY milestone_percent ASC
+                """,
+                (user_id,),
+            )
+            return [self._row_to_pokedex_reward_claim(row) for row in cursor.fetchall()]
+
+    def claim_pokedex_reward(
+        self,
+        user_id: str,
+        milestone_percent: int,
+        reward_premium: int,
+        unlocked_fish_count: int,
+        total_fish_count: int,
+    ) -> bool:
+        claimed_at = datetime.now(self.UTC8)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE")
+            try:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO user_pokedex_reward_claims (
+                        user_id,
+                        milestone_percent,
+                        reward_premium,
+                        claimed_unlocked_fish_count,
+                        claimed_total_fish_count,
+                        claimed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        milestone_percent,
+                        reward_premium,
+                        unlocked_fish_count,
+                        total_fish_count,
+                        claimed_at,
+                    ),
+                )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return False
+
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET premium_currency = premium_currency + ?
+                    WHERE user_id = ?
+                    """,
+                    (reward_premium, user_id),
+                )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return False
+
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                raise

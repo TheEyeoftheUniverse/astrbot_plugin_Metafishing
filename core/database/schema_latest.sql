@@ -332,6 +332,18 @@ CREATE TABLE user_fish_stats (
             FOREIGN KEY (fish_id) REFERENCES fish(fish_id) ON DELETE RESTRICT
         );
 
+-- table: user_pokedex_reward_claims
+CREATE TABLE user_pokedex_reward_claims (
+            user_id TEXT NOT NULL,
+            milestone_percent INTEGER NOT NULL,
+            reward_premium INTEGER NOT NULL,
+            claimed_unlocked_fish_count INTEGER NOT NULL,
+            claimed_total_fish_count INTEGER NOT NULL,
+            claimed_at DATETIME NOT NULL,
+            PRIMARY KEY (user_id, milestone_percent),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
 -- table: user_items
 CREATE TABLE user_items (
             user_id TEXT NOT NULL,

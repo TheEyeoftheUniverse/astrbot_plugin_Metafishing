@@ -424,6 +424,17 @@ class UserFishStat:
     last_caught_at: Optional[datetime]
     total_caught: int
 
+
+@dataclass
+class PokedexRewardClaim:
+    """用户图鉴奖励领取记录"""
+    user_id: str
+    milestone_percent: int
+    reward_premium: int
+    claimed_unlocked_fish_count: int
+    claimed_total_fish_count: int
+    claimed_at: Optional[datetime]
+
 # ---------------------------------
 # 商店实体 (Shop Entities) - 新设计
 # ---------------------------------

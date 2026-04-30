@@ -1,4 +1,5 @@
 import json
+import math
 import random
 import threading
 import time
@@ -19,6 +20,20 @@ from ..domain.models import FishingRecord, TaxRecord, FishingZone
 from ..services.fishing_zone_service import FishingZoneService
 from ..services.wipe_bomb_daily_service import add_wipe_bomb_jackpot
 from ..utils import get_now, get_fish_template, get_today, get_last_reset_time, calculate_after_refine
+
+POKEDEX_REWARD_MILESTONES = [
+    (5, 66),
+    (10, 88),
+    (20, 120),
+    (30, 180),
+    (40, 260),
+    (50, 360),
+    (60, 520),
+    (70, 760),
+    (80, 1066),
+    (90, 1400),
+    (100, 1846),
+]
 
 
 class FishingService:
@@ -61,6 +76,7 @@ class FishingService:
         self.rare_fish_reset_lock = threading.Lock()  # 防止稀有鱼重置并发执行的锁
         self.log_cleanup_lock = threading.Lock()  # 防止日志清理并发执行的锁
         self.zone_pass_reset_lock = threading.Lock()  # 防止通行证日检并发执行的锁
+        self.pokedex_reward_claim_lock = threading.Lock()  # 防止图鉴奖励重复领取
         self.last_zone_pass_check_reset_time = None
         self.last_log_cleanup_reset_time = None
         # 可选的消息通知回调：签名 (target: str, message: str) -> None，用于消息通知
@@ -547,6 +563,114 @@ class FishingService:
             "unlocked_fish_count": unlock_fish_count,
             "unlocked_percentage": (unlock_fish_count / all_fish_count) if all_fish_count > 0 else 0
     }
+
+    def _build_pokedex_reward_status(self, user_id: str, user) -> Dict[str, Any]:
+        stats = self.log_repo.get_user_fish_stats(user_id)
+        claims = self.log_repo.get_user_pokedex_reward_claims(user_id)
+        claim_map = {claim.milestone_percent: claim for claim in claims}
+
+        total_fish_count = len(self.item_template_repo.get_all_fish())
+        unlocked_fish_count = len(stats)
+        unlocked_ratio = (unlocked_fish_count / total_fish_count) if total_fish_count > 0 else 0.0
+
+        milestones = []
+        for milestone_percent, reward_premium in POKEDEX_REWARD_MILESTONES:
+            required_fish_count = (
+                math.ceil(total_fish_count * milestone_percent / 100.0)
+                if total_fish_count > 0
+                else 0
+            )
+            claim_record = claim_map.get(milestone_percent)
+            claimed = claim_record is not None
+            claimable = (
+                not claimed
+                and total_fish_count > 0
+                and unlocked_fish_count >= required_fish_count
+            )
+            remaining_fish_count = 0 if claimed or claimable else max(required_fish_count - unlocked_fish_count, 0)
+
+            milestones.append(
+                {
+                    "milestone_percent": milestone_percent,
+                    "reward_premium": reward_premium,
+                    "required_fish_count": required_fish_count,
+                    "claimed": claimed,
+                    "claimable": claimable,
+                    "remaining_fish_count": remaining_fish_count,
+                    "claimed_at": getattr(claim_record, "claimed_at", None),
+                }
+            )
+
+        claimable_rewards = [item for item in milestones if item["claimable"]]
+        next_milestone = next((item for item in milestones if not item["claimed"]), None)
+        total_reward_amount = sum(reward for _, reward in POKEDEX_REWARD_MILESTONES)
+        total_claimed_premium = sum(item["reward_premium"] for item in milestones if item["claimed"])
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "current_premium_currency": user.premium_currency,
+            "unlocked_fish_count": unlocked_fish_count,
+            "total_fish_count": total_fish_count,
+            "unlocked_percentage": unlocked_ratio,
+            "unlocked_percentage_text": f"{unlocked_ratio * 100:.1f}%",
+            "milestones": milestones,
+            "claimable_rewards": claimable_rewards,
+            "claimable_reward_total": sum(item["reward_premium"] for item in claimable_rewards),
+            "claimed_count": sum(1 for item in milestones if item["claimed"]),
+            "total_milestones": len(milestones),
+            "total_claimed_premium": total_claimed_premium,
+            "total_reward_amount": total_reward_amount,
+            "next_milestone": next_milestone,
+            "all_claimed": all(item["claimed"] for item in milestones) if milestones else True,
+        }
+
+    def get_pokedex_reward_status(self, user_id: str) -> Dict[str, Any]:
+        """获取用户图鉴奖励状态。"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+        return self._build_pokedex_reward_status(user_id, user)
+
+    def claim_pokedex_rewards(self, user_id: str) -> Dict[str, Any]:
+        """领取当前所有可领取的图鉴奖励。"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+
+        with self.pokedex_reward_claim_lock:
+            status = self._build_pokedex_reward_status(user_id, user)
+            claimable_rewards = status.get("claimable_rewards", [])
+            newly_claimed_rewards = []
+            newly_claimed_premium = 0
+
+            for reward in claimable_rewards:
+                claimed = self.log_repo.claim_pokedex_reward(
+                    user_id,
+                    reward["milestone_percent"],
+                    reward["reward_premium"],
+                    status["unlocked_fish_count"],
+                    status["total_fish_count"],
+                )
+                if claimed:
+                    newly_claimed_rewards.append(
+                        {
+                            "milestone_percent": reward["milestone_percent"],
+                            "reward_premium": reward["reward_premium"],
+                            "required_fish_count": reward["required_fish_count"],
+                        }
+                    )
+                    newly_claimed_premium += reward["reward_premium"]
+
+            refreshed_user = self.user_repo.get_by_id(user_id)
+            refreshed_status = self._build_pokedex_reward_status(user_id, refreshed_user or user)
+            refreshed_status["newly_claimed_rewards"] = newly_claimed_rewards
+            refreshed_status["newly_claimed_premium"] = newly_claimed_premium
+            if newly_claimed_rewards:
+                refreshed_status["message"] = f"成功领取 {newly_claimed_premium} 高级货币"
+            else:
+                refreshed_status["message"] = "当前没有可领取的图鉴奖励"
+            return refreshed_status
 
     def get_user_fish_log(self, user_id: str, limit: int = 10) -> Dict[str, Any]:
         """

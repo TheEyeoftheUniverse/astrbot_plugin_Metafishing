@@ -4,7 +4,7 @@ from ..core.utils import get_now
 from ..utils import safe_datetime_handler, to_percentage, safe_get_file_path
 from ..draw.pokedex import draw_pokedex
 from astrbot.api.message_components import Image as AstrImage
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Any
 
 if TYPE_CHECKING:
     from ..main import FishingPlugin
@@ -64,6 +64,42 @@ def _build_fish_message(result, fishing_cost):
         
         return message
     return f"{result['message']}\n💸消耗：{fishing_cost} 金币/次"
+
+
+def _build_pokedex_reward_message(result: Dict[str, Any]) -> str:
+    lines = [
+        "【图鉴奖励】",
+        f"当前进度：{result.get('unlocked_fish_count', 0)}/{result.get('total_fish_count', 0)}（{result.get('unlocked_percentage_text', '0.0%')}）",
+    ]
+
+    newly_claimed_rewards = result.get("newly_claimed_rewards", [])
+    if newly_claimed_rewards:
+        lines.append("")
+        lines.append("本次领取：")
+        for reward in newly_claimed_rewards:
+            lines.append(
+                f" - {reward['milestone_percent']}% 节点：{reward['reward_premium']} 高级货币"
+            )
+        lines.append(f"合计获得：{result.get('newly_claimed_premium', 0)} 高级货币")
+    else:
+        lines.append("")
+        lines.append("当前没有可领取奖励")
+
+    lines.append("")
+    lines.append(f"已领取节点：{result.get('claimed_count', 0)}/{result.get('total_milestones', 0)}")
+    lines.append(f"累计已领取：{result.get('total_claimed_premium', 0)} 高级货币")
+
+    next_milestone = result.get("next_milestone")
+    if next_milestone:
+        lines.append(f"下一奖励：{next_milestone['milestone_percent']}% 节点")
+        lines.append(
+            f"还需数量：{next_milestone['remaining_fish_count']} 种（目标 {next_milestone['required_fish_count']}/{result.get('total_fish_count', 0)}）"
+        )
+    else:
+        lines.append("下一奖励：已全部领取完毕")
+
+    lines.append(f"当前高级货币：{result.get('current_premium_currency', 0)}")
+    return "\n".join(lines)
 
 
 class FishingHandlers:
@@ -241,3 +277,15 @@ class FishingHandlers:
         except Exception as e:
             logger.error(f"绘制图鉴图片失败: {e}", exc_info=e)
             yield event.plain_result("❌ 绘制图鉴时发生错误，请稍后再试或联系管理员。")
+
+    async def pokedex_reward(self, event: AstrMessageEvent):
+        """领取或查看图鉴奖励进度"""
+        user_id = self.plugin._get_effective_user_id(event)
+        result = self.fishing_service.claim_pokedex_rewards(user_id)
+        if not result or not result.get("success"):
+            yield event.plain_result(
+                f"❌ 图鉴奖励处理失败：{(result or {}).get('message', '未知错误')}"
+            )
+            return
+
+        yield event.plain_result(_build_pokedex_reward_message(result))

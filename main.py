@@ -604,6 +604,12 @@ class FishingPlugin(Star):
         async for r in self.fishing_handlers.fish_pokedex(event): 
             yield r
 
+    @filter.command("图鉴奖励")
+    async def pokedex_reward(self, event: AstrMessageEvent):
+        """领取图鉴奖励或查看当前图鉴奖励进度"""
+        async for r in self.fishing_handlers.pokedex_reward(event):
+            yield r
+
     # =========== 市场与商店 ==========
 
     @filter.command("全部卖出", alias={"全部出售", "卖出全部", "出售全部", "清空鱼"})

@@ -2126,6 +2126,7 @@ async def pokedex():
     user_id = session.get("user_id")
     item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
     log_repo = current_app.config.get("LOG_REPO")
+    fishing_service = current_app.config.get("FISHING_SERVICE")
     
     # 获取所有鱼类模板
     all_fish = item_template_repo.get_all_fish()
@@ -2168,11 +2169,41 @@ async def pokedex():
     # 排序
     for rarity in fish_by_rarity:
         fish_by_rarity[rarity].sort(key=lambda x: x["id"])
-    
+
+    pokedex_reward_status = (
+        fishing_service.get_pokedex_reward_status(user_id)
+        if fishing_service
+        else {"success": False, "message": "服务不可用"}
+    )
+
     return await render_template("pokedex.html", 
                                   fish_by_rarity=fish_by_rarity,
                                   total_fish=len(all_fish),
-                                  caught_count=len(caught_fish_map))
+                                  caught_count=len(caught_fish_map),
+                                  pokedex_reward_status=pokedex_reward_status)
+
+
+@player_bp.route("/pokedex/reward/claim", methods=["POST"])
+@login_required
+async def claim_pokedex_reward():
+    """领取图鉴奖励"""
+    user_id = session.get("user_id")
+    fishing_service = current_app.config.get("FISHING_SERVICE")
+    if not fishing_service:
+        await flash("图鉴奖励服务不可用", "danger")
+        return redirect(url_for("player_bp.pokedex"))
+
+    result = fishing_service.claim_pokedex_rewards(user_id)
+    if not result.get("success"):
+        await flash(result.get("message", "图鉴奖励领取失败"), "danger")
+        return redirect(url_for("player_bp.pokedex"))
+
+    newly_claimed_premium = int(result.get("newly_claimed_premium", 0) or 0)
+    if newly_claimed_premium > 0:
+        await flash(f"成功领取图鉴奖励：{newly_claimed_premium} 钻石", "success")
+    else:
+        await flash(result.get("message", "当前没有可领取的图鉴奖励"), "info")
+    return redirect(url_for("player_bp.pokedex"))
 
 @player_bp.route("/inventory")
 @login_required
