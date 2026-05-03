@@ -377,6 +377,11 @@ class AbstractExchangeRepository(ABC):
         pass
 
     @abstractmethod
+    def get_latest_prices(self) -> List[Exchange]:
+        """获取每个商品最近一条价格记录"""
+        pass
+
+    @abstractmethod
     def add_exchange_price(self, price: Exchange) -> None:
         """新增一条交易所价格记录"""
         pass

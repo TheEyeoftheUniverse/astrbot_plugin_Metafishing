@@ -18,23 +18,28 @@ class ExchangePriceService:
         self.config = config.get("exchange", {})
         self._update_schedule = self._parse_update_schedule(self.config.get("update_timing"))
         
-        # 商品定义
-        self.commodities = {
-            "dried_fish": {"name": "鱼干", "description": "经过晾晒处理的鱼类，保质期较长"},
-            "fish_roe": {"name": "鱼卵", "description": "珍贵的鱼类卵子，营养价值极高"},
-            "fish_oil": {"name": "鱼油", "description": "从鱼类中提取的油脂，用途广泛"}
-        }
+        self.commodities = self._load_commodities()
         
         # 价格更新任务
         self._price_update_thread: Optional[threading.Thread] = None
         self._price_update_running = False
 
     def _get_initial_prices(self) -> Dict[str, int]:
-        return self.config.get("initial_prices", {
-            "dried_fish": 6000,
-            "fish_roe": 12000,
-            "fish_oil": 10000
-        })
+        return dict(self.config.get("initial_prices", {}))
+
+    def _load_commodities(self) -> Dict[str, Dict[str, str]]:
+        try:
+            commodities = self.exchange_repo.get_all_commodities()
+            return {
+                commodity.commodity_id: {
+                    "name": commodity.name,
+                    "description": commodity.description,
+                }
+                for commodity in commodities
+            }
+        except Exception as e:
+            logger.error(f"从数据库加载期货商品失败: {e}")
+            return {}
 
     def _build_latest_price_snapshot(self, prices: List[Exchange]) -> Dict[str, int]:
         snapshot: Dict[str, int] = {}
@@ -52,7 +57,7 @@ class ExchangePriceService:
     def _get_current_and_previous_snapshots(
         self,
         today_prices: List[Exchange],
-        fallback_prices: List[Exchange],
+        previous_reference_prices: List[Exchange],
     ) -> Tuple[Dict[str, int], Dict[str, int]]:
         initial_prices = self._get_initial_prices()
 
@@ -61,17 +66,17 @@ class ExchangePriceService:
             unique_times = sorted({price.time for price in today_prices})
             if len(unique_times) >= 2:
                 previous_snapshot = self._build_snapshot_for_time(today_prices, unique_times[-2])
-            elif fallback_prices:
-                previous_snapshot = self._build_latest_price_snapshot(fallback_prices)
+            elif previous_reference_prices:
+                previous_snapshot = self._build_latest_price_snapshot(previous_reference_prices)
             else:
                 previous_snapshot = dict(initial_prices)
             return current_snapshot, previous_snapshot
 
-        if fallback_prices:
-            current_snapshot = self._build_latest_price_snapshot(fallback_prices)
-            unique_times = sorted({price.time for price in fallback_prices})
+        if previous_reference_prices:
+            current_snapshot = self._build_latest_price_snapshot(previous_reference_prices)
+            unique_times = sorted({price.time for price in previous_reference_prices})
             if len(unique_times) >= 2:
-                previous_snapshot = self._build_snapshot_for_time(fallback_prices, unique_times[-2])
+                previous_snapshot = self._build_snapshot_for_time(previous_reference_prices, unique_times[-2])
             else:
                 previous_snapshot = dict(initial_prices)
             return current_snapshot, previous_snapshot
@@ -136,7 +141,7 @@ class ExchangePriceService:
         try:
             all_commodities = self.exchange_repo.get_all_user_commodities()
         except Exception as e:
-            logger.warning(f"读取交易所持仓失败，供需状态回退为默认值: {e}")
+            logger.warning(f"读取交易所持仓失败，供需状态按无持仓计算: {e}")
             all_commodities = []
 
         total_quantity = sum(item.quantity for item in all_commodities)
@@ -167,8 +172,9 @@ class ExchangePriceService:
             prices = self.exchange_repo.get_prices_for_date(today_str)
             yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
             y_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
+            reference_prices = y_prices or self.exchange_repo.get_latest_prices()
 
-            current_prices, previous_prices = self._get_current_and_previous_snapshots(prices, y_prices)
+            current_prices, previous_prices = self._get_current_and_previous_snapshots(prices, reference_prices)
             market_descriptors = self._calculate_market_descriptors(current_prices, previous_prices)
 
             return {
@@ -256,10 +262,7 @@ class ExchangePriceService:
                         if last_known_price is not None:
                             history[commodity_id].append(last_known_price)
                         else:
-                            # 序列开头仍未知时，才使用初始价格
-                            initial_price = self.config.get("initial_prices", {}).get(commodity_id, 1000)
-                            last_known_price = initial_price
-                            history[commodity_id].append(initial_price)
+                            history[commodity_id].append(None)
             
             return {
                 "success": True,
@@ -290,26 +293,34 @@ class ExchangePriceService:
                 for p in sorted(today_prices, key=lambda x: x.time):
                     base_prices[p.commodity_id] = p.price
 
-            # 对缺失的商品，回退到昨日
+            # 对缺失的商品，使用数据库中最近一条价格记录补齐
             if len(base_prices) < len(self.commodities):
                 yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-                y_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
-                for p in sorted(y_prices, key=lambda x: x.time):
+                reference_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
+                if not reference_prices:
+                    reference_prices = self.exchange_repo.get_latest_prices()
+                for p in sorted(reference_prices, key=lambda x: (x.date, x.time)):
                     if p.commodity_id not in base_prices:
                         base_prices[p.commodity_id] = p.price
 
-            # 仍缺失则使用初始价格
+            # 仍缺失则只接受显式配置的初始价格
             if len(base_prices) < len(self.commodities):
+                initial_prices = self._get_initial_prices()
                 for commodity_id in self.commodities.keys():
                     if commodity_id not in base_prices:
-                        base_prices[commodity_id] = self.config.get("initial_prices", {}).get(commodity_id, 1000)
+                        if commodity_id in initial_prices:
+                            base_prices[commodity_id] = initial_prices[commodity_id]
+                        else:
+                            logger.error(f"商品 {commodity_id} 缺少价格记录，跳过本次手动更新")
             
             logger.info(f"基于当前价格更新：{base_prices}")
             
             # 计算新价格
             new_prices = {}
             for commodity_id in self.commodities.keys():
-                last_price = base_prices.get(commodity_id, 100)
+                if commodity_id not in base_prices:
+                    continue
+                last_price = base_prices[commodity_id]
                 new_price = self._calculate_new_price(commodity_id, last_price)
                 new_prices[commodity_id] = new_price
                 
@@ -350,11 +361,7 @@ class ExchangePriceService:
             self.exchange_repo.delete_prices_for_date(today_str)
             
             # 设置初始价格
-            initial_prices = self.config.get("initial_prices", {
-                "dried_fish": 6000,
-                "fish_roe": 12000,
-                "fish_oil": 10000
-            })
+            initial_prices = self._get_initial_prices()
             
             for commodity_id, price in initial_prices.items():
                 self.exchange_repo.add_exchange_price(Exchange(
@@ -579,31 +586,32 @@ class ExchangePriceService:
                     logger.info(f"今日在窗口 {window_start} - {window_end or '24:00:00'} 已更新，跳过自动更新")
                     return
             
-            # 以“上一次价格”为基准：优先取今日最新记录；若无则回退到昨日；再无则初始
+            # 以“上一次价格”为基准：优先取今日最新记录；若无则取数据库最近记录；再无则取显式初始价
             last_prices: Dict[str, int] = {}
             # 今日最新
             if existing_prices:
                 for p in sorted(existing_prices, key=lambda x: x.time):
                     last_prices[p.commodity_id] = p.price
 
-            # 回退到昨日（仅填补缺失的商品）
+            # 使用数据库中最近一条价格记录填补缺失商品
             if len(last_prices) < len(self.commodities):
                 yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-                y_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
-                for p in sorted(y_prices, key=lambda x: x.time):
+                reference_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
+                if not reference_prices:
+                    reference_prices = self.exchange_repo.get_latest_prices()
+                for p in sorted(reference_prices, key=lambda x: (x.date, x.time)):
                     if p.commodity_id not in last_prices:
                         last_prices[p.commodity_id] = p.price
 
-            # 最后使用初始价格补齐
+            # 最后只使用显式配置的初始价格补齐
             if len(last_prices) < len(self.commodities):
-                init_prices = self.config.get("initial_prices", {
-                    "dried_fish": 6000,
-                    "fish_roe": 12000,
-                    "fish_oil": 10000
-                })
+                init_prices = self._get_initial_prices()
                 for commodity_id in self.commodities.keys():
                     if commodity_id not in last_prices:
-                        last_prices[commodity_id] = init_prices.get(commodity_id, 1000)
+                        if commodity_id in init_prices:
+                            last_prices[commodity_id] = init_prices[commodity_id]
+                        else:
+                            logger.error(f"商品 {commodity_id} 缺少价格记录，跳过本次自动更新")
 
             logger.info(f"基于上一次价格更新：{last_prices}")
 
@@ -614,7 +622,9 @@ class ExchangePriceService:
             # 计算新价格
             new_prices = {}
             for commodity_id in self.commodities.keys():
-                last_price = last_prices.get(commodity_id, self.config.get("initial_prices", {}).get(commodity_id, 100))
+                if commodity_id not in last_prices:
+                    continue
+                last_price = last_prices[commodity_id]
                 new_price = self._calculate_new_price(commodity_id, last_price)
                 new_prices[commodity_id] = new_price
                 

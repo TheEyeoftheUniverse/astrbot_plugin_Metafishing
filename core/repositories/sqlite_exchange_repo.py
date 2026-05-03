@@ -40,6 +40,24 @@ class SqliteExchangeRepository(AbstractExchangeRepository):
         rows = c.fetchall()
         return [Exchange(*row) for row in rows]
 
+    def get_latest_prices(self) -> List[Exchange]:
+        conn = self._get_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT ep.date, ep.time, ep.commodity_id, ep.price, ep.update_type, ep.created_at
+            FROM exchange_prices ep
+            INNER JOIN (
+                SELECT commodity_id, MAX(datetime(date || ' ' || time)) AS latest_at
+                FROM exchange_prices
+                GROUP BY commodity_id
+            ) latest
+                ON latest.commodity_id = ep.commodity_id
+               AND latest.latest_at = datetime(ep.date || ' ' || ep.time)
+            ORDER BY ep.commodity_id
+        """)
+        rows = c.fetchall()
+        return [Exchange(*row) for row in rows]
+
     def add_exchange_price(self, price: Exchange) -> None:
         conn = self._get_connection()
         c = conn.cursor()

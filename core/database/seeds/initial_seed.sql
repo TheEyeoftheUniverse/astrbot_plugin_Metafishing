@@ -874,6 +874,23 @@ INSERT OR IGNORE INTO "commodities" ("commodity_id", "name", "description") VALU
 INSERT OR IGNORE INTO "commodities" ("commodity_id", "name", "description") VALUES ('cthulhu_high_risk', '黑礁鱼卵囊', '高风险标的。黑礁鱼卵囊只在异常潮位后出现，质量难以预测，价格波动极端。');
 INSERT OR IGNORE INTO "commodities" ("commodity_id", "name", "description") VALUES ('cthulhu_speculative', '梦潮鱼油', '投机品。带有梦潮沉淀物的鱼油，传闻、失踪航线和禁令都可能触发行情突变。');
 
+-- table: exchange_prices
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'dried_fish', 6000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'fish_roe', 12000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'fish_oil', 10000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'fantasy_stable', 6000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'fantasy_high_risk', 12000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'fantasy_speculative', 10000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'scifi_stable', 6000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'scifi_high_risk', 12000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'scifi_speculative', 10000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'xuanhuan_stable', 6000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'xuanhuan_high_risk', 12000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'xuanhuan_speculative', 10000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'cthulhu_stable', 6000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'cthulhu_high_risk', 12000, 'seed', '2026-04-25T00:00:00');
+INSERT OR IGNORE INTO "exchange_prices" ("date", "time", "commodity_id", "price", "update_type", "created_at") VALUES ('2026-04-25', '00:00:00', 'cthulhu_speculative', 10000, 'seed', '2026-04-25T00:00:00');
+
 -- table: fishing_zones
 INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "available_from", "available_until", "required_item_id", "requires_pass", "fishing_cost") VALUES (1, '区域一：新手港湾', '刚买到人生第一杆钓竿的人常被推荐的钓点，只能钓到寻常鱼类。', 500, 8, '{"rarity_distribution": [0.6, 0.3, 0.08, 0.02, 0]}', 1, NULL, NULL, NULL, 0, 10);
 INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "available_from", "available_until", "required_item_id", "requires_pass", "fishing_cost") VALUES (2, '区域二：入门海峡', '积累了一定钓获后就会被推荐来这里，据说偶尔能钓到不同寻常的鱼。', 1500, 0, '{"rarity_distribution": [0.4, 0.3, 0.2, 0.09, 0.01, 0]}', 1, NULL, NULL, NULL, 0, 30);
