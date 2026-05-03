@@ -403,26 +403,6 @@
         "type": "int",
         "default": 30,
         "description": "商品合并时间窗口（分钟）"
-      },
-      "initial_prices": {
-        "type": "object",
-        "items": {
-          "dried_fish": {
-            "type": "int",
-            "default": 6000,
-            "description": "鱼干初始价格（低风险低收益）"
-          },
-          "fish_roe": {
-            "type": "int",
-            "default": 12000,
-            "description": "鱼卵初始价格（高风险高收益）"
-          },
-          "fish_oil": {
-            "type": "int",
-            "default": 10000,
-            "description": "鱼油初始价格（投机品，事件驱动）"
-          }
-        }
       }
     }
   }

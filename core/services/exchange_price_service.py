@@ -19,13 +19,34 @@ class ExchangePriceService:
         self._update_schedule = self._parse_update_schedule(self.config.get("update_timing"))
         
         self.commodities = self._load_commodities()
+        self.price_rules = self._load_price_rules()
         
         # 价格更新任务
         self._price_update_thread: Optional[threading.Thread] = None
         self._price_update_running = False
 
     def _get_initial_prices(self) -> Dict[str, int]:
-        return dict(self.config.get("initial_prices", {}))
+        initial_prices = {
+            price.commodity_id: price.price
+            for price in self.exchange_repo.get_initial_prices()
+        }
+        return self._require_complete_prices(initial_prices, "数据库初始期货价格")
+
+    def _require_complete_prices(self, prices: Dict[str, int], source: str) -> Dict[str, int]:
+        missing = sorted(commodity_id for commodity_id in self.commodities if commodity_id not in prices)
+        invalid = sorted(
+            commodity_id
+            for commodity_id, price in prices.items()
+            if commodity_id in self.commodities and (not isinstance(price, int) or price <= 0)
+        )
+        if missing or invalid:
+            details = []
+            if missing:
+                details.append(f"缺少商品: {', '.join(missing)}")
+            if invalid:
+                details.append(f"价格非法: {', '.join(invalid)}")
+            raise RuntimeError(f"{source}不完整，停止期货价格计算；" + "；".join(details))
+        return {commodity_id: prices[commodity_id] for commodity_id in self.commodities}
 
     def _load_commodities(self) -> Dict[str, Dict[str, str]]:
         try:
@@ -40,6 +61,17 @@ class ExchangePriceService:
         except Exception as e:
             logger.error(f"从数据库加载期货商品失败: {e}")
             return {}
+
+    def _load_price_rules(self) -> Dict[str, Dict[str, Any]]:
+        try:
+            rules = self.exchange_repo.get_commodity_price_rules()
+            missing = sorted(commodity_id for commodity_id in self.commodities if commodity_id not in rules)
+            if missing:
+                raise RuntimeError("缺少商品调价规则: " + ", ".join(missing))
+            return {commodity_id: rules[commodity_id] for commodity_id in self.commodities}
+        except Exception as e:
+            logger.error(f"从数据库加载期货调价规则失败: {e}")
+            raise
 
     def _build_latest_price_snapshot(self, prices: List[Exchange]) -> Dict[str, int]:
         snapshot: Dict[str, int] = {}
@@ -285,7 +317,7 @@ class ExchangePriceService:
             batch_time_str = batch_now.strftime("%H:%M:%S")
             batch_created_at = batch_now.isoformat()
             
-            # 先获取“上一次价格”作为基准（优先今日最新，其次昨日，最后初始）
+            # 先获取“上一次价格”作为基准（优先今日最新，其次历史最新）。
             base_prices: Dict[str, int] = {}
             today_prices = self.exchange_repo.get_prices_for_date(today_str)
             if today_prices:
@@ -293,7 +325,7 @@ class ExchangePriceService:
                 for p in sorted(today_prices, key=lambda x: x.time):
                     base_prices[p.commodity_id] = p.price
 
-            # 对缺失的商品，使用数据库中最近一条价格记录补齐
+            # 对缺失的商品，使用数据库中最近一条价格记录补齐。
             if len(base_prices) < len(self.commodities):
                 yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
                 reference_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
@@ -303,15 +335,7 @@ class ExchangePriceService:
                     if p.commodity_id not in base_prices:
                         base_prices[p.commodity_id] = p.price
 
-            # 仍缺失则只接受显式配置的初始价格
-            if len(base_prices) < len(self.commodities):
-                initial_prices = self._get_initial_prices()
-                for commodity_id in self.commodities.keys():
-                    if commodity_id not in base_prices:
-                        if commodity_id in initial_prices:
-                            base_prices[commodity_id] = initial_prices[commodity_id]
-                        else:
-                            logger.error(f"商品 {commodity_id} 缺少价格记录，跳过本次手动更新")
+            base_prices = self._require_complete_prices(base_prices, "当前期货价格记录")
             
             logger.info(f"基于当前价格更新：{base_prices}")
             
@@ -360,7 +384,6 @@ class ExchangePriceService:
             # 删除今日现有价格
             self.exchange_repo.delete_prices_for_date(today_str)
             
-            # 设置初始价格
             initial_prices = self._get_initial_prices()
             
             for commodity_id, price in initial_prices.items():
@@ -384,10 +407,14 @@ class ExchangePriceService:
 
     def _calculate_new_price(self, commodity_id: str, current_price: int) -> int:
         """计算新价格"""
-        # 获取商品配置
-        commodity_config = self.config.get("commodities", {}).get(commodity_id, {})
-        volatility = commodity_config.get("volatility", 0.1)
-        max_change_rate = self.config.get("max_change_rate", 0.2)
+        rule = self.price_rules.get(commodity_id)
+        if not rule:
+            raise RuntimeError(f"商品 {commodity_id} 缺少数据库调价规则")
+
+        volatility = float(rule["volatility"])
+        max_change_rate = float(rule["max_change_rate"])
+        min_price = int(rule["min_price"])
+        max_price = int(rule["max_price"])
         
         # 随机调整
         random_factor = random.uniform(-1, 1)
@@ -399,9 +426,7 @@ class ExchangePriceService:
         # 计算新价格
         new_price = int(current_price * (1 + change_rate))
         
-        # 确保价格不会过低
-        min_price = max(1, int(current_price * 0.1))
-        new_price = max(min_price, new_price)
+        new_price = max(min_price, min(max_price, new_price))
         
         return new_price
 
@@ -586,14 +611,14 @@ class ExchangePriceService:
                     logger.info(f"今日在窗口 {window_start} - {window_end or '24:00:00'} 已更新，跳过自动更新")
                     return
             
-            # 以“上一次价格”为基准：优先取今日最新记录；若无则取数据库最近记录；再无则取显式初始价
+            # 以“上一次价格”为基准：优先取今日最新记录；若无则取数据库最近记录。
             last_prices: Dict[str, int] = {}
             # 今日最新
             if existing_prices:
                 for p in sorted(existing_prices, key=lambda x: x.time):
                     last_prices[p.commodity_id] = p.price
 
-            # 使用数据库中最近一条价格记录填补缺失商品
+            # 使用数据库中最近一条价格记录填补缺失商品。
             if len(last_prices) < len(self.commodities):
                 yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
                 reference_prices = self.exchange_repo.get_prices_for_date(yesterday_str)
@@ -603,15 +628,7 @@ class ExchangePriceService:
                     if p.commodity_id not in last_prices:
                         last_prices[p.commodity_id] = p.price
 
-            # 最后只使用显式配置的初始价格补齐
-            if len(last_prices) < len(self.commodities):
-                init_prices = self._get_initial_prices()
-                for commodity_id in self.commodities.keys():
-                    if commodity_id not in last_prices:
-                        if commodity_id in init_prices:
-                            last_prices[commodity_id] = init_prices[commodity_id]
-                        else:
-                            logger.error(f"商品 {commodity_id} 缺少价格记录，跳过本次自动更新")
+            last_prices = self._require_complete_prices(last_prices, "当前期货价格记录")
 
             logger.info(f"基于上一次价格更新：{last_prices}")
 

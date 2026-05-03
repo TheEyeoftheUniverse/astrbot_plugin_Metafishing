@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..domain.models import Commodity, Exchange, UserCommodity
 from .abstract_repository import AbstractExchangeRepository
@@ -57,6 +57,45 @@ class SqliteExchangeRepository(AbstractExchangeRepository):
         """)
         rows = c.fetchall()
         return [Exchange(*row) for row in rows]
+
+    def get_initial_prices(self) -> List[Exchange]:
+        conn = self._get_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT ep.date, ep.time, ep.commodity_id, ep.price, ep.update_type, ep.created_at
+            FROM exchange_prices ep
+            INNER JOIN (
+                SELECT commodity_id, MIN(datetime(date || ' ' || time)) AS initial_at
+                FROM exchange_prices
+                WHERE update_type = 'initial'
+                GROUP BY commodity_id
+            ) initial
+                ON initial.commodity_id = ep.commodity_id
+               AND initial.initial_at = datetime(ep.date || ' ' || ep.time)
+            WHERE ep.update_type = 'initial'
+            ORDER BY ep.commodity_id
+        """)
+        rows = c.fetchall()
+        return [Exchange(*row) for row in rows]
+
+    def get_commodity_price_rules(self) -> Dict[str, Dict[str, Any]]:
+        conn = self._get_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT commodity_id, volatility, max_change_rate, min_price, max_price
+            FROM exchange_commodity_rules
+            ORDER BY commodity_id
+        """)
+        rows = c.fetchall()
+        return {
+            row[0]: {
+                "volatility": row[1],
+                "max_change_rate": row[2],
+                "min_price": row[3],
+                "max_price": row[4],
+            }
+            for row in rows
+        }
 
     def add_exchange_price(self, price: Exchange) -> None:
         conn = self._get_connection()

@@ -1,19 +1,4 @@
 {
-  "announcement": "科考测试中，结算又又又失败了，继续测试，下次一定行\n（（（我又不小心把留言板清空了",
-  "messages": [
-    {
-      "id": "1940ae66-3a02-487e-92b2-b58f55e39c20",
-      "user_id": "1844915844",
-      "username": "人类玻璃不接稿不接广告",
-      "content": "我的天哪树上的猫爵大人",
-      "timestamp": "2026-01-15 17:35:29"
-    },
-    {
-      "id": "7b4d4bf4-cf0c-496d-8fdf-2950ca6d3df3",
-      "user_id": "1051646761",
-      "username": "麦辣焦焦",
-      "content": "这大豌豆喵不是内测号？",
-      "timestamp": "2026-01-13 16:29:38"
-    }
-  ]
+  "announcement": "",
+  "messages": []
 }

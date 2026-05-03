@@ -382,6 +382,16 @@ class AbstractExchangeRepository(ABC):
         pass
 
     @abstractmethod
+    def get_initial_prices(self) -> List[Exchange]:
+        """获取每个商品的数据库初始价格记录"""
+        pass
+
+    @abstractmethod
+    def get_commodity_price_rules(self) -> Dict[str, Dict[str, Any]]:
+        """获取每个期货商品的调价规则"""
+        pass
+
+    @abstractmethod
     def add_exchange_price(self, price: Exchange) -> None:
         """新增一条交易所价格记录"""
         pass

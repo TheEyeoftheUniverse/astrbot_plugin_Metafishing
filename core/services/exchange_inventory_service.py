@@ -24,11 +24,12 @@ class ExchangeInventoryService:
         self.market_service = market_service
         self.config = config.get("exchange", {})
         
-        # 商品定义
         self.commodities = {
-            "dried_fish": {"name": "鱼干", "description": "经过晾晒处理的鱼类，保质期较长"},
-            "fish_roe": {"name": "鱼卵", "description": "珍贵的鱼类卵子，营养价值极高"},
-            "fish_oil": {"name": "鱼油", "description": "从鱼类中提取的油脂，用途广泛"}
+            commodity.commodity_id: {
+                "name": commodity.name,
+                "description": commodity.description,
+            }
+            for commodity in self.exchange_repo.get_all_commodities()
         }
 
     def _get_base_capacity(self) -> int:
@@ -63,17 +64,16 @@ class ExchangeInventoryService:
         if not prices:
             yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
             prices = self.exchange_repo.get_prices_for_date(yesterday_str)
+        if not prices:
+            prices = self.exchange_repo.get_latest_prices()
 
         price_map: Dict[str, int] = {}
         for price in sorted(prices, key=lambda entry: entry.time):
             price_map[price.commodity_id] = price.price
 
-        initial_prices = self.config.get(
-            "initial_prices",
-            {"dried_fish": 6000, "fish_roe": 12000, "fish_oil": 10000},
-        )
-        for commodity_id in self.commodities.keys():
-            price_map.setdefault(commodity_id, initial_prices.get(commodity_id, 1000))
+        missing = sorted(commodity_id for commodity_id in self.commodities if commodity_id not in price_map)
+        if missing:
+            raise RuntimeError(f"期货当前价格记录不完整，缺少商品: {', '.join(missing)}")
 
         return price_map
 
@@ -569,22 +569,7 @@ class ExchangeInventoryService:
             if not inventory:
                 return {"success": False, "message": "库存为空"}
             
-            # 获取当前市场价格：先查今日，无则查昨日；仍无则失败
-            today = datetime.now().date()
-            today_str = today.strftime("%Y-%m-%d")
-            prices = self.exchange_repo.get_prices_for_date(today_str)
-
-            if not prices:
-                yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-                prices = self.exchange_repo.get_prices_for_date(yesterday_str)
-
-            if not prices:
-                return {
-                    "success": False,
-                    "message": "暂无今日与昨日市场价格，无法执行清仓",
-                }
-
-            current_prices = {price.commodity_id: price.price for price in prices}
+            current_prices = self._get_current_prices()
             
             # 按商品分组计算详细盈亏
             commodity_summary = {}
@@ -606,7 +591,7 @@ class ExchangeInventoryService:
                 now = datetime.now()
                 is_expired = item.expires_at <= now
                 
-                current_price = current_prices.get(commodity_id, 0)
+                current_price = current_prices[commodity_id]
                 item_cost = item.purchase_price * item.quantity
                 
                 if is_expired:
@@ -752,23 +737,8 @@ class ExchangeInventoryService:
             if not commodity_items:
                 return {"success": False, "message": f"您没有 {self.commodities[commodity_id]['name']}"}
             
-            # 获取当前市场价格：先查今日，无则查昨日；仍无则失败
-            today = datetime.now().date()
-            today_str = today.strftime("%Y-%m-%d")
-            prices = self.exchange_repo.get_prices_for_date(today_str)
-
-            if not prices:
-                yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-                prices = self.exchange_repo.get_prices_for_date(yesterday_str)
-
-            if not prices:
-                return {
-                    "success": False,
-                    "message": "暂无今日与昨日市场价格，无法执行清仓",
-                }
-
-            current_prices = {price.commodity_id: price.price for price in prices}
-            current_price = current_prices.get(commodity_id, 0)
+            current_prices = self._get_current_prices()
+            current_price = current_prices[commodity_id]
             
             # 计算详细盈亏
             total_cost = 0
@@ -953,7 +923,7 @@ class ExchangeInventoryService:
                     current_value = 0
                 else:
                     # 未腐败商品按当前市场价格计算
-                    current_price = current_prices.get(commodity.commodity_id, 0)
+                    current_price = current_prices[commodity.commodity_id]
                     current_value = current_price * commodity.quantity
                 
                 total_current_value += current_value

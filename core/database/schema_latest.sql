@@ -41,6 +41,17 @@ CREATE TABLE commodities (
             description TEXT
         );
 
+
+-- table: exchange_commodity_rules
+CREATE TABLE exchange_commodity_rules (
+            commodity_id TEXT PRIMARY KEY,
+            volatility REAL NOT NULL CHECK (volatility >= 0),
+            max_change_rate REAL NOT NULL CHECK (max_change_rate >= 0),
+            min_price INTEGER NOT NULL DEFAULT 1 CHECK (min_price > 0),
+            max_price INTEGER NOT NULL DEFAULT 1000000 CHECK (max_price >= min_price),
+            FOREIGN KEY (commodity_id) REFERENCES commodities(commodity_id) ON DELETE CASCADE
+        );
+
 -- table: exchange_prices
 CREATE TABLE exchange_prices (
             price_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -394,6 +405,9 @@ CREATE INDEX idx_aquarium_upgrades_level ON aquarium_upgrades(level);
 
 -- index: idx_check_ins_date
 CREATE INDEX idx_check_ins_date ON check_ins(check_in_date);
+
+-- index: idx_exchange_commodity_rules_commodity
+CREATE INDEX idx_exchange_commodity_rules_commodity ON exchange_commodity_rules(commodity_id);
 
 -- index: idx_exchange_prices_created_at
 CREATE INDEX idx_exchange_prices_created_at ON exchange_prices(created_at);

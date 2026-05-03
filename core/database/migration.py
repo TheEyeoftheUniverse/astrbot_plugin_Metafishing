@@ -1,7 +1,7 @@
 import sqlite3
 import os
 import re
-import importlib
+import importlib.util
 
 from astrbot.api import logger
 
@@ -28,28 +28,15 @@ def _list_migration_files(migrations_dir: str) -> list[str]:
     )
 
 
-def _apply_initial_setup(db_path: str, initial_migration: str, target_version: int) -> None:
-    """
-    新项目首装只执行 001 基线迁移，然后直接写入当前最新版本号。
-    后续历史迁移文件保留为开发记录，但不再参与新库初始化。
-    """
-    module_name = f"data.plugins.astrbot_plugin_fishing.core.database.migrations.{initial_migration[:-3]}"
-    migration_module = importlib.import_module(module_name)
-
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        try:
-            cursor.execute("BEGIN TRANSACTION")
-            migration_module.up(cursor)
-            set_version(cursor, target_version)
-            conn.commit()
-            logger.info(
-                f"已通过 {initial_migration} 初始化最新基线 schema，并将版本号直接设置为 {target_version}。"
-            )
-        except Exception:
-            conn.rollback()
-            raise
+def _load_migration_module(migrations_dir: str, filename: str):
+    module_path = os.path.join(migrations_dir, filename)
+    module_name = f"astrbot_plugin_fishing_migration_{filename[:-3]}"
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载迁移文件: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def run_migrations(db_path: str, migrations_dir: str):
@@ -76,21 +63,17 @@ def run_migrations(db_path: str, migrations_dir: str):
         logger.info(f"当前数据库版本: {current_version}")
         conn.commit()
 
-    if current_version == 0 and migration_files:
-        initial_migration = migration_files[0]
-        logger.info(
-            f"检测到新库初始化流程，执行 {initial_migration} 并跳过其余历史迁移回放（目标版本 {latest_version}）。"
+    if current_version > latest_version:
+        raise RuntimeError(
+            f"数据库版本 {current_version} 高于代码迁移版本 {latest_version}，请确认插件代码与数据库匹配。"
         )
-        _apply_initial_setup(db_path, initial_migration, latest_version)
-        return
 
     for filename in migration_files:
         version = int(filename.split("_")[0])
         if version > current_version:
             logger.info(f"正在应用迁移脚本: {filename}...")
             try:
-                module_name = f"data.plugins.astrbot_plugin_fishing.core.database.migrations.{filename[:-3]}"
-                migration_module = importlib.import_module(module_name)
+                migration_module = _load_migration_module(migrations_dir, filename)
 
                 with sqlite3.connect(db_path) as conn:
                     conn.row_factory = sqlite3.Row
@@ -108,5 +91,5 @@ def run_migrations(db_path: str, migrations_dir: str):
                         logger.error(f"应用迁移失败: {filename}。错误: {e}")
                         raise
             except Exception as e:
-                logger.error(f"加载迁移模块失败: {module_name}。错误: {e}")
+                logger.error(f"加载或执行迁移失败: {filename}。错误: {e}")
                 raise

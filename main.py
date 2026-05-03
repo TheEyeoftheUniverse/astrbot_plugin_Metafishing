@@ -132,7 +132,6 @@ class FishingPlugin(Star):
                 "max_price": 1000000,
                 "sentiment_weights": {"panic": 0.1, "pessimistic": 0.2, "neutral": 0.4, "optimistic": 0.2, "euphoric": 0.1},
                 "merge_window_minutes": 30,
-                "initial_prices": {"dried_fish": 6000, "fish_roe": 12000, "fish_oil": 10000}
             }
         else:
             logger.info(f"[CONFIG] Exchange capacity loaded: {exchange_config.get('capacity', 'NOT SET')}")
