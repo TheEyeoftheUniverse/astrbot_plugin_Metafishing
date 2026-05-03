@@ -12,7 +12,7 @@ from ..repositories.abstract_repository import (
     AbstractLogRepository,
     AbstractAchievementRepository
 )
-from ..domain.models import GachaPool, GachaPoolItem, GachaRecord
+from ..domain.models import GachaPool, GachaPoolItem
 from ..utils import get_now
 
 
@@ -39,7 +39,8 @@ class GachaService:
         inventory_repo: AbstractInventoryRepository,
         item_template_repo: AbstractItemTemplateRepository,
         log_repo: AbstractLogRepository,
-        achievement_repo: AbstractAchievementRepository
+        achievement_repo: AbstractAchievementRepository,
+        config: Optional[Dict[str, Any]] = None,
     ):
         self.gacha_repo = gacha_repo
         self.user_repo = user_repo
@@ -47,6 +48,7 @@ class GachaService:
         self.item_template_repo = item_template_repo
         self.achievement_repo = achievement_repo
         self.log_repo = log_repo
+        self.config = config or {}
 
     def get_all_pools(self) -> Dict[str, Any]:
         """提供查看所有卡池信息的功能。"""
@@ -56,11 +58,6 @@ class GachaService:
             return {"success": True, "pools": pools}
         except Exception as e:
             return {"success": False, "message": f"获取卡池信息失败: {str(e)}"}
-
-    def get_daily_free_pool(self) -> Optional[GachaPool]:
-        """获取每日免费池 (第一个成本为0的池)"""
-        free_pools = self.gacha_repo.get_free_pools()
-        return free_pools[0] if free_pools else None
 
     def get_pool_details(self, pool_id: int) -> Dict[str, Any]:
         """获取单个卡池的详细信息，包括奖品列表和概率。"""
@@ -128,21 +125,6 @@ class GachaService:
         if not pool or not pool.items:
             return {"success": False, "message": "卡池不存在或卡池为空"}
 
-        # 每日免费池限制检查
-        free_pool = self.get_daily_free_pool()
-        if free_pool and pool_id == free_pool.gacha_pool_id:
-            if num_draws > 1:
-                return {"success": False, "message": "每日免费补给一次只能抽一张哦！"}
-
-            draws_today = self.log_repo.get_gacha_records_count_today(
-                user_id, free_pool.gacha_pool_id
-            )
-            if draws_today >= 1:
-                return {
-                    "success": False,
-                    "message": "今天的免费补给已经领过啦，明天再来吧！",
-                }
-
         # 限时卡池过期校验
         try:
             is_limited = bool(getattr(pool, "is_limited_time", 0))
@@ -196,7 +178,9 @@ class GachaService:
             user.coins -= total_coin_cost
         self.user_repo.update(user)
 
-        # 3. 发放奖励并记录日志
+        guarantee_reward = self._grant_guarantee_reward(user_id, pool, num_draws)
+
+        # 3. 发放奖励
         granted_rewards = []
         for item in draw_results:
             self._grant_reward(user_id, item)
@@ -247,12 +231,70 @@ class GachaService:
                     "name": self.item_template_repo.get_title_by_id(item.item_id).name
                 })
 
-        return {"success": True, "results": granted_rewards}
+        return {
+            "success": True,
+            "results": granted_rewards,
+            "guarantee_reward": guarantee_reward,
+        }
+
+    def _get_pool_guarantee_config(self, pool: GachaPool) -> Dict[str, Any]:
+        raw = (self.config or {}).get("gacha_guarantee", {}) or {}
+        pool_id_key = str(getattr(pool, "gacha_pool_id", 0) or 0)
+        configured = raw.get(pool_id_key) or raw.get(getattr(pool, "name", ""))
+        if configured:
+            return {
+                "enabled": bool(configured.get("enabled", True)),
+                "item_id": int(configured.get("item_id", 0) or 0),
+                "amount_per_draw": int(configured.get("amount_per_draw", 0) or 0),
+            }
+
+        # 当前数据层尚未统一入库前，使用内置默认映射；后续可完全由配置或数据替换。
+        defaults = {
+            1: {"item_id": 47, "amount_per_draw": 1},
+            2: {"item_id": 48, "amount_per_draw": 1},
+            3: {"item_id": 49, "amount_per_draw": 1},
+            4: {"item_id": 50, "amount_per_draw": 1},
+            5: {"item_id": 51, "amount_per_draw": 1},
+            6: {"item_id": 52, "amount_per_draw": 1},
+            7: {"item_id": 53, "amount_per_draw": 1},
+            8: {"item_id": 54, "amount_per_draw": 1},
+        }
+        default = defaults.get(getattr(pool, "gacha_pool_id", 0))
+        if not default:
+            return {"enabled": False, "item_id": 0, "amount_per_draw": 0}
+        return {"enabled": True, **default}
+
+    def _grant_guarantee_reward(
+        self, user_id: str, pool: GachaPool, num_draws: int
+    ) -> Optional[Dict[str, Any]]:
+        guarantee = self._get_pool_guarantee_config(pool)
+        if not guarantee.get("enabled"):
+            return None
+
+        item_id = int(guarantee.get("item_id", 0) or 0)
+        amount_per_draw = int(guarantee.get("amount_per_draw", 0) or 0)
+        if item_id <= 0 or amount_per_draw <= 0 or num_draws <= 0:
+            return None
+
+        template = self.item_template_repo.get_by_id(item_id)
+        if not template:
+            logger.warning(
+                f"卡池 {getattr(pool, 'gacha_pool_id', '?')} 配置了保底货币 item_id={item_id}，但当前模板不存在，已跳过发放。"
+            )
+            return None
+
+        total_quantity = amount_per_draw * num_draws
+        self.inventory_repo.update_item_quantity(user_id, item_id, total_quantity)
+        return {
+            "type": "item",
+            "id": item_id,
+            "name": template.name if template else f"道具{item_id}",
+            "rarity": template.rarity if template else 0,
+            "quantity": total_quantity,
+        }
 
     def _grant_reward(self, user_id: str, item: GachaPoolItem):
-        """根据抽到的物品，为用户发放具体奖励并记录日志。"""
-        item_name = "未知物品"
-        item_rarity = 1
+        """根据抽到的物品，为用户发放具体奖励。"""
         template = None
 
         if item.item_type == "rod":
@@ -275,31 +317,7 @@ class GachaService:
             user = self.user_repo.get_by_id(user_id)
             user.coins += item.quantity
             self.user_repo.update(user)
-            item_name = f"{item.quantity} 金币"
         elif item.item_type == "titles":
             # 注意：成就仓储负责授予称号
             self.achievement_repo.grant_title_to_user(user_id, item.item_id)
             template = self.item_template_repo.get_title_by_id(item.item_id)
-
-        if template:
-            item_name = template.name
-            item_rarity = template.rarity if hasattr(template, "rarity") else 1
-
-        # 记录日志
-        log_entry = GachaRecord(
-            record_id=0, # DB自增
-            user_id=user_id,
-            gacha_pool_id=item.gacha_pool_id,
-            item_type=item.item_type,
-            item_id=item.item_id,
-            item_name=item_name,
-            quantity=item.quantity,
-            rarity=item_rarity,
-            timestamp=get_now()
-        )
-        self.log_repo.add_gacha_record(log_entry)
-
-    def get_user_gacha_history(self, user_id: str, limit: int = 10) -> Dict[str, Any]:
-        """提供查询抽卡历史记录的功能。"""
-        records = self.log_repo.get_gacha_records(user_id, limit)
-        return {"success": True, "records": records}

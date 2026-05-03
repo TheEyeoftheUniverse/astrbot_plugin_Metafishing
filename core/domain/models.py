@@ -276,7 +276,7 @@ class AquariumUpgrade:
 
 @dataclass
 class FishingRecord:
-    """一条详细的钓鱼记录"""
+    """一次捕获事件，用于更新图鉴聚合统计。"""
     record_id: int
     user_id: str
     fish_id: int
@@ -287,33 +287,6 @@ class FishingRecord:
     bait_id: Optional[int] = None
     location_id: Optional[int] = None
     is_king_size: bool = False
-
-@dataclass
-class GachaRecord:
-    """一条抽卡记录"""
-    record_id: int
-    user_id: str
-    gacha_pool_id: int
-    item_type: str
-    item_id: int
-    item_name: str
-    timestamp: datetime
-    quantity: int = 1
-    rarity: int = 1
-
-    def __getitem__(self, item):
-        """允许通过属性名访问字段"""
-        return getattr(self, item)
-
-@dataclass
-class WipeBombLog:
-    """一条擦弹记录"""
-    log_id: int
-    user_id: str
-    contribution_amount: int
-    reward_multiplier: float
-    reward_amount: int
-    timestamp: datetime
 
 @dataclass
 class MarketListing:

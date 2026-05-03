@@ -4,7 +4,7 @@ import json
 
 from .abstract_effect import AbstractItemEffect
 from ...domain.models import User, Item, UserBuff
-from ...utils import get_now
+from ...utils import get_now, get_today
 
 
 def get_end_of_day():
@@ -17,10 +17,9 @@ class AddWipeBombAttemptsEffect(AbstractItemEffect):
 
     def __init__(self, user_repo=None, buff_repo=None, **kwargs):
         super().__init__(user_repo, buff_repo, **kwargs)
-        self.log_repo = kwargs.get("log_repo")
         self.game_config = kwargs.get("game_config")
-        if not self.log_repo or not self.game_config:
-            raise ValueError("LogRepository and GameConfig are required for this effect.")
+        if not self.game_config:
+            raise ValueError("GameConfig is required for this effect.")
 
     def apply(
         self, user: User, item_template: Item, payload: Dict[str, Any], quantity: int = 1
@@ -84,7 +83,8 @@ class AddWipeBombAttemptsEffect(AbstractItemEffect):
         # 计算剩余次数
         base_max_attempts = self.game_config.get("wipe_bomb", {}).get("max_attempts_per_day", 3)
         total_max_attempts = base_max_attempts + extra_attempts_after_update
-        used_attempts_today = self.log_repo.get_wipe_bomb_log_count_today(user.user_id)
+        today_str = get_today().strftime("%Y-%m-%d")
+        used_attempts_today = user.wipe_bomb_attempts_today if user.last_wipe_bomb_date == today_str else 0
         remaining_today = max(0, total_max_attempts - used_attempts_today)
 
         message = (

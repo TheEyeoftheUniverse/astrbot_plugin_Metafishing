@@ -2566,7 +2566,6 @@ async def gacha():
     user_id = session.get("user_id")
     user_repo = current_app.config.get("USER_REPO")
     gacha_service = current_app.config.get("GACHA_SERVICE")
-    log_repo = current_app.config.get("LOG_REPO")
     
     user = user_repo.get_by_id(user_id)
     if not user:
@@ -2576,10 +2575,6 @@ async def gacha():
     # 获取所有卡池
     pools_result = gacha_service.get_all_pools()
     all_pools_raw = pools_result.get("pools", [])
-    
-    # 获取免费卡池
-    free_pool = gacha_service.get_daily_free_pool()
-    free_pool_id = free_pool.gacha_pool_id if free_pool else None
     
     # 将卡池对象转换为字典并添加额外信息
     all_pools = []
@@ -2598,24 +2593,11 @@ async def gacha():
                 "open_until": pool.open_until
             }
         
-        # 检查是否为免费卡池
-        pool_dict["is_free"] = (free_pool_id and pool_dict["gacha_pool_id"] == free_pool_id)
-        if pool_dict["is_free"]:
-            # 检查今天是否已经抽过
-            draws_today = log_repo.get_gacha_records_count_today(user_id, pool_dict["gacha_pool_id"])
-            pool_dict["drawn_today"] = draws_today >= 1
-        else:
-            pool_dict["drawn_today"] = False
-        
         all_pools.append(pool_dict)
-    
-    # 获取最近的抽卡记录
-    recent_records = log_repo.get_gacha_records(user_id, limit=10)
     
     return await render_template("gacha.html",
                                   user=user,
-                                  pools=all_pools,
-                                  recent_records=recent_records)
+                                  pools=all_pools)
 
 @player_bp.route("/tavern")
 @login_required

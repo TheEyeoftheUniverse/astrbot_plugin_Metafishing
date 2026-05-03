@@ -90,18 +90,6 @@
                     </div>
                 </div>
                 
-                <!-- 今日免费次数 -->
-                {% if pool.is_free %}
-                <div class="alert alert-success mb-3">
-                    <i class="fas fa-gift"></i> 
-                    {% if pool.drawn_today %}
-                    今日免费补给已领取，明天再来！
-                    {% else %}
-                    每日免费补给可用！
-                    {% endif %}
-                </div>
-                {% endif %}
-                
                 <!-- 奖品预览 -->
                 <div class="mb-3">
                     <button class="btn btn-sm btn-outline-info w-100" onclick="showPoolDetails({{ pool.gacha_pool_id }})">
@@ -118,77 +106,31 @@
                 <div class="row g-2">
                     <div class="col-6">
                         <button class="btn btn-success w-100" 
-                                onclick="performDraw({{ pool.gacha_pool_id }}, 1, '{{ pool.name }}')"
-                                {% if pool.is_free and pool.drawn_today %}disabled{% endif %}>
+                                onclick="performDraw({{ pool.gacha_pool_id }}, 1, '{{ pool.name }}')">
                             <i class="fas fa-dice-one"></i> 单抽
                         </button>
                     </div>
                     <div class="col-6">
                         <button class="btn btn-primary w-100" 
-                                onclick="performDraw({{ pool.gacha_pool_id }}, 10, '{{ pool.name }}')"
-                                {% if pool.is_free %}disabled{% endif %}>
+                                onclick="performDraw({{ pool.gacha_pool_id }}, 10, '{{ pool.name }}')">
                             <i class="fas fa-dice-d20"></i> 十连
                         </button>
                     </div>
                 </div>
                 
                 <!-- 多次十连按钮 -->
-                {% if not pool.is_free %}
                 <div class="mt-2">
                     <button class="btn btn-warning w-100" 
                             onclick="performMultiDraw({{ pool.gacha_pool_id }}, '{{ pool.name }}')">
                         <i class="fas fa-dice"></i> 多次十连
                     </button>
                 </div>
-                {% endif %}
             </div>
         </div>
     </div>
     {% endfor %}
 </div>
 
-<!-- 抽卡记录 -->
-{% if recent_records %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0"><i class="fas fa-history"></i> 最近抽卡记录</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>时间</th>
-                                <th>卡池</th>
-                                <th>物品</th>
-                                <th>稀有度</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for record in recent_records %}
-                            <tr>
-                                <td>{{ record.created_at.strftime('%m-%d %H:%M') if record.created_at else '-' }}</td>
-                                <td>{{ record.pool_name }}</td>
-                                <td>{{ record.item_name }}</td>
-                                <td>
-                                    {% if record.item_rarity %}
-                                    <span class="text-warning">{{ '⭐' * record.item_rarity }}</span>
-                                    {% else %}
-                                    -
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <!-- 奖品详情模态框 -->
 <div class="modal fade" id="poolDetailsModal" tabindex="-1">

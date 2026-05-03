@@ -294,7 +294,10 @@ async def bait(plugin: "FishingPlugin", event: AstrMessageEvent):
         for bait in bait_info["baits"]:
             bait_id = int(bait.get("bait_id", 0) or 0)
             bcode = f"B{bait_id}" if bait_id else "B0"
-            message += f" - {bait['name']} x {bait['quantity']} (稀有度: {format_rarity_display(bait['rarity'])}) ID: {bcode}\n"
+            auto_use_text = ""
+            if bait.get("supports_armed_state"):
+                auto_use_text = "，自动可用" if bait.get("is_armed") else "，自动保留"
+            message += f" - {bait['name']} x {bait['quantity']} (稀有度: {format_rarity_display(bait['rarity'])}{auto_use_text}) ID: {bcode}\n"
             if bait["duration_minutes"] > 0:
                 message += f"   - 持续时间: {bait['duration_minutes']} 分钟\n"
             if bait["effect_description"]:
@@ -666,6 +669,28 @@ async def use_bait(plugin: "FishingPlugin", event: AstrMessageEvent):
             yield event.plain_result(f"❌ 使用鱼饵失败：{result['message']}")
     else:
         yield event.plain_result("❌ 出错啦！请稍后再试。")
+
+
+async def set_bait_auto_use(plugin: "FishingPlugin", event: AstrMessageEvent, enabled: bool):
+    """设置鱼饵是否参与自动使用。"""
+    user_id = plugin._get_effective_user_id(event)
+    args = event.message_str.split(" ")
+    if len(args) < 2:
+        action = "启用" if enabled else "停用"
+        yield event.plain_result(f"❌ 请指定鱼饵 ID，例如：/{action}自动鱼饵 13")
+        return
+
+    bait_id_str = args[1].strip()
+    if not bait_id_str.isdigit():
+        yield event.plain_result("❌ 鱼饵 ID 必须是数字，请检查后重试。")
+        return
+
+    result = plugin.inventory_service.set_bait_auto_use_state(user_id, int(bait_id_str), enabled)
+    if result and result.get("success"):
+        yield event.plain_result(f"✅ {result['message']}")
+    else:
+        error_message = result.get("message", "未知错误") if result else "未知错误"
+        yield event.plain_result(f"❌ 设置失败：{error_message}")
 
 
 async def refine_equipment(plugin: "FishingPlugin", event: AstrMessageEvent, equipment_type: str = None):

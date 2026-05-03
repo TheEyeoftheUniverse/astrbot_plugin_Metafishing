@@ -6,8 +6,6 @@ from datetime import date, datetime, timedelta, timezone
 from .abstract_repository import AbstractLogRepository
 from ..domain.models import (
     FishingRecord,
-    GachaRecord,
-    WipeBombLog,
     TaxRecord,
     UserFishStat,
     PokedexRewardClaim,
@@ -34,24 +32,6 @@ class SqliteLogRepository(AbstractLogRepository):
         return conn
 
     # --- 私有映射辅助方法 ---
-    def _row_to_fishing_record(self, row: sqlite3.Row) -> Optional[FishingRecord]:
-        if not row:
-            return None
-        # 数据库中的 is_king_size 是 INTEGER，需要转为 bool
-        data = dict(row)
-        return FishingRecord(
-            record_id=data["record_id"],
-            user_id=data["user_id"],
-            fish_id=data["fish_id"],
-            value=data["value"],
-            timestamp=data["timestamp"],
-            rod_instance_id=data.get("rod_instance_id"),
-            accessory_instance_id=data.get("accessory_instance_id"),
-            bait_id=data.get("bait_id"),
-            location_id=data.get("location_id"),
-            is_king_size=bool(data.get("is_king_size", 0)),
-        )
-
     def _row_to_user_fish_stat(self, row: sqlite3.Row) -> Optional[UserFishStat]:
         if not row:
             return None
@@ -77,16 +57,6 @@ class SqliteLogRepository(AbstractLogRepository):
             claimed_at=data.get("claimed_at"),
         )
 
-    def _row_to_gacha_record(self, row: sqlite3.Row) -> Optional[GachaRecord]:
-        if not row:
-            return None
-        return GachaRecord(**row)
-
-    def _row_to_wipe_bomb_log(self, row: sqlite3.Row) -> Optional[WipeBombLog]:
-        if not row:
-            return None
-        return WipeBombLog(**row)
-
     def _row_to_tax_record(self, row: sqlite3.Row) -> Optional[TaxRecord]:
         if not row:
             return None
@@ -94,31 +64,9 @@ class SqliteLogRepository(AbstractLogRepository):
 
     # --- Fishing Log Methods ---
     def add_fishing_record(self, record: FishingRecord, log_to_records: bool = True) -> bool:
-        # log_to_records=False 时跳过流水写入（仅自动钓鱼批量场景使用），
-        # 仍然 UPSERT user_fish_stats 以保证图鉴/最高纪录不丢。
+        # 仅更新图鉴聚合统计；详细钓鱼流水已移除。
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            if log_to_records:
-                cursor.execute(
-                    """
-                    INSERT INTO fishing_records (
-                        user_id, fish_id, value, rod_instance_id,
-                        accessory_instance_id, bait_id, timestamp, is_king_size
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        record.user_id,
-                        record.fish_id,
-                        record.value,
-                        record.rod_instance_id,
-                        record.accessory_instance_id,
-                        record.bait_id,
-                        record.timestamp or datetime.now(self.UTC8),
-                        1 if record.is_king_size else 0,
-                    ),
-                )
-
-            # 更新用户鱼类聚合统计（UPSERT）
             now_ts = record.timestamp or datetime.now(self.UTC8)
             cursor.execute(
                 """
@@ -151,23 +99,12 @@ class SqliteLogRepository(AbstractLogRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT fish_id, MIN(timestamp) as first_caught_time
-                FROM fishing_records
+                SELECT fish_id, first_caught_at as first_caught_time
+                FROM user_fish_stats
                 WHERE user_id = ?
-                GROUP BY fish_id
             """, (user_id,))
             rows = cursor.fetchall()
             return {row["fish_id"]: row["first_caught_time"] for row in rows}
-            
-    def get_fishing_records(self, user_id: str, limit: int) -> List[FishingRecord]:
-        with self._get_connection() as conn:
-            # 为了简化返回，这里不连接获取名称，表现层可以按需从ItemTemplateRepository获取
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM fishing_records
-                WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?
-            """, (user_id, limit))
-            return [self._row_to_fishing_record(row) for row in cursor.fetchall()]
 
     def cleanup_expired_records(self, retention_days: int = 30, per_user_limit: int = 50) -> Dict[str, int]:
         cutoff_time = datetime.now(self.UTC8) - timedelta(days=retention_days)
@@ -176,87 +113,6 @@ class SqliteLogRepository(AbstractLogRepository):
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                DELETE FROM fishing_records
-                WHERE timestamp < ?
-                """,
-                (cutoff_time,),
-            )
-            results["fishing_records_expired"] = cursor.rowcount
-
-            cursor.execute(
-                f"""
-                DELETE FROM fishing_records
-                WHERE record_id IN (
-                    SELECT record_id FROM (
-                        SELECT record_id,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY user_id
-                                   ORDER BY timestamp DESC, record_id DESC
-                               ) AS row_num
-                        FROM fishing_records
-                    ) ranked
-                    WHERE row_num > {per_user_limit}
-                )
-                """
-            )
-            results["fishing_records_trimmed"] = cursor.rowcount
-
-            cursor.execute(
-                """
-                DELETE FROM gacha_records
-                WHERE timestamp < ?
-                """,
-                (cutoff_time,),
-            )
-            results["gacha_records_expired"] = cursor.rowcount
-
-            cursor.execute(
-                f"""
-                DELETE FROM gacha_records
-                WHERE record_id IN (
-                    SELECT record_id FROM (
-                        SELECT record_id,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY user_id
-                                   ORDER BY timestamp DESC, record_id DESC
-                               ) AS row_num
-                        FROM gacha_records
-                    ) ranked
-                    WHERE row_num > {per_user_limit}
-                )
-                """
-            )
-            results["gacha_records_trimmed"] = cursor.rowcount
-
-            cursor.execute(
-                """
-                DELETE FROM wipe_bomb_log
-                WHERE timestamp < ?
-                """,
-                (cutoff_time,),
-            )
-            results["wipe_bomb_log_expired"] = cursor.rowcount
-
-            cursor.execute(
-                f"""
-                DELETE FROM wipe_bomb_log
-                WHERE log_id IN (
-                    SELECT log_id FROM (
-                        SELECT log_id,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY user_id
-                                   ORDER BY timestamp DESC, log_id DESC
-                               ) AS row_num
-                        FROM wipe_bomb_log
-                    ) ranked
-                    WHERE row_num > {per_user_limit}
-                )
-                """
-            )
-            results["wipe_bomb_log_trimmed"] = cursor.rowcount
 
             cursor.execute(
                 """
@@ -289,78 +145,6 @@ class SqliteLogRepository(AbstractLogRepository):
 
         return results
 
-    # --- Gacha Log Methods ---
-    def add_gacha_record(self, record: GachaRecord) -> None:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # 1) 写入抽卡记录
-            cursor.execute(
-                """
-                INSERT INTO gacha_records (
-                    user_id, gacha_pool_id, item_type, item_id,
-                    item_name, quantity, rarity, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.user_id,
-                    record.gacha_pool_id,
-                    record.item_type,
-                    record.item_id,
-                    record.item_name,
-                    record.quantity,
-                    record.rarity,
-                    record.timestamp or datetime.now(self.UTC8),
-                ),
-            )
-
-            conn.commit()
-
-    def get_gacha_records(self, user_id: str, limit: int) -> List[GachaRecord]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM gacha_records
-                WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?
-            """, (user_id, limit))
-            return [self._row_to_gacha_record(row) for row in cursor.fetchall()]
-
-    # --- Wipe Bomb Log Methods ---
-    # 存储时转为 UTC
-    def add_wipe_bomb_log(self, log: WipeBombLog) -> None:
-        timestamp = log.timestamp or datetime.now(self.UTC8)
-        # 如果 timestamp 是 naive datetime，附加 UTC+8 时区
-        if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=self.UTC8)
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # 1) 写入擦弹日志
-            cursor.execute(
-                """INSERT INTO wipe_bomb_log
-                (user_id, contribution_amount, reward_multiplier, reward_amount, timestamp)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (log.user_id, log.contribution_amount, log.reward_multiplier, log.reward_amount, timestamp),
-            )
-
-            conn.commit()
-
-    # 查询时考虑时区
-    def get_wipe_bomb_log_count_today(self, user_id: str) -> int:
-        # 获取 UTC+8 的今天的开始和结束时间点
-        today_start = datetime.now(self.UTC8).replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COUNT(*) FROM wipe_bomb_log
-                WHERE user_id = ? AND timestamp >= ? AND timestamp < ?
-                  AND contribution_amount > 0
-            """, (user_id, today_start, today_end))
-            result = cursor.fetchone()
-            return result[0] if result else 0
-
     # --- Check-in Log Methods ---
     def add_check_in(self, user_id: str, check_in_date: date) -> None:
         with self._get_connection() as conn:
@@ -383,17 +167,8 @@ class SqliteLogRepository(AbstractLogRepository):
             return cursor.fetchone() is not None
 
     def add_log(self, user_id: str, log_type: str, message: str) -> None:
-        """添加一条通用日志"""
-        # 由于 fishing_records 表有外键约束，我们使用一个简单的日志表
-        # 或者插入到现有的日志表中，避免外键约束问题
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # 使用 wipe_bomb_log 表来记录通用日志，因为它没有外键约束
-            cursor.execute("""
-                INSERT INTO wipe_bomb_log (user_id, contribution_amount, reward_multiplier, reward_amount, timestamp)
-                VALUES (?, ?, ?, ?, ?)
-            """, (user_id, 0, 0.0, 0, datetime.now()))
-            conn.commit()
+        """兼容旧调用；当前不再持久化通用日志。"""
+        return None
 
     # --- Tax Log Methods ---
     def add_tax_record(self, record: TaxRecord) -> None:
@@ -456,15 +231,6 @@ class SqliteLogRepository(AbstractLogRepository):
 
             conn.commit()
 
-    def get_wipe_bomb_logs(self, user_id: str, limit: int = 10) -> List[WipeBombLog]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM wipe_bomb_log
-                WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?
-            """, (user_id, limit))
-            return [self._row_to_wipe_bomb_log(row) for row in cursor.fetchall()]
-
     def get_tax_records(self, user_id: str, limit: int = 10) -> List[TaxRecord]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -504,45 +270,6 @@ class SqliteLogRepository(AbstractLogRepository):
             """, (user_id, last_reset))
             result = cursor.fetchone()
             return result[0] > 0 if result else False
-
-    def get_max_wipe_bomb_multiplier(self, user_id: str) -> float:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT MAX(reward_multiplier) FROM wipe_bomb_log
-                WHERE user_id = ?
-            """, (user_id,))
-            result = cursor.fetchone()
-            return result[0] if result and result[0] is not None else 0.0
-
-    def get_min_wipe_bomb_multiplier(self, user_id: str) -> Optional[float]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT MIN(reward_multiplier) FROM wipe_bomb_log
-                WHERE user_id = ?
-            """, (user_id,))
-            result = cursor.fetchone()
-            return result[0] if result and result[0] is not None else None
-
-    def get_gacha_records_count_today(
-        self, user_id: str, gacha_pool_id: int
-    ) -> int:
-        # 获取 UTC+8 的今天的开始和结束时间点
-        today_start_utc8 = datetime.now(self.UTC8).replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end_utc8 = today_start_utc8 + timedelta(days=1)
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT COUNT(*) FROM gacha_records
-                WHERE user_id = ? AND gacha_pool_id = ? AND timestamp >= ? AND timestamp < ?
-                """,
-                (user_id, gacha_pool_id, today_start_utc8, today_end_utc8),
-            )
-            result = cursor.fetchone()
-            return result[0] if result else 0
 
     # --- 用户鱼类统计（用于图鉴与个人纪录） ---
     def get_user_fish_stats(self, user_id: str) -> List[UserFishStat]:

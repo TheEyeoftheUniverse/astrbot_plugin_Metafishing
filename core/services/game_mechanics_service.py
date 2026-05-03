@@ -13,7 +13,7 @@ from ..repositories.abstract_repository import (
     AbstractItemTemplateRepository,
     AbstractUserBuffRepository,
 )
-from ..domain.models import WipeBombLog, User
+from ..domain.models import User
 from .wipe_bomb_daily_service import add_wipe_bomb_jackpot, consume_wipe_bomb_jackpot, get_wipe_bomb_jackpot_amount
 from ...core.utils import get_now, get_today
 
@@ -374,16 +374,7 @@ class GameMechanicsService:
         # 8. 一次性将所有用户数据的变更保存到数据库
         self.user_repo.update(user)
 
-        # 9. 记录日志
-        log_entry = WipeBombLog(
-            log_id=0, # DB自增
-            user_id=user_id,
-            contribution_amount=contribution_amount,
-            reward_multiplier=reward_multiplier,
-            reward_amount=reward_amount,
-            timestamp=get_now()
-        )
-        self.log_repo.add_wipe_bomb_log(log_entry)
+        wipe_bomb_timestamp = get_now()
 
         # 上传非敏感数据到服务器
         def upload_data_async():
@@ -396,7 +387,7 @@ class GameMechanicsService:
                 "reward_multiplier": reward_multiplier,
                 "reward_amount": reward_amount,
                 "profit": profit,
-                "timestamp": log_entry.timestamp.isoformat()
+                "timestamp": wipe_bomb_timestamp.isoformat()
             }
             api_url = self.wipe_bomb_upload_config.get("url", "http://veyu.me/api/record")
             timeout_seconds = self.wipe_bomb_upload_config.get("timeout_seconds", 3)
@@ -431,23 +422,6 @@ class GameMechanicsService:
             result["suppression_notice"] = "✨ 天界之力降临！你的惊人运气触发了时空沙漏的平衡法则！为了避免时空扭曲，命运女神暂时调整了概率之流，但宝藏之门依然为你敞开！"
         
         return result
-
-    def get_wipe_bomb_history(self, user_id: str, limit: int = 10) -> Dict[str, Any]:
-        """
-        获取用户的擦弹历史记录。
-        """
-        logs = self.log_repo.get_wipe_bomb_logs(user_id, limit)
-        return {
-            "success": True,
-            "logs": [
-                {
-                    "contribution": log.contribution_amount,
-                    "multiplier": log.reward_multiplier,
-                    "reward": log.reward_amount,
-                    "timestamp": log.timestamp
-                } for log in logs
-            ]
-        }
 
     def steal_fish(self, thief_id: str, victim_id: str) -> Dict[str, Any]:
         """

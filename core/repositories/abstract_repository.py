@@ -8,7 +8,7 @@ from datetime import date, datetime
 from ..domain.models import (
     User, Fish, Rod, Bait, Accessory, Title, Achievement, Item,
     UserRodInstance, UserAccessoryInstance, UserFishInventoryItem, UserAquariumItem,
-    FishingRecord, GachaRecord, WipeBombLog, MarketListing, TaxRecord,
+    FishingRecord, MarketListing, TaxRecord,
     GachaPool, GachaPoolItem, FishingZone, UserBuff, AquariumUpgrade,
     ShopOffer, ShopOfferCost, ShopOfferReward,
     Commodity, Exchange, UserCommodity, PokedexRewardClaim  # 新增交易所模型导入
@@ -450,11 +450,6 @@ class AbstractGachaRepository(ABC):
     @abstractmethod
     def delete_pool_item(self, item_pool_id: int) -> None: pass
 
-    @abstractmethod
-    def get_free_pools(self) -> List[GachaPool]:
-        pass
-
-
 class AbstractMarketRepository(ABC):
     """市场仓储接口"""
     # 获取单个市场商品
@@ -477,30 +472,15 @@ class AbstractMarketRepository(ABC):
 
 class AbstractLogRepository(ABC):
     """日志类数据仓储接口"""
-    # 记录一条钓鱼日志
+    # 记录一次捕获，用于更新图鉴聚合统计；不再写钓鱼流水
     @abstractmethod
     def add_fishing_record(self, record: FishingRecord, log_to_records: bool = True) -> bool: pass
     # 获取用户已经解锁的鱼类
     @abstractmethod
     def get_unlocked_fish_ids(self, user_id: str) -> Dict[int, datetime]: pass
-    # 获取用户钓鱼日志
-    @abstractmethod
-    def get_fishing_records(self, user_id: str, limit: int) -> List[FishingRecord]: pass
     # 清理需要保留上限和过期时间的日志数据
     @abstractmethod
     def cleanup_expired_records(self, retention_days: int = 30, per_user_limit: int = 50) -> Dict[str, int]: pass
-    # 记录一条抽卡日志
-    @abstractmethod
-    def add_gacha_record(self, record: GachaRecord) -> None: pass
-    # 获取用户抽卡日志
-    @abstractmethod
-    def get_gacha_records(self, user_id: str, limit: int) -> List[GachaRecord]: pass
-    # 记录一条擦弹日志
-    @abstractmethod
-    def add_wipe_bomb_log(self, log: WipeBombLog) -> None: pass
-    # 获取用户今日擦弹次数
-    @abstractmethod
-    def get_wipe_bomb_log_count_today(self, user_id: str) -> int: pass
     # 记录一条签到日志
     @abstractmethod
     def add_check_in(self, user_id: str, check_in_date: date) -> None: pass
@@ -510,30 +490,15 @@ class AbstractLogRepository(ABC):
     # 记录一条税收日志
     @abstractmethod
     def add_tax_record(self, record: TaxRecord) -> None: pass
-    # 获取用户的擦弹历史
-    @abstractmethod
-    def get_wipe_bomb_logs(self, user_id: str, limit: int = 10) -> List[WipeBombLog]: pass
     # 获取用户的税收历史
     @abstractmethod
     def get_tax_records(self, user_id: str, limit: int = 10) -> List[TaxRecord]: pass
     # 检查某个用户今天是否已经被征收过每日资产税
     @abstractmethod
     def has_user_daily_tax_today(self, user_id: str, reset_hour: int = 0) -> bool: pass
-    # 获取用户历史上最大的擦弹倍数
-    @abstractmethod
-    def get_max_wipe_bomb_multiplier(self, user_id: str) -> float: pass
-    @abstractmethod
-    def get_min_wipe_bomb_multiplier(self, user_id: str) -> Optional[float]: pass
-
-    @abstractmethod
-    def get_gacha_records_count_today(
-        self, user_id: str, gacha_pool_id: int
-    ) -> int:
-        pass
-
     @abstractmethod
     def add_log(self, user_id: str, log_type: str, message: str) -> None:
-        """添加一条通用日志"""
+        """兼容旧调用；当前不再持久化通用日志。"""
         pass
 
     # --- 用户鱼类统计（用于图鉴与个人纪录） ---

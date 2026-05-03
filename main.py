@@ -107,6 +107,8 @@ class FishingPlugin(Star):
         user_config = config.get("user", {})
         market_config = config.get("market", {})
         sell_prices_config = config.get("sell_prices", {})
+        armed_state_config = config.get("armed_state", {}) or {}
+        gacha_guarantee_config = config.get("gacha_guarantee", {}) or {}
         
         # 直接从框架获取 exchange 配置（不重建）
         exchange_config = config.get("exchange", {})
@@ -211,7 +213,20 @@ class FishingPlugin(Star):
                     "6": 25.0, "7": 55.0, "8": 125.0, "9": 280.0, "10": 660.0
                 }
             },
-            "exchange": exchange_config  # 直接使用框架的配置
+            "exchange": exchange_config,  # 直接使用框架的配置
+            "armed_state": {
+                "item_ids": armed_state_config.get("item_ids", [8, 9, 10, 11, 12, 13]),
+                # 默认覆盖当前高星鱼饵区间，后续可通过配置精细覆盖
+                "bait_ids": armed_state_config.get(
+                    "bait_ids",
+                    list(range(7, 23)),
+                ),
+                # 鱼饵默认保持当前“可自动使用”的旧行为，直到玩家主动关闭
+                "default_armed_for_baits": armed_state_config.get(
+                    "default_armed_for_baits", True
+                ),
+            },
+            "gacha_guarantee": gacha_guarantee_config,
         }
         
         # 初始化数据库模式
@@ -238,8 +253,15 @@ class FishingPlugin(Star):
                                                           self.item_template_repo, self.buff_repo, self.game_config)
 
         # 3.3 实例化其他核心服务
-        self.gacha_service = GachaService(self.gacha_repo, self.user_repo, self.inventory_repo, self.item_template_repo,
-                                         self.log_repo, self.achievement_repo)
+        self.gacha_service = GachaService(
+            self.gacha_repo,
+            self.user_repo,
+            self.inventory_repo,
+            self.item_template_repo,
+            self.log_repo,
+            self.achievement_repo,
+            self.game_config,
+        )
         # UserService 依赖 GachaService，因此在 GachaService 之后实例化
         self.user_service = UserService(self.user_repo, self.log_repo, self.inventory_repo, self.item_template_repo, self.gacha_service, self.game_config, self.achievement_repo)
         self.inventory_service = InventoryService(
@@ -310,6 +332,9 @@ class FishingPlugin(Star):
                 "fishing_service": self.fishing_service,
                 "log_repo": self.log_repo,
                 "game_config": self.game_config,
+                "achievement_repo": self.achievement_repo,
+                "item_template_repo": self.item_template_repo,
+                "inventory_repo": self.inventory_repo,
             },
         )
         
@@ -419,12 +444,6 @@ class FishingPlugin(Star):
         async for r in self.fishing_handlers.auto_fish(event): 
             yield r
 
-    @filter.command("钓鱼记录", alias={"钓鱼日志", "钓鱼历史"})
-    async def fishing_log(self, event: AstrMessageEvent):
-        """查看你的钓鱼历史记录"""
-        async for r in common_handlers.fishing_log(self, event):
-            yield r
-
     @filter.command("状态", alias={"我的状态"})
     async def state(self, event: AstrMessageEvent):
         """查看你的游戏状态，包括金币、等级、装备等信息"""
@@ -528,6 +547,18 @@ class FishingPlugin(Star):
     async def bait(self, event: AstrMessageEvent):
         """查看你拥有的所有鱼饵"""
         async for r in inventory_handlers.bait(self, event):
+            yield r
+
+    @filter.command("启用自动鱼饵")
+    async def enable_auto_bait(self, event: AstrMessageEvent):
+        """允许指定鱼饵参与自动使用。用法：启用自动鱼饵 13"""
+        async for r in inventory_handlers.set_bait_auto_use(self, event, True):
+            yield r
+
+    @filter.command("停用自动鱼饵")
+    async def disable_auto_bait(self, event: AstrMessageEvent):
+        """禁止指定鱼饵参与自动使用。用法：停用自动鱼饵 13"""
+        async for r in inventory_handlers.set_bait_auto_use(self, event, False):
             yield r
 
     @filter.command("道具", alias={"我的道具", "查看道具"})
@@ -710,22 +741,10 @@ class FishingPlugin(Star):
         async for r in gacha_handlers.view_gacha_pool(self, event):
             yield r
 
-    @filter.command("抽卡记录")
-    async def gacha_history(self, event: AstrMessageEvent):
-        """查看你的抽卡历史记录"""
-        async for r in gacha_handlers.gacha_history(self, event):
-            yield r
-
     @filter.command("擦弹")
     async def wipe_bomb(self, event: AstrMessageEvent):
         """使用擦弹道具，有机会重置保底计数"""
         async for r in gacha_handlers.wipe_bomb(self, event):
-            yield r
-
-    @filter.command("擦弹记录", alias={"擦弹历史"})
-    async def wipe_bomb_history(self, event: AstrMessageEvent):
-        """查看你的擦弹历史记录"""
-        async for r in gacha_handlers.wipe_bomb_history(self, event):
             yield r
 
     # =========== 科考系统 ==========

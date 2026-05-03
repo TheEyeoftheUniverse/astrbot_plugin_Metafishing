@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set
 
 # 导入仓储接口和领域模型
 from ..repositories.abstract_repository import (
@@ -11,10 +11,14 @@ from ..repositories.abstract_repository import (
 from .effect_manager import EffectManager
 from ..utils import calculate_after_refine
 from .game_mechanics_service import GameMechanicsService
+from ..domain.models import UserBuff
+from ..utils import get_now
 
 
 class InventoryService:
     """封装与用户库存相关的业务逻辑"""
+
+    ARMED_STATE_BUFF_TYPE = "ARMED_TEMPLATE_STATES"
 
     def __init__(
         self,
@@ -33,6 +37,142 @@ class InventoryService:
         self.game_mechanics_service = game_mechanics_service
         self.config = config
         self.expedition_service = expedition_service
+
+    def _get_armed_state_settings(self) -> Dict[str, Any]:
+        return (self.config or {}).get("armed_state", {}) or {}
+
+    def _get_armed_state_buff_repo(self):
+        return getattr(self.game_mechanics_service, "buff_repo", None)
+
+    def _load_armed_state_payload(self, user_id: str) -> Dict[str, Dict[str, bool]]:
+        buff_repo = self._get_armed_state_buff_repo()
+        if not buff_repo:
+            return {"item": {}, "bait": {}}
+        try:
+            buff = buff_repo.get_active_by_user_and_type(user_id, self.ARMED_STATE_BUFF_TYPE)
+        except Exception:
+            return {"item": {}, "bait": {}}
+        if not buff or not getattr(buff, "payload", None):
+            return {"item": {}, "bait": {}}
+        try:
+            payload = json.loads(buff.payload or "{}")
+        except Exception:
+            payload = {}
+        item_map = payload.get("item") if isinstance(payload.get("item"), dict) else {}
+        bait_map = payload.get("bait") if isinstance(payload.get("bait"), dict) else {}
+        return {
+            "item": {str(k): bool(v) for k, v in item_map.items()},
+            "bait": {str(k): bool(v) for k, v in bait_map.items()},
+        }
+
+    def _save_armed_state_payload(self, user_id: str, payload: Dict[str, Dict[str, bool]]) -> None:
+        buff_repo = self._get_armed_state_buff_repo()
+        if not buff_repo:
+            return
+        normalized = {
+            "item": {str(k): bool(v) for k, v in (payload.get("item") or {}).items()},
+            "bait": {str(k): bool(v) for k, v in (payload.get("bait") or {}).items()},
+        }
+        is_empty = not normalized["item"] and not normalized["bait"]
+        existing = buff_repo.get_active_by_user_and_type(user_id, self.ARMED_STATE_BUFF_TYPE)
+        if is_empty:
+            if existing:
+                buff_repo.delete(existing.id)
+            return
+        if existing:
+            existing.payload = json.dumps(normalized, ensure_ascii=False)
+            existing.expires_at = None
+            buff_repo.update(existing)
+            return
+        buff_repo.add(
+            UserBuff(
+                id=0,
+                user_id=user_id,
+                buff_type=self.ARMED_STATE_BUFF_TYPE,
+                payload=json.dumps(normalized, ensure_ascii=False),
+                started_at=get_now(),
+                expires_at=None,
+            )
+        )
+
+    def _supports_item_armed_state(self, item_template) -> bool:
+        if not item_template:
+            return False
+        configured_ids = {
+            int(x) for x in (self._get_armed_state_settings().get("item_ids") or []) if str(x).isdigit()
+        }
+        return int(getattr(item_template, "item_id", 0) or 0) in configured_ids
+
+    def _supports_bait_armed_state(self, bait_template) -> bool:
+        if not bait_template:
+            return False
+        configured_ids = {
+            int(x) for x in (self._get_armed_state_settings().get("bait_ids") or []) if str(x).isdigit()
+        }
+        return int(getattr(bait_template, "bait_id", 0) or 0) in configured_ids
+
+    def _get_default_armed_state(self, resource_type: str) -> bool:
+        if resource_type == "bait":
+            return bool(self._get_armed_state_settings().get("default_armed_for_baits", True))
+        return False
+
+    def is_template_armed(self, user_id: str, resource_type: str, template_id: int) -> bool:
+        payload = self._load_armed_state_payload(user_id)
+        resource_map = payload.get(resource_type, {})
+        key = str(template_id)
+        if key in resource_map:
+            return bool(resource_map[key])
+        return self._get_default_armed_state(resource_type)
+
+    def set_template_armed_state(
+        self, user_id: str, resource_type: str, template_id: int, armed: bool
+    ) -> Dict[str, Any]:
+        if resource_type not in {"item", "bait"}:
+            return {"success": False, "message": "不支持的状态类型"}
+
+        if resource_type == "item":
+            inventory = self.inventory_repo.get_user_item_inventory(user_id)
+            if inventory.get(template_id, 0) <= 0:
+                return {"success": False, "message": "你没有这个道具"}
+            template = self.item_template_repo.get_item_by_id(template_id)
+            if not template:
+                return {"success": False, "message": "道具信息不存在"}
+            if not self._supports_item_armed_state(template):
+                return {"success": False, "message": f"【{template.name}】不支持使用中状态。"}
+            name = template.name
+        else:
+            inventory = self.inventory_repo.get_user_bait_inventory(user_id)
+            if inventory.get(template_id, 0) <= 0:
+                return {"success": False, "message": "你没有这个鱼饵"}
+            template = self.item_template_repo.get_bait_by_id(template_id)
+            if not template:
+                return {"success": False, "message": "鱼饵信息不存在"}
+            if not self._supports_bait_armed_state(template):
+                return {"success": False, "message": f"【{template.name}】不支持自动使用状态。"}
+            name = template.name
+
+        payload = self._load_armed_state_payload(user_id)
+        payload.setdefault(resource_type, {})[str(template_id)] = bool(armed)
+        self._save_armed_state_payload(user_id, payload)
+        return {
+            "success": True,
+            "message": f"【{name}】已{'启用' if armed else '关闭'}自动/待命状态。",
+            "armed": bool(armed),
+        }
+
+    def _clear_armed_state_if_empty(self, user_id: str, resource_type: str, template_id: int) -> None:
+        if resource_type == "item":
+            remaining = self.inventory_repo.get_user_item_inventory(user_id).get(template_id, 0)
+        else:
+            remaining = self.inventory_repo.get_user_bait_inventory(user_id).get(template_id, 0)
+        if remaining > 0:
+            return
+        payload = self._load_armed_state_payload(user_id)
+        resource_map = payload.get(resource_type, {})
+        if str(template_id) in resource_map:
+            resource_map.pop(str(template_id), None)
+            payload[resource_type] = resource_map
+            self._save_armed_state_payload(user_id, payload)
 
     # === 短码解析 ===
     def _to_base36(self, n: int) -> str:
@@ -170,6 +310,7 @@ class InventoryService:
         for bait_id, quantity in bait_inventory.items():
             bait_template = self.item_template_repo.get_bait_by_id(bait_id)
             if bait_template:
+                supports_armed_state = self._supports_bait_armed_state(bait_template)
                 enriched_baits.append({
                     "bait_id": bait_id,
                     "name": bait_template.name,
@@ -182,6 +323,8 @@ class InventoryService:
                     "fish_quality_bonus": 1.0 + getattr(bait_template, "success_rate_modifier", 0.0),
                     "fish_quantity_bonus": getattr(bait_template, "quantity_modifier", 1.0),
                     "rare_fish_chance_bonus": getattr(bait_template, "rare_chance_modifier", 0.0),
+                    "supports_armed_state": supports_armed_state,
+                    "is_armed": self.is_template_armed(user_id, "bait", bait_id) if supports_armed_state else False,
                 })
 
         return {
@@ -240,6 +383,7 @@ class InventoryService:
             if item_template:
                 # 生成用户友好的描述
                 user_friendly_desc = self._get_user_friendly_description(item_template)
+                supports_armed_state = self._supports_item_armed_state(item_template)
                 
                 enriched_items.append({
                     "item_id": item_id,
@@ -250,6 +394,8 @@ class InventoryService:
                     "effect_type": item_template.effect_type,
                     "user_friendly_description": user_friendly_desc,
                     "is_consumable": getattr(item_template, "is_consumable", False),
+                    "supports_armed_state": supports_armed_state,
+                    "is_armed": self.is_template_armed(user_id, "item", item_id) if supports_armed_state else False,
                 })
 
         return {
@@ -1051,7 +1197,17 @@ class InventoryService:
 
         self.user_repo.update(user)
 
-        return {"success": True, "message": f"💫 成功使用鱼饵【{bait_template.name}】"}
+        message = f"💫 成功使用鱼饵【{bait_template.name}】"
+        if self._supports_bait_armed_state(bait_template):
+            # 手动使用即视为允许其进入自动使用池，避免现有体验断裂。
+            self.set_template_armed_state(user_id, "bait", bait_id, True)
+            message += "，并已加入自动使用池。"
+
+        return {"success": True, "message": message}
+
+    def set_bait_auto_use_state(self, user_id: str, bait_id: int, enabled: bool) -> Dict[str, Any]:
+        """显式设置鱼饵是否允许参与自动使用。"""
+        return self.set_template_armed_state(user_id, "bait", bait_id, enabled)
 
     def get_user_fish_pond_capacity(self, user_id: str) -> Dict[str, Any]:
         """
@@ -1472,6 +1628,8 @@ class InventoryService:
                                     max_rarity = payload.get("max_rarity")
                                     
                                     # 只有无max_rarity限制的keep模式护符（天命护符·神佑）能防止降级
+                                    if self._supports_item_armed_state(tpl) and not self.is_template_armed(user.user_id, "item", tpl.item_id):
+                                        continue
                                     if mode == "keep" and max_rarity is None:
                                         chosen_tpl = tpl
                                         break
@@ -1481,6 +1639,7 @@ class InventoryService:
                         if chosen_tpl is not None:
                             # 自动消耗一个天命护符·神佑
                             self.inventory_repo.decrease_item_quantity(user.user_id, chosen_tpl.item_id, 1)
+                            self._clear_armed_state_if_empty(user.user_id, "item", chosen_tpl.item_id)
                             return {
                                 "success": False,
                                 "message": f"🛡 {chosen_tpl.name} 生效！避免了等级降级。",
@@ -1534,6 +1693,8 @@ class InventoryService:
                                             pass
                                         mode = payload.get("mode", "keep")
                                         max_rarity = payload.get("max_rarity")
+                                        if self._supports_item_armed_state(tpl) and not self.is_template_armed(user.user_id, "item", tpl.item_id):
+                                            continue
                                         
                                         # 检查护符是否对当前装备生效
                                         if max_rarity is not None and template.rarity > int(max_rarity):
@@ -1560,6 +1721,7 @@ class InventoryService:
                                 if chosen_tpl is not None:
                                     # 自动消耗一个护符道具
                                     self.inventory_repo.decrease_item_quantity(user.user_id, chosen_tpl.item_id, 1)
+                                    self._clear_armed_state_if_empty(user.user_id, "item", chosen_tpl.item_id)
                                     if chosen_mode == "downgrade":
                                         # 等级-1并保留
                                         instance.refine_level = max(1, instance.refine_level - 1)
@@ -1780,6 +1942,10 @@ class InventoryService:
         item_template = self.item_template_repo.get_item_by_id(item_id)
         if not item_template:
             return {"success": False, "message": "道具信息不存在"}
+
+        if self._supports_item_armed_state(item_template):
+            current = self.is_template_armed(user_id, "item", item_id)
+            return self.set_template_armed_state(user_id, "item", item_id, not current)
 
         if not getattr(item_template, "is_consumable", False):
             return {"success": False, "message": f"【{item_template.name}】无法直接使用。"}

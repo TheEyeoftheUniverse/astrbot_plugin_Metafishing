@@ -1,5 +1,5 @@
-from astrbot.api.event import filter, AstrMessageEvent
-from ..utils import parse_target_user_id, to_percentage, safe_datetime_handler
+from astrbot.api.event import AstrMessageEvent
+from ..utils import to_percentage
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -258,29 +258,6 @@ async def view_gacha_pool(self: "FishingPlugin", event: AstrMessageEvent):
         yield event.plain_result("❌ 出错啦！请稍后再试。")
 
 
-async def gacha_history(self: "FishingPlugin", event: AstrMessageEvent):
-    """查看抽卡记录"""
-    user_id = self._get_effective_user_id(event)
-    if result := self.gacha_service.get_user_gacha_history(user_id):
-        if result["success"]:
-            history = result.get("records", [])
-            if not history:
-                yield event.plain_result("📜 您还没有抽卡记录。")
-                return
-            total_count = len(history)
-            message = f"【📜 抽卡记录】共 {total_count} 条\n\n"
-
-            for record in history:
-                message += f"物品名称: {record['item_name']} (稀有度: {'⭐' * record['rarity']})\n"
-                message += f"时间: {safe_datetime_handler(record['timestamp'])}\n\n"
-
-            yield event.plain_result(message)
-        else:
-            yield event.plain_result(f"❌ 查看抽卡记录失败：{result['message']}")
-    else:
-        yield event.plain_result("❌ 出错啦！请稍后再试。")
-
-
 async def wipe_bomb(self: "FishingPlugin", event: AstrMessageEvent):
     """擦弹功能"""
     user_id = self._get_effective_user_id(event)
@@ -349,34 +326,3 @@ async def wipe_bomb(self: "FishingPlugin", event: AstrMessageEvent):
     else:
         yield event.plain_result("❌ 出错啦！请稍后再试。")
 
-
-async def wipe_bomb_history(self: "FishingPlugin", event: AstrMessageEvent):
-    """查看擦弹记录"""
-    user_id = self._get_effective_user_id(event)
-    if result := self.game_mechanics_service.get_wipe_bomb_history(user_id):
-        if result["success"]:
-            history = result.get("logs", [])
-            if not history:
-                yield event.plain_result("📜 您还没有擦弹记录。")
-                return
-            message = "【📜 擦弹记录】\n\n"
-            for record in history:
-                # 添加一点emoji
-                message += f"⏱️ 时间: {safe_datetime_handler(record['timestamp'])}\n"
-                message += f"💸 投入: {record['contribution']} 金币, 🎁 奖励: {record['reward']} 金币\n"
-                # 计算盈亏
-                profit = record["reward"] - record["contribution"]
-                profit_text = f"盈利: +{profit}" if profit >= 0 else f"亏损: {profit}"
-                profit_emoji = "📈" if profit >= 0 else "📉"
-
-                if record["multiplier"] >= 3:
-                    message += f"🔥 倍率: {record['multiplier']} ({profit_emoji} {profit_text})\n\n"
-                elif record["multiplier"] >= 1:
-                    message += f"✨ 倍率: {record['multiplier']} ({profit_emoji} {profit_text})\n\n"
-                else:
-                    message += f"💔 倍率: {record['multiplier']} ({profit_emoji} {profit_text})\n\n"
-            yield event.plain_result(message)
-        else:
-            yield event.plain_result(f"❌ 查看擦弹记录失败：{result['message']}")
-    else:
-        yield event.plain_result("❌ 出错啦！请稍后再试。")

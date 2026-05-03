@@ -16,7 +16,7 @@ from ..repositories.abstract_repository import (
     AbstractLogRepository,
     AbstractUserBuffRepository,
 )
-from ..domain.models import FishingRecord, TaxRecord, FishingZone
+from ..domain.models import FishingRecord, TaxRecord, FishingZone, UserBuff
 from ..services.fishing_zone_service import FishingZoneService
 from ..services.wipe_bomb_daily_service import add_wipe_bomb_jackpot
 from ..utils import get_now, get_fish_template, get_today, get_last_reset_time, calculate_after_refine
@@ -84,6 +84,79 @@ class FishingService:
         # 通知目标可配置，默认群聊。可由 config['notifications']['relocation_target'] 覆盖
         notifications_cfg = self.config.get("notifications", {}) if isinstance(self.config, dict) else {}
         self._notification_target = notifications_cfg.get("relocation_target", "group")
+
+    def _get_armed_state_settings(self) -> Dict[str, Any]:
+        return (self.config or {}).get("armed_state", {}) or {}
+
+    def _supports_bait_armed_state(self, bait_template) -> bool:
+        if not bait_template:
+            return False
+        configured_ids = {
+            int(x) for x in (self._get_armed_state_settings().get("bait_ids") or []) if str(x).isdigit()
+        }
+        return int(getattr(bait_template, "bait_id", 0) or 0) in configured_ids
+
+    def _is_bait_armed(self, user_id: str, bait_id: int) -> bool:
+        try:
+            buff = self.buff_repo.get_active_by_user_and_type(user_id, "ARMED_TEMPLATE_STATES")
+        except Exception:
+            buff = None
+        default_armed = bool(self._get_armed_state_settings().get("default_armed_for_baits", True))
+        if not buff or not getattr(buff, "payload", None):
+            return default_armed
+        try:
+            payload = json.loads(buff.payload or "{}")
+        except Exception:
+            payload = {}
+        bait_map = payload.get("bait") if isinstance(payload.get("bait"), dict) else {}
+        if str(bait_id) in bait_map:
+            return bool(bait_map[str(bait_id)])
+        return default_armed
+
+    def _set_bait_armed(self, user_id: str, bait_id: int, armed: bool) -> None:
+        try:
+            buff = self.buff_repo.get_active_by_user_and_type(user_id, "ARMED_TEMPLATE_STATES")
+        except Exception:
+            buff = None
+        payload = {"item": {}, "bait": {}}
+        if buff and getattr(buff, "payload", None):
+            try:
+                existing = json.loads(buff.payload or "{}")
+                payload["item"] = existing.get("item") if isinstance(existing.get("item"), dict) else {}
+                payload["bait"] = existing.get("bait") if isinstance(existing.get("bait"), dict) else {}
+            except Exception:
+                pass
+        payload.setdefault("bait", {})[str(bait_id)] = bool(armed)
+        if buff:
+            buff.payload = json.dumps(payload, ensure_ascii=False)
+            buff.expires_at = None
+            self.buff_repo.update(buff)
+        else:
+            self.buff_repo.add(
+                UserBuff(
+                    id=0,
+                    user_id=user_id,
+                    buff_type="ARMED_TEMPLATE_STATES",
+                    payload=json.dumps(payload, ensure_ascii=False),
+                    started_at=get_now(),
+                    expires_at=None,
+                )
+            )
+
+    def _get_random_auto_usable_bait_id(self, user_id: str) -> Optional[int]:
+        bait_inventory = self.inventory_repo.get_user_bait_inventory(user_id) or {}
+        candidates = []
+        for bait_id, quantity in bait_inventory.items():
+            if quantity <= 0:
+                continue
+            bait_template = self.item_template_repo.get_bait_by_id(bait_id)
+            if bait_template and self._supports_bait_armed_state(bait_template):
+                if not self._is_bait_armed(user_id, bait_id):
+                    continue
+            candidates.append(bait_id)
+        if not candidates:
+            return None
+        return random.choice(candidates)
         
 
     def register_notifier(self, notifier, default_target: Optional[str] = None):
@@ -293,7 +366,7 @@ class FishingService:
 
         if user.current_bait_id is None:
             # 随机获取一个库存鱼饵，但需要验证鱼竿星级要求
-            random_bait_id = self.inventory_repo.get_random_bait(user.user_id)
+            random_bait_id = self._get_random_auto_usable_bait_id(user.user_id)
             if random_bait_id:
                 # 验证鱼饵是否满足鱼竿星级要求
                 bait_template = self.item_template_repo.get_bait_by_id(random_bait_id)
@@ -306,11 +379,14 @@ class FishingService:
                             # 鱼竿星级满足要求，可以使用
                             user.current_bait_id = random_bait_id
                         else:
-                            # 鱼竿星级不足，不自动使用此鱼饵
-                            logger.info(f"用户 {user_id} 的鱼竿星级不足以使用鱼饵 {random_bait_id}（需要 {bait_template.required_rod_rarity} 星）")
+                            # 鱼竿星级不足，不自动使用此鱼饵，并将其移出自动使用队列，避免后台持续刷日志
+                            if self._supports_bait_armed_state(bait_template):
+                                self._set_bait_armed(user_id, random_bait_id, False)
+                            logger.info(f"用户 {user_id} 的鱼竿星级不足以使用鱼饵 {random_bait_id}（需要 {bait_template.required_rod_rarity} 星），已移出自动使用队列")
                     else:
-                        # 没有装备鱼竿，不能使用有星级要求的鱼饵
-                        pass
+                        # 没有装备鱼竿，不能使用有星级要求的鱼饵，并将其移出自动使用队列
+                        if self._supports_bait_armed_state(bait_template):
+                            self._set_bait_armed(user_id, random_bait_id, False)
                 else:
                     # 没有星级要求，直接使用
                     user.current_bait_id = random_bait_id
@@ -671,43 +747,6 @@ class FishingService:
             else:
                 refreshed_status["message"] = "当前没有可领取的图鉴奖励"
             return refreshed_status
-
-    def get_user_fish_log(self, user_id: str, limit: int = 10) -> Dict[str, Any]:
-        """
-        获取用户的钓鱼记录。
-
-        Args:
-            user_id: 用户ID。
-            limit: 返回记录的数量限制。
-
-        Returns:
-            包含钓鱼记录的字典。
-        """
-        records = self.log_repo.get_fishing_records(user_id, limit)
-        # 根据records中的 fish_id 获取鱼类名称 rod_instance_id 和 accessory_instance_id 以及 bait_id 获取鱼竿、饰品、鱼饵信息
-        fish_details = []
-        for record in records:
-            fish_template = self.item_template_repo.get_fish_by_id(record.fish_id)
-            bait_template = self.item_template_repo.get_bait_by_id(record.bait_id) if record.bait_id else None
-
-            user_rod = self.inventory_repo.get_user_rod_instance_by_id(user_id, record.rod_instance_id) if record.rod_instance_id else None
-            rod_instance = self.item_template_repo.get_rod_by_id(user_rod.rod_id) if user_rod else None
-            user_accessory = self.inventory_repo.get_user_accessory_instance_by_id(user_id, record.accessory_instance_id) if record.accessory_instance_id else None
-            accessory_instance = self.item_template_repo.get_accessory_by_id(user_accessory.accessory_id) if user_accessory else None
-
-            fish_details.append({
-                "fish_name": fish_template.name if fish_template else "未知鱼类",
-                "fish_rarity": fish_template.rarity if fish_template else "未知稀有度",
-                "fish_value": record.value,
-                "timestamp": record.timestamp,
-                "rod": rod_instance.name if rod_instance else "未装备鱼竿",
-                "accessory": accessory_instance.name if accessory_instance else "未装备饰品",
-                "bait": bait_template.name if bait_template else "未使用鱼饵",
-            })
-        return {
-            "success": True,
-            "records": fish_details
-        }
 
     def get_user_fishing_zones(self, user_id: str) -> Dict[str, Any]:
         """

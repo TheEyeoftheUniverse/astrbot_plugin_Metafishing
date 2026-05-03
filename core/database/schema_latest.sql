@@ -1,4 +1,4 @@
--- Latest bootstrap schema for fresh installs. Generated from migration version 45.
+-- Latest bootstrap schema for fresh installs.
 
 -- table: accessories
 CREATE TABLE accessories (
@@ -63,16 +63,6 @@ CREATE TABLE "fish" (
             icon_url TEXT
         );
 
--- table: fishing_records
-CREATE TABLE fishing_records (
-            record_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, fish_id INTEGER NOT NULL,
-            value INTEGER NOT NULL, rod_instance_id INTEGER,
-            accessory_instance_id INTEGER, bait_id INTEGER, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            location_id INTEGER, is_king_size INTEGER DEFAULT 0,
-            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-            FOREIGN KEY (fish_id) REFERENCES fish(fish_id) ON DELETE RESTRICT
-        );
-
 -- table: fishing_zones
 CREATE TABLE fishing_zones (
             id INTEGER PRIMARY KEY,
@@ -100,15 +90,6 @@ CREATE TABLE gacha_pools (
             gacha_pool_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT,
             cost_coins INTEGER DEFAULT 0, cost_premium_currency INTEGER DEFAULT 0
         , is_limited_time INTEGER DEFAULT 0, open_until TEXT);
-
--- table: gacha_records
-CREATE TABLE gacha_records (
-            record_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, gacha_pool_id INTEGER NOT NULL,
-            item_type TEXT NOT NULL, item_id INTEGER NOT NULL, item_name TEXT NOT NULL,
-            quantity INTEGER DEFAULT 1, rarity INTEGER DEFAULT 1, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-            FOREIGN KEY (gacha_pool_id) REFERENCES gacha_pools(gacha_pool_id) ON DELETE CASCADE
-        );
 
 -- table: items
 CREATE TABLE items (
@@ -399,14 +380,6 @@ CREATE TABLE users (
             last_stolen_at DATETIME
         , fishing_zone_id INTEGER DEFAULT 1, wipe_bomb_forecast TEXT, aquarium_capacity INTEGER DEFAULT 50, exchange_account_status INTEGER DEFAULT 0, last_electric_fish_time DATETIME, max_wipe_bomb_multiplier REAL DEFAULT 0.0, min_wipe_bomb_multiplier REAL DEFAULT NULL, wipe_bomb_attempts_today INTEGER NOT NULL DEFAULT 0, last_wipe_bomb_date TEXT DEFAULT NULL, max_coins INTEGER DEFAULT 0, exchange_capacity INTEGER DEFAULT 1000);
 
--- table: wipe_bomb_log
-CREATE TABLE wipe_bomb_log (
-            log_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL,
-            contribution_amount INTEGER NOT NULL, reward_multiplier REAL NOT NULL,
-            reward_amount INTEGER NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
-        );
-
 -- table: zone_fish_mapping
 CREATE TABLE zone_fish_mapping (
             zone_id INTEGER,
@@ -428,23 +401,8 @@ CREATE INDEX idx_exchange_prices_created_at ON exchange_prices(created_at);
 -- index: idx_exchange_prices_date_commodity
 CREATE INDEX idx_exchange_prices_date_commodity ON exchange_prices(date, commodity_id);
 
--- index: idx_fishing_records_fish_id
-CREATE INDEX idx_fishing_records_fish_id ON fishing_records(fish_id);
-
--- index: idx_fishing_records_timestamp
-CREATE INDEX idx_fishing_records_timestamp ON fishing_records(timestamp);
-
--- index: idx_fishing_records_user_time
-CREATE INDEX idx_fishing_records_user_time ON fishing_records(user_id, timestamp);
-
 -- index: idx_gacha_pool_items_pool_type
 CREATE INDEX idx_gacha_pool_items_pool_type ON gacha_pool_items(gacha_pool_id, item_type);
-
--- index: idx_gacha_records_timestamp
-CREATE INDEX idx_gacha_records_timestamp ON gacha_records(timestamp);
-
--- index: idx_gacha_records_user_time
-CREATE INDEX idx_gacha_records_user_time ON gacha_records(user_id, timestamp);
 
 -- index: idx_market_item_quality
 CREATE INDEX idx_market_item_quality 
@@ -560,9 +518,3 @@ CREATE INDEX idx_users_coins ON users(coins);
 
 -- index: idx_users_last_login
 CREATE INDEX idx_users_last_login ON users(last_login_time);
-
--- index: idx_wipe_bomb_log_timestamp
-CREATE INDEX idx_wipe_bomb_log_timestamp ON wipe_bomb_log(timestamp);
-
--- index: idx_wipe_bomb_log_user_time
-CREATE INDEX idx_wipe_bomb_log_user_time ON wipe_bomb_log(user_id, timestamp);
