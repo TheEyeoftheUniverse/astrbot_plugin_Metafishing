@@ -4,7 +4,7 @@ from .abstract_effect import AbstractItemEffect
 
 
 class _GrantTitleBaseEffect(AbstractItemEffect):
-    effect_type = "GRANT_TITLE"
+    effect_type = None
 
     def __init__(
         self,

@@ -824,12 +824,6 @@ class FishingPlugin(Star):
         async for r in social_handlers.electric_fish(self, event):
             yield r
 
-    @filter.command("驱灵")
-    async def dispel_protection(self, event: AstrMessageEvent):
-        """驱散目标玩家的保护效果。用法：驱灵 @用户"""
-        async for r in social_handlers.dispel_protection(self, event):
-            yield r
-
     @filter.command("查看称号", alias={"称号"})
     async def view_titles(self, event: AstrMessageEvent):
         """查看你拥有的所有称号"""

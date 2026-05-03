@@ -453,53 +453,27 @@ class GameMechanicsService:
             remaining = int(cooldown_seconds - (now - last_steal_time).total_seconds())
             return {"success": False, "message": f"偷鱼冷却中，请等待 {remaining // 60} 分钟后再试"}
 
-        # 1. 检查受害者是否受保护，以及偷窃者是否有反制能力
-        protection_buff = self.buff_repo.get_active_by_user_and_type(
-            victim_id, "STEAL_PROTECTION_BUFF"
-        )
-        
-        penetration_buff = self.buff_repo.get_active_by_user_and_type(
-            thief_id, "STEAL_PENETRATION_BUFF"
-        )
-        shadow_cloak_buff = self.buff_repo.get_active_by_user_and_type(
-            thief_id, "SHADOW_CLOAK_BUFF"
-        )
-        
-        if protection_buff:
-            if not penetration_buff and not shadow_cloak_buff:
-                return {"success": False, "message": f"❌ 无法偷窃，【{victim.nickname}】的鱼塘似乎被神秘力量守护着！"}
-            else:
-                if shadow_cloak_buff:
-                    self.buff_repo.delete(shadow_cloak_buff.id)
-
-        # 2. 检查受害者是否有鱼可偷
+        # 1. 检查受害者是否有鱼可偷
         victim_inventory = self.inventory_repo.get_fish_inventory(victim_id)
         if not victim_inventory:
             return {"success": False, "message": f"目标用户【{victim.nickname}】的鱼塘是空的！"}
 
-        # 3. 随机选择一条鱼偷取
+        # 2. 随机选择一条鱼偷取
         stolen_fish_item = random.choice(victim_inventory)
         stolen_fish_template = self.item_template_repo.get_fish_by_id(stolen_fish_item.fish_id)
 
         if not stolen_fish_template:
             return {"success": False, "message": "发生内部错误，无法识别被偷的鱼"}
 
-        # 4. 执行偷窃事务（保持品质属性）
+        # 3. 执行偷窃事务（保持品质属性）
         self.inventory_repo.update_fish_quantity(victim_id, stolen_fish_item.fish_id, delta=-1, quality_level=stolen_fish_item.quality_level)
         self.inventory_repo.add_fish_to_inventory(thief_id, stolen_fish_item.fish_id, quantity=1, quality_level=stolen_fish_item.quality_level)
 
-        # 5. 更新偷窃者的CD时间
+        # 4. 更新偷窃者的CD时间
         thief.last_steal_time = now
         self.user_repo.update(thief)
 
-        # 6. 生成成功消息
-        counter_message = ""
-        if protection_buff:
-            if penetration_buff:
-                counter_message = "⚡ 破灵符的力量穿透了海灵守护！"
-            elif shadow_cloak_buff:
-                counter_message = "🌑 暗影斗篷让你在阴影中行动！"
-
+        # 5. 生成成功消息
         # 构建品质信息
         quality_info = ""
         actual_value = stolen_fish_template.base_value
@@ -509,7 +483,7 @@ class GameMechanicsService:
         
         return {
             "success": True,
-            "message": f"{counter_message}✅ 成功从【{victim.nickname}】的鱼塘里偷到了一条{stolen_fish_template.rarity}★【{stolen_fish_template.name}】{quality_info}！价值 {actual_value} 金币",
+            "message": f"✅ 成功从【{victim.nickname}】的鱼塘里偷到了一条{stolen_fish_template.rarity}★【{stolen_fish_template.name}】{quality_info}！价值 {actual_value} 金币",
         }
 
     # ============================================================
@@ -549,26 +523,7 @@ class GameMechanicsService:
             remaining = int(cooldown_seconds - (now - last_electric_fish_time).total_seconds())
             return {"success": False, "message": f"电鱼冷却中，请等待 {remaining // 60} 分钟后再试"}
     
-        # 1. 检查受害者是否受保护，逻辑同偷鱼
-        protection_buff = self.buff_repo.get_active_by_user_and_type(
-            victim_id, "STEAL_PROTECTION_BUFF"
-        )
-        
-        penetration_buff = self.buff_repo.get_active_by_user_and_type(
-            thief_id, "STEAL_PENETRATION_BUFF"
-        )
-        shadow_cloak_buff = self.buff_repo.get_active_by_user_and_type(
-            thief_id, "SHADOW_CLOAK_BUFF"
-        )
-        
-        if protection_buff:
-            if not penetration_buff and not shadow_cloak_buff:
-                return {"success": False, "message": f"❌ 无法电鱼，【{victim.nickname}】的鱼塘似乎被神秘力量守护着！"}
-            else:
-                if shadow_cloak_buff:
-                    self.buff_repo.delete(shadow_cloak_buff.id)
-    
-        # 2. 检查受害者鱼塘数量是否达标
+        # 1. 检查受害者鱼塘数量是否达标
         victim_inventory = self.inventory_repo.get_fish_inventory(victim_id)
         if not victim_inventory:
             return {"success": False, "message": f"目标用户【{victim.nickname}】的鱼塘是空的！"}
@@ -577,7 +532,7 @@ class GameMechanicsService:
         if total_fish_count < 100:
             return {"success": False, "message": f"目标用户【{victim.nickname}】的鱼塘里鱼太少了（{total_fish_count}/100），电不到什么好东西，还是放过他吧。"}
         
-        # 3. 计算成功率并进行判定
+        # 2. 计算成功率并进行判定
         # 所有目标用户的成功率相同，只使用基础成功率
         final_success_rate = self.config.get("electric_fish", {}).get("base_success_rate", 0.6)
         
@@ -621,7 +576,7 @@ class GameMechanicsService:
                 "message": f"❌ 电鱼失败！{severity}降临，雷电击中了你，损失了 {penalty_coins} 金币（{penalty_rate*100:.1f}%）！\n💡 本次成功率为 {final_success_rate*100:.1f}%"
             }
 
-        # 4. 成功了！根据成功度（roll值）决定收益档次
+        # 3. 成功了！根据成功度（roll值）决定收益档次
         # roll越接近0表示越幸运，获得的收益越高
         success_quality = roll / final_success_rate  # 归一化到0-1之间
         
@@ -642,7 +597,7 @@ class GameMechanicsService:
             success_type = "🔹小成功"
             multiplier_range = (0.05, 0.10)
         
-        # 5. 准备数据：获取鱼模板并将鱼塘扁平化
+        # 4. 准备数据：获取鱼模板并将鱼塘扁平化
         fish_templates = {
             item.fish_id: self.item_template_repo.get_fish_by_id(item.fish_id)
             for item in victim_inventory
@@ -651,7 +606,7 @@ class GameMechanicsService:
         for item in victim_inventory:
             all_fish_in_pond.extend([item.fish_id] * item.quantity)
 
-        # 6. 决定偷取数量并进行初次完全随机抽样
+        # 5. 决定偷取数量并进行初次完全随机抽样
         num_to_steal = 0
         if total_fish_count > 400:
             # 如果鱼数大于400，按成功档次的百分比计算
@@ -670,7 +625,7 @@ class GameMechanicsService:
         actual_num_to_steal = min(num_to_steal, len(all_fish_in_pond))
         initial_catch = random.sample(all_fish_in_pond, actual_num_to_steal)
 
-        # 7. 检查并修正高星鱼数量
+        # 6. 检查并修正高星鱼数量
         high_rarity_caught = []
         low_rarity_caught = []
         for fish_id in initial_catch:
@@ -707,12 +662,12 @@ class GameMechanicsService:
                 replacements = random.sample(replacement_pool, num_can_replace)
                 final_stolen_fish_ids.extend(replacements)
 
-        # 8. 统计最终偷到的鱼
+        # 7. 统计最终偷到的鱼
         stolen_fish_counts = {}
         for fish_id in final_stolen_fish_ids:
             stolen_fish_counts[fish_id] = stolen_fish_counts.get(fish_id, 0) + 1
     
-        # 9. 执行电鱼事务并计算总价值
+        # 8. 执行电鱼事务并计算总价值
         stolen_summary = []
         total_value_stolen = 0
     
@@ -725,18 +680,11 @@ class GameMechanicsService:
                 stolen_summary.append(f"【{template.name}】x{count}")
                 total_value_stolen += template.base_value * count
     
-        # 10. 更新电鱼的CD时间并保存
+        # 9. 更新电鱼的CD时间并保存
         thief.last_electric_fish_time = now
         self.user_repo.update(thief)
-    
-        # 11. 生成成功消息
-        counter_message = ""
-        if protection_buff:
-            if penetration_buff:
-                counter_message = "⚡ 破灵符的力量穿透了海灵守护！\n"
-            elif shadow_cloak_buff:
-                counter_message = "🌑 暗影斗篷让你在阴影中行动！\n"
-    
+
+        # 10. 生成成功消息
         stolen_details = "、".join(stolen_summary)
         actual_stolen_count = len(final_stolen_fish_ids)
         
@@ -745,51 +693,11 @@ class GameMechanicsService:
         
         return {
             "success": True,
-            "message": f"{counter_message}{success_type}！成功对【{victim.nickname}】的鱼塘进行了电击，捕获了{actual_stolen_count}条鱼（占其总数的{steal_percentage:.1f}%），总价值 {total_value_stolen} 金币！\n分别是：{stolen_details}。\n💡 本次成功率为 {final_success_rate*100:.1f}%",
+            "message": f"{success_type}！成功对【{victim.nickname}】的鱼塘进行了电击，捕获了{actual_stolen_count}条鱼（占其总数的{steal_percentage:.1f}%），总价值 {total_value_stolen} 金币！\n分别是：{stolen_details}。\n💡 本次成功率为 {final_success_rate*100:.1f}%",
         }
     # ============================================================
     # ===================== 新增功能：电鱼 结束 =====================
     # ============================================================
-
-    def dispel_steal_protection(self, target_id: str) -> Dict[str, Any]:
-        """
-        驱散目标的海灵守护效果
-        """
-        target = self.user_repo.get_by_id(target_id)
-        if not target:
-            return {"success": False, "message": "目标用户不存在"}
-
-        protection_buff = self.buff_repo.get_active_by_user_and_type(
-            target_id, "STEAL_PROTECTION_BUFF"
-        )
-        
-        if not protection_buff:
-            return {"success": False, "message": f"【{target.nickname}】没有海灵守护效果"}
-        
-        self.buff_repo.delete(protection_buff.id)
-        
-        return {
-            "success": True, 
-            "message": f"成功驱散了【{target.nickname}】的海灵守护效果"
-        }
-
-    def check_steal_protection(self, target_id: str) -> Dict[str, Any]:
-        """
-        检查目标是否有海灵守护效果
-        """
-        target = self.user_repo.get_by_id(target_id)
-        if not target:
-            return {"has_protection": False, "target_name": "未知用户", "message": "目标用户不存在"}
-
-        protection_buff = self.buff_repo.get_active_by_user_and_type(
-            target_id, "STEAL_PROTECTION_BUFF"
-        )
-        
-        return {
-            "has_protection": protection_buff is not None,
-            "target_name": target.nickname,
-            "message": f"【{target.nickname}】{'有' if protection_buff else '没有'}海灵守护效果"
-        }
 
     def calculate_sell_price(self, item_type: str, rarity: int, refine_level: int) -> int:
         """

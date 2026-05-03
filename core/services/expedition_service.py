@@ -384,9 +384,38 @@ class ExpeditionService:
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         return f"EXP{timestamp}{random.randint(100, 999)}"
 
-    def _select_random_fish(self, rarity: int, zone_id: int = 1) -> Optional[Dict[str, Any]]:
-        """从指定星级中随机选择一条鱼"""
-        fishes = self.item_template_repo.get_fishes_by_rarity(rarity)
+    def _get_target_zone_ids(self, expedition_type: str) -> List[int]:
+        """根据科考类型返回允许抽取目标鱼的区域列表。"""
+        zones = self.inventory_repo.get_all_zones() or []
+        all_zone_ids = sorted(int(zone.id) for zone in zones if getattr(zone, "id", None) is not None)
+        if not all_zone_ids:
+            return []
+
+        if expedition_type == "short":
+            early_zone_ids = [zone_id for zone_id in all_zone_ids if zone_id <= 4]
+            return early_zone_ids or all_zone_ids
+
+        return all_zone_ids
+
+    def _select_random_fish(self, rarity: int, zone_ids: Optional[List[int]] = None) -> Optional[Dict[str, Any]]:
+        """从指定星级与允许区域池中随机选择一条鱼。"""
+        fishes_by_id = {}
+
+        if zone_ids:
+            allowed_zone_ids = {int(zone_id) for zone_id in zone_ids}
+            for zone in self.inventory_repo.get_all_zones() or []:
+                zone_id = int(getattr(zone, "id", 0) or 0)
+                if zone_id not in allowed_zone_ids:
+                    continue
+                for fish_id in getattr(zone, "specific_fish_ids", []) or []:
+                    fish = self.item_template_repo.get_fish_by_id(int(fish_id))
+                    if fish and int(getattr(fish, "rarity", 0) or 0) == rarity:
+                        fishes_by_id[fish.fish_id] = fish
+        else:
+            for fish in self.item_template_repo.get_fishes_by_rarity(rarity) or []:
+                fishes_by_id[fish.fish_id] = fish
+
+        fishes = list(fishes_by_id.values())
         if not fishes:
             return None
 
@@ -482,6 +511,8 @@ class ExpeditionService:
         # 生成科考ID和邀请码
         expedition_id = self._generate_expedition_id()
         
+        allowed_zone_ids = self._get_target_zone_ids(expedition_type)
+
         # 随机选择5种目标鱼（1-5星各一种）
         targets = {}
         # 4星和5星鱼的特殊目标数量
@@ -489,7 +520,7 @@ class ExpeditionService:
         five_star_targets = {"short": 10, "medium": 50, "long": 100}
         
         for rarity in range(1, 6):
-            fish = self._select_random_fish(rarity)
+            fish = self._select_random_fish(rarity, allowed_zone_ids)
             if fish:
                 # 4星和5星鱼使用特殊的目标数量，其他星级使用通用配置
                 if rarity == 5:
@@ -597,7 +628,6 @@ class ExpeditionService:
         success_count = len(expedition["participants"]) - 1  # 减去队长
         message = (f"🔬 {type_names[expedition_type]}科考已发起！\n"
                   f"📋 邀请码：{expedition_id}\n"
-                  f"⏰ 截止时间：{end_time.strftime('%m-%d %H:%M')}\n"
                   f"🎯 目标鱼类：\n{targets_text}\n\n")
 
         # 添加邀请结果信息
@@ -640,13 +670,6 @@ class ExpeditionService:
             # 检查科考状态
             if expedition["status"] != "active":
                 return {"success": False, "message": "该科考已结束"}
-
-            # 检查是否已过期
-            end_time = datetime.strptime(expedition["end_time"], "%Y-%m-%d %H:%M:%S")
-            now = get_now()
-            
-            if now > end_time:
-                return {"success": False, "message": "该科考已过期"}
 
             # 检查是否已在队伍中
             if user_id in expedition["participants"]:
@@ -946,8 +969,6 @@ class ExpeditionService:
             message_parts.append("")
 
         expedition_id = expedition["expedition_id"]
-        end_time = datetime.strptime(expedition["end_time"], "%Y-%m-%d %H:%M:%S")
-        now = get_now()
 
         # 显示当前科考状态
         message_parts.append(f"🔬 当前科考状态 [{expedition['expedition_id']}]")
@@ -977,19 +998,10 @@ class ExpeditionService:
             participants_info.append(f"  {p['nickname']}: {total_contrib}条")
 
         type_names = {"short": "探险", "medium": "征服", "long": "圣域"}
-        
-        # 计算剩余时间
-        remaining = end_time - now
-        hours = int(remaining.total_seconds() / 3600)
-        minutes = int((remaining.total_seconds() % 3600) / 60)
 
         message_parts.append(f"📋 类型：{type_names.get(expedition['type'], expedition['type'])}")
         message_parts.append(f"👑 队长：{expedition['creator_name']}")
         message_parts.append(f"👥 成员：{len(expedition['participants'])}人")
-        if remaining.total_seconds() >= 0:
-            message_parts.append(f"⏰ 剩余时间：{hours}小时{minutes}分钟")
-        else:
-            message_parts.append("⏰ 已超时：不会自动结算，继续完成全部任务后可领取奖励")
         message_parts.append(f"📊 总进度：{expedition['total_progress'] * 100:.1f}%")
         message_parts.append("")
         message_parts.append("🎯 目标鱼类：")
@@ -1361,10 +1373,6 @@ class ExpeditionService:
                 if exp.get("status") not in ("active", "claimable"):
                     continue
 
-                end_time = datetime.strptime(exp["end_time"], "%Y-%m-%d %H:%M:%S")
-                now = get_now()
-                remaining = end_time - now
-                remaining_seconds = max(0, int(remaining.total_seconds()))
                 rewards = exp.get("rewards", {}) if isinstance(exp.get("rewards", {}), dict) else {}
                 current_reward = rewards.get(current_user_id, {}) if current_user_id else {}
                 current_user_claimed = bool(current_reward.get("claimed")) if isinstance(current_reward, dict) else False
@@ -1390,9 +1398,7 @@ class ExpeditionService:
                     "current_user_claimed": current_user_claimed,
                     "current_user_reward": current_reward if isinstance(current_reward, dict) else {},
                     "current_user_reward_text": self._format_reward_preview(current_reward if isinstance(current_reward, dict) else {}),
-                    "remaining_hours": int(remaining_seconds / 3600),
-                    "remaining_minutes": int((remaining_seconds % 3600) / 60),
-                    "is_overtime": remaining.total_seconds() < 0,
+                    "has_time_limit": False,
                 })
 
             if changed:

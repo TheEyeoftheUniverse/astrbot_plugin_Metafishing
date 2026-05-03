@@ -255,23 +255,7 @@ class FishingService:
         rare_chance = 0.0 # 稀有鱼出现几率
         value_bonus = 0.0 # 同星级价值池加成
 
-        # --- 新增：应用 Buff 效果 ---
         active_buffs = self.buff_repo.get_all_active_by_user(user_id)
-        for buff in active_buffs:
-            if buff.buff_type == "RARE_FISH_BOOST":
-                try:
-                    payload = json.loads(buff.payload) if buff.payload else {}
-                    multiplier = payload.get("multiplier", 1.0)
-                    # 这里的实现是直接增加到 rare_chance
-                    # 注意：如果基础值是0，乘法无意义，所以用加法或更复杂的逻辑
-                    # 假设 payload 的 multiplier 是一个额外的概率加成
-                    rare_chance += multiplier
-                    logger.info(
-                        f"用户 {user_id} 的 RARE_FISH_BOOST 生效，稀有几率增加 {multiplier}"
-                    )
-                except (json.JSONDecodeError, TypeError):
-                    logger.error(f"解析 buff payload 失败: {buff.payload}")
-        # --- Buff 应用结束 ---
 
         # 获取装备鱼竿并应用加成
         equipped_rod_instance = self.inventory_repo.get_user_equipped_rod(user.user_id)

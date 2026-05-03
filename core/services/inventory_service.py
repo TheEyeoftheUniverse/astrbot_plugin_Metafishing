@@ -445,8 +445,8 @@ class InventoryService:
         
         # 如果有自定义描述且不包含技术术语，直接使用
         if effect_desc and not any(tech_term in effect_desc for tech_term in [
-            'ADD_COINS', 'RESET_FISHING_COOLDOWN', 'RESET_DAILY_LIMIT', 
-            'BUFF_', 'MULTIPLY_', '_MODIFIER', 'zone_pass'
+            'ADD_COINS', 'RESET_DAILY_LIMIT', 'BUFF_',
+            'MULTIPLY_', '_MODIFIER', 'zone_pass'
         ]):
             return effect_desc
         
