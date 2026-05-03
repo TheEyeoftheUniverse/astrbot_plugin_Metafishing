@@ -374,16 +374,21 @@ class FishingPlugin(Star):
         self.web_player_task = None
         self._web_player_shutdown_event = asyncio.Event()
         self.player_port = webui_config.get("player_port", 8888)
+        self.public_base_url = str(
+            webui_config.get("public_base_url", "https://fish.eyeoftheuniverse.top")
+            or "https://fish.eyeoftheuniverse.top"
+        ).rstrip("/")
         oauth_config = webui_config.get("oauth", {})
         linuxdo_oauth_config = oauth_config.get("linuxdo", {})
+        configured_redirect_uri = str(linuxdo_oauth_config.get("redirect_uri", "") or "").strip()
+        default_redirect_uri = f"{self.public_base_url}/player/oauth/linuxdo/callback"
+        if not configured_redirect_uri:
+            configured_redirect_uri = default_redirect_uri
         self.player_linuxdo_oauth_config = {
             "enabled": linuxdo_oauth_config.get("enabled", False),
             "client_id": linuxdo_oauth_config.get("client_id", ""),
             "client_secret": linuxdo_oauth_config.get("client_secret", ""),
-            "redirect_uri": linuxdo_oauth_config.get(
-                "redirect_uri",
-                f"http://localhost:{self.player_port}/player/oauth/linuxdo/callback",
-            ),
+            "redirect_uri": configured_redirect_uri,
             "scope": linuxdo_oauth_config.get("scope", "read"),
             "user_id_field": linuxdo_oauth_config.get("user_id_field", "id"),
             "nickname_field": linuxdo_oauth_config.get("nickname_field", "username"),
@@ -1263,6 +1268,11 @@ class FishingPlugin(Star):
             app = create_player_app(
                 services,
                 {
+                    "public_base_url": self.public_base_url,
+                    "unity_allowed_origins": [
+                        self.public_base_url,
+                        "https://fish.eyeoftheuniverse.top",
+                    ],
                     "linuxdo_oauth": self.player_linuxdo_oauth_config,
                 },
             )
@@ -1284,7 +1294,7 @@ class FishingPlugin(Star):
             type(self)._shared_player_webui_owner = self
 
             logger.info(f"玩家WebUI启动中，端口: {fixed_port}")
-            logger.info(f"访问地址: http://localhost:{fixed_port}/player/login")
+            logger.info(f"访问地址: {self.public_base_url}/player/login")
 
             await serve(app, config, shutdown_trigger=self._web_player_shutdown_event.wait)
             logger.info("玩家WebUI服务已优雅停止")

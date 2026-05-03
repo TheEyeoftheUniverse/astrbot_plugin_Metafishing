@@ -21,6 +21,12 @@
         "hint": "玩家端页面默认端口，Linux.do OAuth 回调地址通常也要用这个端口",
         "default": 8888
       },
+      "public_base_url": {
+        "description": "玩家WebUI公网访问地址",
+        "type": "string",
+        "hint": "Unity 和 OAuth 使用的公网根地址，不要以 / 结尾",
+        "default": "https://fish.eyeoftheuniverse.top"
+      },
       "oauth": {
         "description": "玩家WebUI第三方登录配置",
         "type": "object",
@@ -48,7 +54,7 @@
                 "description": "Linux.do OAuth 回调地址",
                 "type": "string",
                 "hint": "需要与 Linux.do 应用后台配置的 Redirect URI 完全一致",
-                "default": "http://localhost:8888/player/oauth/linuxdo/callback"
+                "default": "https://fish.eyeoftheuniverse.top/player/oauth/linuxdo/callback"
               },
               "scope": {
                 "description": "Linux.do OAuth scope",

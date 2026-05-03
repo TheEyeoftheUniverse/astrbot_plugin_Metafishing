@@ -15,6 +15,12 @@ from quart import (
 )
 from astrbot.api import logger
 from ..manager.user_api import user_api_bp
+from ..manager.unity_api import (
+    install_unity_cors,
+    normalize_public_base_url,
+    register_unity_user_api_routes,
+    unity_api_bp,
+)
 
 
 player_bp = Blueprint(
@@ -742,9 +748,19 @@ def create_player_app(services: Dict[str, Any], webui_options: Dict[str, Any] | 
     for service_name, service_instance in services.items():
         app.config[service_name.upper()] = service_instance
 
+    public_base_url = normalize_public_base_url(webui_options.get("public_base_url"))
+    app.config["PUBLIC_BASE_URL"] = public_base_url
+    app.config["UNITY_ALLOWED_ORIGINS"] = webui_options.get("unity_allowed_origins", [])
     app.config["LINUXDO_OAUTH_CONFIG"] = webui_options.get("linuxdo_oauth", {})
+    if public_base_url.startswith("https://"):
+        app.config.setdefault("SESSION_COOKIE_SECURE", True)
+        app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+
     app.register_blueprint(player_bp, url_prefix="/player")
     app.register_blueprint(user_api_bp)
+    app.register_blueprint(unity_api_bp)
+    register_unity_user_api_routes(app)
+    install_unity_cors(app)
 
     @app.route("/")
     def root():
@@ -948,7 +964,6 @@ async def linuxdo_oauth_callback():
     return redirect(url_for("player_bp.login"))
 
 
-@player_bp.route("/oauth/linuxdo/status")
 async def linuxdo_oauth_status():
     """给 Unity 轮询 Linux.do OAuth 状态"""
     device_code = _sanitize_unity_device_code(request.args.get("device_code", ""))
@@ -962,7 +977,6 @@ async def linuxdo_oauth_status():
     return jsonify(_build_unity_linuxdo_status_response(payload))
 
 
-@player_bp.route("/oauth/linuxdo/consume", methods=["POST"])
 async def consume_linuxdo_oauth_for_unity():
     """给 Unity 消费一次性 Linux.do 登录票据并建立自己的 session cookie"""
     form = await request.form
