@@ -2557,6 +2557,68 @@ async def get_pokedex():
         return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
 
 
+@user_api_bp.route("/titles", methods=["GET"])
+@api_login_required
+async def get_user_titles():
+    """获取当前用户拥有的称号列表"""
+    user_id = session.get("user_id")
+
+    try:
+        user_service = current_app.config["USER_SERVICE"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: USER_SERVICE未找到 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = user_service.get_user_titles(user_id)
+        titles = result.get("titles", []) if result.get("success") else []
+        current_title = next((title for title in titles if title.get("is_current")), None)
+        result["current_title_id"] = current_title.get("title_id") if current_title else None
+        result["current_title_name"] = current_title.get("name") if current_title else "无称号"
+        return jsonify(result), 200 if result.get("success") else 400
+    except Exception as e:
+        logger.error(f"获取用户称号失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/titles/equip", methods=["POST"])
+@api_login_required
+async def equip_user_title():
+    """佩戴当前用户拥有的称号"""
+    user_id = session.get("user_id")
+
+    try:
+        user_service = current_app.config["USER_SERVICE"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: USER_SERVICE未找到 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    payload = await request.get_json(silent=True) or {}
+    form = await request.form
+    raw_title_id = payload.get("title_id") or form.get("title_id")
+
+    try:
+        title_id = int(raw_title_id or 0)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "称号参数无效"}), 400
+
+    if title_id <= 0:
+        return jsonify({"success": False, "message": "请选择要佩戴的称号"}), 400
+
+    try:
+        result = user_service.use_title(user_id, title_id)
+        titles_result = user_service.get_user_titles(user_id) if result.get("success") else {}
+        if titles_result.get("success"):
+            result["titles"] = titles_result.get("titles", [])
+            current_title = next((title for title in result["titles"] if title.get("is_current")), None)
+            result["current_title_id"] = current_title.get("title_id") if current_title else title_id
+            result["current_title_name"] = current_title.get("name") if current_title else "无称号"
+        return jsonify(result), 200 if result.get("success") else 400
+    except Exception as e:
+        logger.error(f"佩戴用户称号失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"佩戴失败: {str(e)}"}), 500
+
+
 @user_api_bp.route("/pokedex/reward/status", methods=["GET"])
 @api_login_required
 async def get_pokedex_reward_status():
