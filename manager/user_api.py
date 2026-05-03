@@ -122,10 +122,12 @@ def _build_tavern_rankings(users, inventory_repo, item_template_provider, limit:
         for index, user in enumerate(sorted_users[:limit]):
             user_id = getattr(user, "user_id", "") or ""
             rod_name, accessory_name = _get_equipped_item_names(inventory_repo, item_template_provider, user_id)
+            title_name = _get_current_title_name(item_template_provider, user)
             entries.append({
                 "rank": index + 1,
                 "user_id": user_id,
                 "nickname": _nickname(user),
+                "title_name": title_name or "无称号",
                 "coins": int(getattr(user, "coins", 0) or 0),
                 "diamonds": int(getattr(user, "premium_currency", 0) or 0),
                 "equipped_rod_name": rod_name,
@@ -2544,6 +2546,7 @@ async def get_pokedex():
         result = fishing_service.get_user_pokedex(user_id)
 
         if result.get("success"):
+            result["reward_status"] = fishing_service.get_pokedex_reward_status(user_id)
             logger.info(f"[WebUI] 图鉴查询成功: {user_id}, 解锁 {result.get('unlocked_fish_count', 0)}/{result.get('total_fish_count', 0)}")
             return jsonify(result)
 
@@ -2552,3 +2555,43 @@ async def get_pokedex():
     except Exception as e:
         logger.error(f"获取图鉴失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/pokedex/reward/status", methods=["GET"])
+@api_login_required
+async def get_pokedex_reward_status():
+    """获取用户图鉴奖励状态"""
+    user_id = session.get("user_id")
+
+    try:
+        fishing_service = current_app.config["FISHING_SERVICE"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: FISHING_SERVICE未找到 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = fishing_service.get_pokedex_reward_status(user_id)
+        return jsonify(result), 200 if result.get("success") else 400
+    except Exception as e:
+        logger.error(f"获取图鉴奖励状态失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/pokedex/reward/claim", methods=["POST"])
+@api_login_required
+async def claim_pokedex_reward():
+    """领取用户当前所有可领取的图鉴奖励"""
+    user_id = session.get("user_id")
+
+    try:
+        fishing_service = current_app.config["FISHING_SERVICE"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: FISHING_SERVICE未找到 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = fishing_service.claim_pokedex_rewards(user_id)
+        return jsonify(result), 200 if result.get("success") else 400
+    except Exception as e:
+        logger.error(f"领取图鉴奖励失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"领取失败: {str(e)}"}), 500
