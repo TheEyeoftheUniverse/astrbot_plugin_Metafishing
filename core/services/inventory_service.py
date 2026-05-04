@@ -316,6 +316,7 @@ class InventoryService:
                     "name": bait_template.name,
                     "rarity": bait_template.rarity,
                     "quantity": quantity,
+                    "description": bait_template.description,
                     "duration_minutes": bait_template.duration_minutes,
                     "effect_description": bait_template.effect_description,
                     # Bait 模型使用的是 success/quantity/rare_chance 这套字段，
@@ -390,6 +391,7 @@ class InventoryService:
                     "name": item_template.name,
                     "rarity": item_template.rarity,
                     "quantity": quantity,
+                    "description": item_template.description,
                     "effect_description": item_template.effect_description,
                     "effect_type": item_template.effect_type,
                     "user_friendly_description": user_friendly_desc,
@@ -1942,6 +1944,14 @@ class InventoryService:
         item_template = self.item_template_repo.get_item_by_id(item_id)
         if not item_template:
             return {"success": False, "message": "道具信息不存在"}
+
+        expedition_license_types = {26: "short", 27: "medium", 28: "long"}
+        if item_id in expedition_license_types:
+            if not self.expedition_service:
+                return {"success": False, "message": "科考系统暂不可用"}
+            if quantity != 1:
+                return {"success": False, "message": "科考许可证一次只能使用 1 张"}
+            return self.expedition_service.create_expedition(user_id, expedition_license_types[item_id])
 
         if self._supports_item_armed_state(item_template):
             current = self.is_template_armed(user_id, "item", item_id)

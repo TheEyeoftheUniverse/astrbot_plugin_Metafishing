@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}背包 - 钓鱼游戏{% endblock %}
+{% block title %}背包 - MetaFishing！{% endblock %}
 
 {% block content %}
 {% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
@@ -198,16 +198,15 @@
                                         <i class="fas fa-hand-sparkles"></i>
                                     </button>
                                 {% endif %}
-                                {% if not item.is_armed %}
-                                    <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                {% endif %}
                             </div>
                         </div>
-                        <p class="text-muted small mb-2 flex-grow-1 inventory-description">
-                            {{ item.user_friendly_description or '暂无描述' }}
+                        <p class="text-muted small mb-2 inventory-description">
+                            {{ item.description or '暂无描述' }}
                         </p>
+                        <hr class="inventory-divider">
+                        <div class="small flex-grow-1 inventory-stats inventory-usage-description">
+                            <p class="mb-1"><i class="fas fa-wand-magic-sparkles text-info"></i> {{ item.effect_description or item.user_friendly_description or '暂无用途描述' }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -242,17 +241,14 @@
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 {% endif %}
-                                {% if not bait_active %}
-                                    <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                {% endif %}
                             </div>
                         </div>
-                        <p class="text-muted small mb-2 flex-grow-1 inventory-description">
-                            {{ bait.effect_description or '暂无描述' }}
+                        <p class="text-muted small mb-2 inventory-description">
+                            {{ bait.description or '暂无描述' }}
                         </p>
-                        <div class="small mb-2 inventory-stats">
+                        <hr class="inventory-divider">
+                        <div class="small flex-grow-1 inventory-stats inventory-usage-description">
+                            <p class="mb-1"><i class="fas fa-wand-magic-sparkles text-info"></i> {{ bait.effect_description or '暂无用途描述' }}</p>
                             {% if bait.fish_quality_bonus %}
                             <p class="mb-1"><i class="fas fa-arrow-up text-success"></i> 品质加成: +{{ "%.1f" | format((bait.fish_quality_bonus - 1) * 100) }}%</p>
                             {% endif %}
@@ -414,7 +410,15 @@ async function refineAccessory(code, name, currentLevel) {
 }
 
 async function useItem(itemId, itemName, quantity) {
-    const qty = prompt(`请输入要使用的 ${itemName} 数量 (最多 ${quantity} 个):`, '1');
+    const qty = await webuiPrompt(`请输入要使用的【${itemName}】数量。\n最多 ${quantity} 个。`, {
+        title: '使用道具',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        max: String(quantity),
+        step: '1',
+        confirmText: '使用'
+    });
     if (!qty || qty <= 0) return;
 
     const amount = parseInt(qty);
@@ -447,7 +451,10 @@ async function toggleItemState(itemId) {
 }
 
 async function useBait(baitId, baitName, quantity) {
-    if (!confirm(`确认使用鱼饵【${baitName}】吗？\n使用后将激活鱼饵效果。`)) {
+    if (!await webuiConfirm(`确认使用鱼饵【${baitName}】吗？\n使用后将激活鱼饵效果。`, {
+        title: '使用鱼饵',
+        confirmText: '使用'
+    })) {
         return;
     }
 
@@ -475,22 +482,38 @@ async function deactivateBait(baitId, baitName) {
 }
 
 async function deleteRod(code, name) {
-    if (!confirm(`确认删除鱼竿【${name}】吗？`)) return;
+    if (!await webuiConfirm(`确认删除鱼竿【${name}】吗？`, {
+        title: '删除鱼竿',
+        confirmText: '删除',
+        confirmClass: 'btn-danger'
+    })) return;
     await postInventoryAction('{{ url_for("player_bp.api_delete_rod") }}', {rod_code: code});
 }
 
 async function deleteAccessory(code, name) {
-    if (!confirm(`确认删除饰品【${name}】吗？`)) return;
+    if (!await webuiConfirm(`确认删除饰品【${name}】吗？`, {
+        title: '删除饰品',
+        confirmText: '删除',
+        confirmClass: 'btn-danger'
+    })) return;
     await postInventoryAction('{{ url_for("player_bp.api_delete_accessory") }}', {accessory_code: code});
 }
 
 async function deleteItem(itemId, name, quantity) {
-    if (!confirm(`确认删除全部【${name}】x${quantity} 吗？`)) return;
+    if (!await webuiConfirm(`确认删除全部【${name}】x${quantity} 吗？`, {
+        title: '删除道具',
+        confirmText: '删除',
+        confirmClass: 'btn-danger'
+    })) return;
     await postInventoryAction('{{ url_for("player_bp.api_delete_item") }}', {item_id: itemId, quantity: quantity});
 }
 
 async function deleteBait(baitId, name, quantity) {
-    if (!confirm(`确认删除全部鱼饵【${name}】x${quantity} 吗？`)) return;
+    if (!await webuiConfirm(`确认删除全部鱼饵【${name}】x${quantity} 吗？`, {
+        title: '删除鱼饵',
+        confirmText: '删除',
+        confirmClass: 'btn-danger'
+    })) return;
     await postInventoryAction('{{ url_for("player_bp.api_delete_bait") }}', {bait_id: baitId, quantity: quantity});
 }
 

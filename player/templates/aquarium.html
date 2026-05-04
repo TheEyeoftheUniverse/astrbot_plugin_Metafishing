@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}水族箱 - 钓鱼游戏{% endblock %}
+{% block title %}水族箱 - MetaFishing！{% endblock %}
 
 {% block content %}
 {% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
@@ -201,7 +201,10 @@ function filterByRarity(rarity) {
 }
 
 async function upgradeAquariumCapacity() {
-    if (!confirm('确认升级水族箱容量吗？')) {
+    if (!await webuiConfirm('确认升级水族箱容量吗？', {
+        title: '升级水族箱',
+        confirmText: '确认升级'
+    })) {
         return;
     }
 
@@ -224,7 +227,15 @@ async function upgradeAquariumCapacity() {
 }
 
 async function removeFromAquarium(fishId, qualityLevel, fishName, maxQuantity) {
-    const quantity = prompt(`请输入要移回鱼塘的数量 (最多 ${maxQuantity} 条):`, '1');
+    const quantity = await webuiPrompt(`请输入要移回鱼塘的【${fishName}】数量。\n最多 ${maxQuantity} 条。`, {
+        title: '移回鱼塘',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        max: String(maxQuantity),
+        step: '1',
+        confirmText: '移回'
+    });
     if (!quantity || quantity <= 0) return;
 
     const qty = parseInt(quantity);
@@ -374,7 +385,11 @@ async function executeBatchRemoveFromAquarium() {
 
 // 从水族箱删除展览评论
 async function deleteExhibitionCommentFromAquarium(fishKey, commentId) {
-    if (!confirm('确认删除这条留言吗？')) {
+    if (!await webuiConfirm('确认删除这条留言吗？', {
+        title: '删除留言',
+        confirmText: '删除',
+        confirmClass: 'btn-danger'
+    })) {
         return;
     }
 

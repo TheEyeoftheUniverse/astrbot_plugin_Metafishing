@@ -262,7 +262,7 @@ def draw_help_image():
         draw.text((logo_x + logo_size // 2, logo_y + logo_size // 2), "LOGO",
                   fill=(120, 120, 120), font=subtitle_font, anchor="mm")
 
-    draw.text((width // 2, title_y), "钓鱼游戏帮助", fill=title_color, font=title_font, anchor="mm")
+    draw.text((width // 2, title_y), "MetaFishing！帮助", fill=title_color, font=title_font, anchor="mm")
 
     # 重新基于真实 draw 定义尺寸函数
     def get_text_size(text, font):

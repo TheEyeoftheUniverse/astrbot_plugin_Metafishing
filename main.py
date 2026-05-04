@@ -445,7 +445,7 @@ class FishingPlugin(Star):
 
     @filter.command("注册")
     async def register_user(self, event: AstrMessageEvent):
-        """注册成为钓鱼游戏玩家，开始你的钓鱼之旅"""
+        """注册成为 MetaFishing！玩家，开始你的钓鱼之旅"""
         async for r in common_handlers.register_user(self, event):
             yield r
 
@@ -475,7 +475,7 @@ class FishingPlugin(Star):
 
     @filter.command("钓鱼帮助", alias={"钓鱼菜单", "菜单"})
     async def fishing_help(self, event: AstrMessageEvent):
-        """查看钓鱼游戏的帮助信息和所有可用命令"""
+        """查看 MetaFishing！的帮助信息和所有可用命令"""
         async for r in common_handlers.fishing_help(self, event):
             yield r
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}钓鱼游戏{% endblock %}</title>
+    <title>{% block title %}MetaFishing！{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/litera/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css') }}">
@@ -14,7 +14,7 @@
 <nav class="navbar navbar-expand-lg navbar-light player-topbar fixed-top">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('player_bp.index') }}">
-            <i class="fas fa-gamepad"></i> 钓鱼游戏
+            <i class="fas fa-gamepad"></i> MetaFishing！
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
@@ -105,7 +105,7 @@
 <footer class="editorial-footer py-3 text-center">
     <div class="container">
         <p class="text-muted mb-0">
-            <i class="fas fa-fish"></i> 钓鱼游戏 WebUI &copy; 2025
+            <i class="fas fa-fish"></i> MetaFishing！ WebUI &copy; 2025
         </p>
     </div>
 </footer>
@@ -129,12 +129,124 @@
     </div>
 </div>
 
+<div class="modal fade" id="webuiActionModal" tabindex="-1" aria-labelledby="webuiActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="webuiActionModalLabel">确认操作</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 action-modal-message" id="webuiActionModalMessage" style="white-space: pre-line;"></p>
+                <input class="form-control d-none" id="webuiActionModalInput" type="text">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="webuiActionModalCancel" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="webuiActionModalConfirm">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function formatRarityStars(value) {
     const rarity = Number(value) || 0;
     if (rarity <= 0) return '-';
     return `${rarity}${rarity <= 5 ? '☆' : '★'}`;
+}
+
+function webuiConfirm(message, options = {}) {
+    return new Promise((resolve) => {
+        const modalEl = document.getElementById('webuiActionModal');
+        const titleEl = document.getElementById('webuiActionModalLabel');
+        const messageEl = document.getElementById('webuiActionModalMessage');
+        const inputEl = document.getElementById('webuiActionModalInput');
+        const cancelBtn = document.getElementById('webuiActionModalCancel');
+        const confirmBtn = document.getElementById('webuiActionModalConfirm');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let resolved = false;
+
+        titleEl.textContent = options.title || '确认操作';
+        messageEl.textContent = message || '';
+        inputEl.classList.add('d-none');
+        inputEl.value = '';
+        cancelBtn.textContent = options.cancelText || '取消';
+        confirmBtn.textContent = options.confirmText || '确认';
+        confirmBtn.className = `btn ${options.confirmClass || 'btn-primary'}`;
+
+        const cleanup = (value) => {
+            if (resolved) return;
+            resolved = true;
+            confirmBtn.onclick = null;
+            modalEl.addEventListener('hidden.bs.modal', () => resolve(value), {once: true});
+            modal.hide();
+        };
+
+        confirmBtn.onclick = () => cleanup(true);
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            if (!resolved) {
+                resolved = true;
+                confirmBtn.onclick = null;
+                resolve(false);
+            }
+        }, {once: true});
+
+        modal.show();
+    });
+}
+
+function webuiPrompt(message, options = {}) {
+    return new Promise((resolve) => {
+        const modalEl = document.getElementById('webuiActionModal');
+        const titleEl = document.getElementById('webuiActionModalLabel');
+        const messageEl = document.getElementById('webuiActionModalMessage');
+        const inputEl = document.getElementById('webuiActionModalInput');
+        const cancelBtn = document.getElementById('webuiActionModalCancel');
+        const confirmBtn = document.getElementById('webuiActionModalConfirm');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let resolved = false;
+
+        titleEl.textContent = options.title || '输入数量';
+        messageEl.textContent = message || '';
+        inputEl.classList.remove('d-none');
+        inputEl.type = options.inputType || 'text';
+        inputEl.value = options.defaultValue ?? '';
+        inputEl.min = options.min ?? '';
+        inputEl.max = options.max ?? '';
+        inputEl.step = options.step ?? '';
+        cancelBtn.textContent = options.cancelText || '取消';
+        confirmBtn.textContent = options.confirmText || '确认';
+        confirmBtn.className = `btn ${options.confirmClass || 'btn-primary'}`;
+
+        const cleanup = (value) => {
+            if (resolved) return;
+            resolved = true;
+            confirmBtn.onclick = null;
+            inputEl.onkeydown = null;
+            modalEl.addEventListener('hidden.bs.modal', () => resolve(value), {once: true});
+            modal.hide();
+        };
+
+        confirmBtn.onclick = () => cleanup(inputEl.value);
+        inputEl.onkeydown = (event) => {
+            if (event.key === 'Enter') cleanup(inputEl.value);
+        };
+        modalEl.addEventListener('shown.bs.modal', () => {
+            inputEl.focus();
+            inputEl.select();
+        }, {once: true});
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            if (!resolved) {
+                resolved = true;
+                confirmBtn.onclick = null;
+                inputEl.onkeydown = null;
+                resolve(null);
+            }
+        }, {once: true});
+
+        modal.show();
+    });
 }
 
 // 从 localStorage 恢复通知面板状态

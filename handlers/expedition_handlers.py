@@ -90,7 +90,7 @@ class ExpeditionHandlers:
             if len(parts) < 2:
                 return {
                     "success": False,
-                    "message": "用法：/加入科考 <邀请码>\n示例：/加入科考 EXP20260108001"
+                    "message": "用法：/加入科考 <邀请码>\n示例：/加入科考 123456"
                 }
             
             expedition_id = parts[1].strip()
@@ -166,25 +166,25 @@ class ExpeditionHandlers:
 ━━━━ 📋 科考类型 ━━━━
 🌊 探险（24小时）
     ▸ 队长需要：探险许可证
-  ▸ 队员需要：探险通行证
+  ▸ 队员需要：科考通行证
   ▸ 目标：1-3星各100条 | 4星50条 | 5星10条
   ▸ 钻石奖池：1000钻石
 
 ⚔️ 征服（48小时）
     ▸ 队长需要：征服许可证
-  ▸ 队员需要：征服通行证
+  ▸ 队员需要：科考通行证
   ▸ 目标：1-3星各500条 | 4星100条 | 5星50条
   ▸ 钻石奖池：5000钻石
 
 👑 圣域（72小时）
     ▸ 队长需要：圣域许可证
-  ▸ 队员需要：圣域通行证
+  ▸ 队员需要：科考通行证
   ▸ 目标：1-3星各1000条 | 4星500条 | 5星100条
   ▸ 钻石奖池：10000钻石
 
 ━━━━ 🎮 参与规则 ━━━━
 ▸ 发起者消耗对应等级的许可证创建科考
-▸ 队员加入时消耗一张对应等级的通行证（队长不消耗）
+▸ 队员加入时消耗一张科考通行证（队长不消耗）
 ▸ 每个玩家同时只能参与一个科考
 ▸ 科考不会因为超时自动结算
 ▸ 全部任务完成后，成员各自领取自己的奖励
@@ -228,41 +228,3 @@ class ExpeditionHandlers:
         user_id = event.get_sender_id()
         result = self.expedition_service.test_complete_expedition(user_id)
         return result
-
-
-# 命令注册辅助函数
-def register_expedition_handlers(plugin, expedition_service: ExpeditionService):
-    """注册科考相关命令"""
-    handlers = ExpeditionHandlers(expedition_service)
-    
-    @plugin.cmd_handler("/发起科考", "发起科考队伍", example="/发起科考 探险 [@用户1 @用户2]")
-    async def cmd_start_expedition(plugin, event):
-        result = await handlers.start_expedition(plugin, event)
-        await plugin.send_text(result["message"], event)
-    
-    @plugin.cmd_handler("/加入科考", "加入科考队伍", example="/加入科考 EXP20260108001")
-    async def cmd_join_expedition(plugin, event):
-        result = await handlers.join_expedition(plugin, event)
-        await plugin.send_text(result["message"], event)
-    
-    @plugin.cmd_handler("/退出科考", "退出当前科考队伍", example="/退出科考")
-    async def cmd_leave_expedition(plugin, event):
-        result = await handlers.leave_expedition(plugin, event)
-        await plugin.send_text(result["message"], event)
-    
-    @plugin.cmd_handler("/科考状态", "查看当前科考进度", example="/科考状态")
-    async def cmd_expedition_status(plugin, event):
-        result = await handlers.expedition_status(plugin, event)
-        await plugin.send_text(result["message"], event)
-    
-    @plugin.cmd_handler("/结束科考", "结束科考并结算（仅队长）", example="/结束科考")
-    async def cmd_end_expedition(plugin, event):
-        result = await handlers.end_expedition(plugin, event)
-        await plugin.send_text(result["message"], event)
-    
-    @plugin.cmd_handler("/科考帮助", "查看科考系统帮助", example="/科考帮助")
-    async def cmd_expedition_help(plugin, event):
-        result = await handlers.expedition_help(plugin, event)
-        await plugin.send_text(result["message"], event)
-    
-    logger.info("科考命令已注册")

@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}鱼塘 - 钓鱼游戏{% endblock %}
+{% block title %}鱼塘 - MetaFishing！{% endblock %}
 
 {% block content %}
 {% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
@@ -186,7 +186,10 @@ function filterByRarity(rarity) {
 }
 
 async function upgradeFishpondCapacity() {
-    if (!confirm('确认升级鱼塘容量吗？')) {
+    if (!await webuiConfirm('确认升级鱼塘容量吗？', {
+        title: '升级鱼塘',
+        confirmText: '确认升级'
+    })) {
         return;
     }
 
@@ -230,7 +233,15 @@ async function sellAllFish() {
 }
 
 async function sellFish(fishId, qualityLevel, fishName, maxQuantity) {
-    const quantity = prompt(`请输入要出售的数量 (最多 ${maxQuantity} 条):`, '1');
+    const quantity = await webuiPrompt(`请输入要出售的【${fishName}】数量。\n最多 ${maxQuantity} 条。`, {
+        title: '出售鱼类',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        max: String(maxQuantity),
+        step: '1',
+        confirmText: '出售'
+    });
     if (!quantity || quantity <= 0) return;
 
     const qty = parseInt(quantity);
@@ -263,7 +274,15 @@ async function sellFish(fishId, qualityLevel, fishName, maxQuantity) {
 }
 
 async function moveToAquarium(fishId, qualityLevel, fishName, maxQuantity) {
-    const quantity = prompt(`请输入要放入水族箱的数量 (最多 ${maxQuantity} 条):`, '1');
+    const quantity = await webuiPrompt(`请输入要放入水族箱的【${fishName}】数量。\n最多 ${maxQuantity} 条。`, {
+        title: '放入水族箱',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        max: String(maxQuantity),
+        step: '1',
+        confirmText: '放入'
+    });
     if (!quantity || quantity <= 0) return;
 
     const qty = parseInt(quantity);

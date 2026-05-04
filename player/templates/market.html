@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}交易市场 - 钓鱼游戏{% endblock %}
+{% block title %}交易市场 - MetaFishing！{% endblock %}
 
 {% block content %}
 {% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
@@ -476,7 +476,10 @@ async function listItem() {
 
 // 购买物品
 async function buyMarketItem(marketId, itemName, price) {
-    if (!confirm(`确认购买【${itemName}】吗？\n价格: ${price} 金币`)) {
+    if (!await webuiConfirm(`确认购买【${itemName}】吗？\n价格: ${price} 金币`, {
+        title: '购买市场商品',
+        confirmText: '购买'
+    })) {
         return;
     }
 
@@ -501,7 +504,11 @@ async function buyMarketItem(marketId, itemName, price) {
 
 // 下架物品
 async function delistItem(marketId, itemName) {
-    if (!confirm(`确认下架【${itemName}】吗？`)) {
+    if (!await webuiConfirm(`确认下架【${itemName}】吗？`, {
+        title: '下架商品',
+        confirmText: '下架',
+        confirmClass: 'btn-danger'
+    })) {
         return;
     }
 

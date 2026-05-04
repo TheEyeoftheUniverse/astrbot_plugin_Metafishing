@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}商店 - 钓鱼游戏{% endblock %}
+{% block title %}商店 - MetaFishing！{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -63,7 +63,10 @@
                                 <div class="card-icon-actions shop-item-actions">
                                     <button class="btn btn-sm {% if item_data.can_purchase %}btn-primary{% else %}btn-outline-secondary{% endif %}"
                                             title="{% if item_data.can_purchase %}购买{% else %}{{ item_data.purchase_disabled_reason or '无法购买' }}{% endif %}"
-                                            onclick="buyShopItem({{ item.item_id }}, {{ item.name|tojson }}, {{ shop.shop_id }})"
+                                            data-item-id="{{ item.item_id }}"
+                                            data-item-name="{{ item.name|e }}"
+                                            data-shop-id="{{ shop.shop_id }}"
+                                            onclick="buyShopItemFromButton(this)"
                                             {% if not item_data.can_purchase %}disabled{% endif %}>
                                         <i class="fas fa-shopping-cart"></i>
                                     </button>
@@ -223,8 +226,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function buyShopItemFromButton(button) {
+    const itemId = Number(button.dataset.itemId || 0);
+    const itemName = button.dataset.itemName || '商品';
+    const shopId = Number(button.dataset.shopId || 0);
+    buyShopItem(itemId, itemName, shopId);
+}
+
 async function buyShopItem(itemId, itemName, shopId) {
-    const quantity = prompt(`请输入购买 ${itemName} 的数量:`, '1');
+    const quantity = await webuiPrompt(`请输入购买【${itemName}】的数量。`, {
+        title: '购买商品',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        step: '1',
+        confirmText: '购买'
+    });
     if (!quantity || quantity <= 0) return;
 
     const qty = parseInt(quantity);

@@ -292,13 +292,24 @@ def _serialize_tavern_expedition(expedition):
     total_progress = max(0.0, min(1.0, total_progress))
     contribution_board = _build_tavern_expedition_contribution_board(expedition)
     current_user_id = session.get("user_id", "") or ""
+    participants = expedition.get("participants", {}) if isinstance(expedition.get("participants", {}), dict) else {}
     rewards = expedition.get("rewards", {}) if isinstance(expedition.get("rewards", {}), dict) else {}
     current_reward = rewards.get(current_user_id, {}) if current_user_id else {}
     current_user_claimed = bool(current_reward.get("claimed")) if isinstance(current_reward, dict) else False
+    is_current_user_member = bool(current_user_id) and current_user_id in participants
+    is_current_user_creator = bool(current_user_id) and current_user_id == expedition.get("creator_id")
+    can_show_invite_code = bool(expedition.get("invite_public", False)) or is_current_user_creator
+    can_toggle_invite_public = is_current_user_creator and expedition.get("status", "active") == "active"
+    can_join_via_public_invite = (
+        bool(expedition.get("invite_public", False))
+        and expedition.get("status", "active") == "active"
+        and bool(current_user_id)
+        and not is_current_user_member
+    )
     current_user_can_claim = (
         expedition.get("status", "active") == "claimable"
         and bool(current_user_id)
-        and current_user_id in (expedition.get("participants", {}) if isinstance(expedition.get("participants", {}), dict) else {})
+        and current_user_id in participants
         and isinstance(current_reward, dict)
         and not current_user_claimed
     )
@@ -306,11 +317,18 @@ def _serialize_tavern_expedition(expedition):
     return {
         "expedition_id": expedition.get("expedition_id", "") or "",
         "type": expedition.get("type", "") or "",
+        "creator_id": expedition.get("creator_id", "") or "",
         "creator_name": expedition.get("creator_name", "") or "",
-        "member_count": int(expedition.get("member_count", 0) or 0),
+        "member_count": int(expedition.get("member_count", 0) or len(participants)),
         "total_progress": total_progress,
         "progress_percent": round(total_progress * 100.0, 1),
         "status": expedition.get("status", "active") or "active",
+        "invite_public": bool(expedition.get("invite_public", False)),
+        "is_current_user_member": is_current_user_member,
+        "is_current_user_creator": is_current_user_creator,
+        "can_show_invite_code": can_show_invite_code,
+        "can_toggle_invite_public": can_toggle_invite_public,
+        "can_join_via_public_invite": can_join_via_public_invite,
         "is_completed": total_progress >= 1.0 or expedition.get("status") == "claimable",
         "current_user_can_claim": current_user_can_claim,
         "current_user_claimed": current_user_claimed,
@@ -2438,6 +2456,47 @@ async def claim_tavern_expedition_reward(expedition_id):
     except Exception as e:
         logger.error(f"领取科考奖励失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": f"领取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/tavern/expeditions/<expedition_id>/publish-invite", methods=["POST"])
+@api_login_required
+async def publish_tavern_expedition_invite(expedition_id):
+    """公开当前用户作为队长的科考邀请码。"""
+    user_id = session.get("user_id", "") or ""
+    expedition_service = current_app.config.get("EXPEDITION_SERVICE")
+    if expedition_service is None:
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        payload = await request.get_json(silent=True)
+        public = True
+        if isinstance(payload, dict) and "public" in payload:
+            public = bool(payload.get("public"))
+
+        result = expedition_service.set_expedition_invite_public(user_id, expedition_id, public)
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    except Exception as e:
+        logger.error(f"公开科考邀请码失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"公开失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/tavern/expeditions/<expedition_id>/join", methods=["POST"])
+@api_login_required
+async def join_tavern_public_expedition(expedition_id):
+    """通过公告板公开的邀请码加入科考。"""
+    user_id = session.get("user_id", "") or ""
+    expedition_service = current_app.config.get("EXPEDITION_SERVICE")
+    if expedition_service is None:
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = expedition_service.join_public_expedition(user_id, expedition_id)
+        status_code = 200 if result.get("success") else 400
+        return jsonify(result), status_code
+    except Exception as e:
+        logger.error(f"加入公开科考失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"加入失败: {str(e)}"}), 500
 
 
 @user_api_bp.route("/tavern/expeditions/<expedition_id>/special-event", methods=["GET"])

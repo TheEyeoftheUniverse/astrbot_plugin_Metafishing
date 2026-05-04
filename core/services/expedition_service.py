@@ -19,8 +19,9 @@ from ..utils import get_now
 class ExpeditionService:
     """科学考察服务"""
 
-    # 参与者加入科考所需的通行证物品 ID
-    _JOIN_PASS_ITEM_IDS = {"short": 38, "medium": 39, "long": 40}
+    # 科考相关道具 ID
+    _LICENSE_ITEM_IDS = {"short": 26, "medium": 27, "long": 28}
+    _JOIN_PASS_ITEM_ID = 29
 
     def __init__(
         self,
@@ -380,9 +381,8 @@ class ExpeditionService:
         return {"changed": True, "status": "ended", "message": expedition["settlement_report"]}
 
     def _generate_expedition_id(self) -> str:
-        """生成科考ID"""
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        return f"EXP{timestamp}{random.randint(100, 999)}"
+        """生成 6 位数字邀请码。"""
+        return f"{random.randint(100000, 999999)}"
 
     def _get_target_zone_ids(self, expedition_type: str) -> List[int]:
         """根据科考类型返回允许抽取目标鱼的区域列表。"""
@@ -432,9 +432,9 @@ class ExpeditionService:
         Returns:
             None 表示通行证已成功消耗；否则返回失败原因文案。
         """
-        pass_item_id = self._JOIN_PASS_ITEM_IDS.get(expedition_type)
-        if pass_item_id is None:
+        if expedition_type not in self._LICENSE_ITEM_IDS:
             return "未知的科考类型"
+        pass_item_id = self._JOIN_PASS_ITEM_ID
 
         user_items = self.inventory_repo.get_user_item_inventory(user_id)
         item_count = user_items.get(pass_item_id, 0)
@@ -474,19 +474,19 @@ class ExpeditionService:
                 "duration_hours": 24,
                 "targets": 100,
                 "base_reward": 100,
-                "required_item_id": 35,  # 探险许可证
+                "required_item_id": self._LICENSE_ITEM_IDS["short"],  # 探险许可证
             },
             "medium": {
                 "duration_hours": 48,
                 "targets": 500,
                 "base_reward": 500,
-                "required_item_id": 36,  # 征服许可证
+                "required_item_id": self._LICENSE_ITEM_IDS["medium"],  # 征服许可证
             },
             "long": {
                 "duration_hours": 72,
                 "targets": 1000,
                 "base_reward": 1000,
-                "required_item_id": 37,  # 圣域许可证
+                "required_item_id": self._LICENSE_ITEM_IDS["long"],  # 圣域许可证
             },
         }
 
@@ -507,9 +507,6 @@ class ExpeditionService:
         
         # 消耗许可证
         self.inventory_repo.update_item_quantity(creator_id, required_item_id, -1)
-        
-        # 生成科考ID和邀请码
-        expedition_id = self._generate_expedition_id()
         
         allowed_zone_ids = self._get_target_zone_ids(expedition_type)
 
@@ -546,7 +543,7 @@ class ExpeditionService:
         end_time = now + timedelta(hours=config["duration_hours"])
         
         expedition = {
-            "expedition_id": expedition_id,
+            "expedition_id": "",
             "type": expedition_type,
             "start_time": now.strftime("%Y-%m-%d %H:%M:%S"),
             "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -570,6 +567,7 @@ class ExpeditionService:
             },
             "total_progress": 0.0,
             "status": "active",
+            "invite_public": False,
             "rare_fish_caught": {}  # 记录成员钓起的6~10星鱼ID: {user_id: [fish_ids]}
         }
 
@@ -613,6 +611,11 @@ class ExpeditionService:
         # 保存科考数据
         with self._expedition_lock:
             expeditions = self._load_expeditions()
+            expedition_id = self._generate_expedition_id()
+            while expedition_id in expeditions:
+                expedition_id = self._generate_expedition_id()
+
+            expedition["expedition_id"] = expedition_id
             expeditions[expedition_id] = expedition
             self._save_expeditions(expeditions)
 
@@ -735,6 +738,49 @@ class ExpeditionService:
             if user_id in exp["participants"] and exp["status"] == "active":
                 return exp
         return None
+
+    def get_expedition_by_id(self, expedition_id: str) -> Optional[Dict[str, Any]]:
+        """按邀请码获取当前科考。"""
+        if not expedition_id:
+            return None
+        expeditions = self._load_expeditions()
+        expedition = expeditions.get(str(expedition_id).strip())
+        return expedition if isinstance(expedition, dict) else None
+
+    def set_expedition_invite_public(self, user_id: str, expedition_id: str, public: bool = True) -> Dict[str, Any]:
+        """队长公开或取消公开科考邀请码。"""
+        if not expedition_id:
+            return {"success": False, "message": "邀请码不能为空"}
+
+        with self._expedition_lock:
+            expeditions = self._load_expeditions()
+            expedition = expeditions.get(str(expedition_id).strip())
+            if not isinstance(expedition, dict):
+                return {"success": False, "message": "科考不存在或已结束"}
+            if expedition.get("creator_id") != user_id:
+                return {"success": False, "message": "只有队长可以公开邀请码"}
+            if expedition.get("status") != "active":
+                return {"success": False, "message": "已结束的科考不能公开邀请码"}
+
+            expedition["invite_public"] = bool(public)
+            expeditions[expedition["expedition_id"]] = expedition
+            self._save_expeditions(expeditions)
+
+        return {
+            "success": True,
+            "message": "邀请码已公开" if public else "邀请码已取消公开",
+            "expedition_id": expedition_id,
+            "invite_public": bool(public),
+        }
+
+    def join_public_expedition(self, user_id: str, expedition_id: str) -> Dict[str, Any]:
+        """通过 WebUI 中公开的邀请码加入科考。"""
+        expedition = self.get_expedition_by_id(expedition_id)
+        if not isinstance(expedition, dict):
+            return {"success": False, "message": "科考不存在或已结束"}
+        if not expedition.get("invite_public", False):
+            return {"success": False, "message": "该科考邀请码尚未公开"}
+        return self.join_expedition(user_id, expedition_id)
 
     def get_user_claimable_expeditions(self, user_id: str) -> List[Dict[str, Any]]:
         """获取用户仍可领取奖励的科考列表。"""
@@ -1001,6 +1047,9 @@ class ExpeditionService:
 
         message_parts.append(f"📋 类型：{type_names.get(expedition['type'], expedition['type'])}")
         message_parts.append(f"👑 队长：{expedition['creator_name']}")
+        if expedition.get("creator_id") == user_id:
+            visibility_text = "已公开" if expedition.get("invite_public", False) else "未公开"
+            message_parts.append(f"🔑 邀请码：{expedition_id}（{visibility_text}）")
         message_parts.append(f"👥 成员：{len(expedition['participants'])}人")
         message_parts.append(f"📊 总进度：{expedition['total_progress'] * 100:.1f}%")
         message_parts.append("")
@@ -1374,12 +1423,23 @@ class ExpeditionService:
                     continue
 
                 rewards = exp.get("rewards", {}) if isinstance(exp.get("rewards", {}), dict) else {}
+                participants = exp.get("participants", {}) if isinstance(exp.get("participants", {}), dict) else {}
                 current_reward = rewards.get(current_user_id, {}) if current_user_id else {}
                 current_user_claimed = bool(current_reward.get("claimed")) if isinstance(current_reward, dict) else False
+                is_current_user_member = bool(current_user_id) and current_user_id in participants
+                is_current_user_creator = bool(current_user_id) and current_user_id == exp.get("creator_id")
+                can_show_invite_code = bool(exp.get("invite_public", False)) or is_current_user_creator
+                can_toggle_invite_public = is_current_user_creator and exp.get("status") == "active"
+                can_join_via_public_invite = (
+                    exp.get("invite_public", False)
+                    and exp.get("status") == "active"
+                    and bool(current_user_id)
+                    and not is_current_user_member
+                )
                 current_user_can_claim = (
                     exp.get("status") == "claimable"
                     and bool(current_user_id)
-                    and current_user_id in exp.get("participants", {})
+                    and current_user_id in participants
                     and isinstance(current_reward, dict)
                     and not current_user_claimed
                 )
@@ -1387,12 +1447,19 @@ class ExpeditionService:
                 active_list.append({
                     "expedition_id": exp["expedition_id"],
                     "type": exp["type"],
+                    "creator_id": exp.get("creator_id", ""),
                     "creator_name": exp["creator_name"],
-                    "member_count": len(exp["participants"]),
+                    "member_count": len(participants),
                     "total_progress": exp["total_progress"],
                     "targets": exp["targets"],
-                    "participants": exp["participants"],
+                    "participants": participants,
                     "status": exp.get("status", "active"),
+                    "invite_public": bool(exp.get("invite_public", False)),
+                    "is_current_user_member": is_current_user_member,
+                    "is_current_user_creator": is_current_user_creator,
+                    "can_show_invite_code": can_show_invite_code,
+                    "can_toggle_invite_public": can_toggle_invite_public,
+                    "can_join_via_public_invite": can_join_via_public_invite,
                     "is_completed": self._is_expedition_completed(exp),
                     "current_user_can_claim": current_user_can_claim,
                     "current_user_claimed": current_user_claimed,
@@ -1404,6 +1471,11 @@ class ExpeditionService:
             if changed:
                 self._save_expeditions(expeditions)
 
+        active_list.sort(key=lambda item: (
+            0 if item.get("is_current_user_member") or item.get("is_current_user_creator") else 1,
+            0 if item.get("status") == "active" else 1,
+            item.get("expedition_id", ""),
+        ))
         return active_list
 
     def auto_settle_expired_expeditions(self) -> int:

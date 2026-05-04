@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# AstrBot 钓鱼插件
+# MetaFishing！
 
 </div>
 

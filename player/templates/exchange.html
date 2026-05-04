@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}期货 - 钓鱼游戏{% endblock %}
+{% block title %}期货 - MetaFishing！{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
@@ -349,7 +349,10 @@ if (document.getElementById('priceChart')) {
 
 // 开通账户
 async function openAccount() {
-    if (!confirm('确认免费开通期货账户吗？')) {
+    if (!await webuiConfirm('确认免费开通期货账户吗？', {
+        title: '开通账户',
+        confirmText: '免费开通'
+    })) {
         return;
     }
 
@@ -372,7 +375,10 @@ async function openAccount() {
 }
 
 async function upgradeCapacity() {
-    if (!confirm('确认升级期货容量吗？')) {
+    if (!await webuiConfirm('确认升级期货容量吗？', {
+        title: '升级容量',
+        confirmText: '确认升级'
+    })) {
         return;
     }
 
@@ -396,7 +402,14 @@ async function upgradeCapacity() {
 
 // 买入商品
 async function buyCommodity(commodityId, commodityName, currentPrice) {
-    const qty = prompt(`买入【${commodityName}】\n当前价格: ${currentPrice} 金币/个\n请输入买入数量:`, '1');
+    const qty = await webuiPrompt(`买入【${commodityName}】\n当前价格: ${currentPrice} 金币/个\n请输入买入数量。`, {
+        title: '买入商品',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        step: '1',
+        confirmText: '继续'
+    });
     if (!qty || qty <= 0) return;
 
     const quantity = parseInt(qty);
@@ -406,7 +419,10 @@ async function buyCommodity(commodityId, commodityName, currentPrice) {
     }
 
     const totalCost = quantity * currentPrice;
-    if (!confirm(`确认购买 ${quantity} 个【${commodityName}】吗？\n总价: ${totalCost} 金币`)) {
+    if (!await webuiConfirm(`确认购买 ${quantity} 个【${commodityName}】吗？\n总价: ${totalCost} 金币`, {
+        title: '确认买入',
+        confirmText: '买入'
+    })) {
         return;
     }
 
@@ -440,7 +456,15 @@ async function sellCommodity(commodityId, commodityName, currentPrice, maxQty) {
         return;
     }
 
-    const qty = prompt(`卖出【${commodityName}】\n当前价格: ${currentPrice} 金币/个\n持有数量: ${maxQty}\n请输入卖出数量:`, '1');
+    const qty = await webuiPrompt(`卖出【${commodityName}】\n当前价格: ${currentPrice} 金币/个\n持有数量: ${maxQty}\n请输入卖出数量。`, {
+        title: '卖出商品',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        max: String(maxQty),
+        step: '1',
+        confirmText: '继续'
+    });
     if (!qty || qty <= 0) return;
 
     const quantity = parseInt(qty);
@@ -450,7 +474,10 @@ async function sellCommodity(commodityId, commodityName, currentPrice, maxQty) {
     }
 
     const totalValue = quantity * currentPrice;
-    if (!confirm(`确认卖出 ${quantity} 个【${commodityName}】吗？\n总价: ${totalValue} 金币`)) {
+    if (!await webuiConfirm(`确认卖出 ${quantity} 个【${commodityName}】吗？\n总价: ${totalValue} 金币`, {
+        title: '确认卖出',
+        confirmText: '卖出'
+    })) {
         return;
     }
 
