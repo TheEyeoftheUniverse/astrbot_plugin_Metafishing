@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+
+{% block title %}个人信息 - 钓鱼游戏{% endblock %}
+
+{% block content %}
+<section class="page-hero mb-4">
+    <div>
+        <div class="editorial-kicker"><i class="fas fa-id-card"></i> Player Notes</div>
+        <h2>个人信息</h2>
+        <p class="text-muted mb-0 mt-2">管理昵称、称号和 WebUI/App 登录密钥。</p>
+    </div>
+</section>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-user-pen"></i> 基础资料</h5>
+                <form method="post" action="{{ url_for('player_bp.update_profile_nickname') }}" class="mb-4">
+                    <label class="form-label" for="nickname">玩家昵称</label>
+                    <div class="input-group">
+                        <input class="form-control" id="nickname" name="nickname" maxlength="24" value="{{ user.nickname or user.user_id }}" required>
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-check"></i> 保存
+                        </button>
+                    </div>
+                </form>
+
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="form-label">玩家ID</label>
+                        <input class="form-control" value="{{ user.user_id }}" readonly>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label">初始密码</label>
+                        <input class="form-control" value="{{ initial_password }}" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-trophy"></i> 玩家称号</h5>
+                <form method="post" action="{{ url_for('player_bp.update_profile_title') }}">
+                    <label class="form-label" for="title_id">选择称号</label>
+                    <div class="input-group">
+                        <select class="form-select" id="title_id" name="title_id" {% if not titles %}disabled{% endif %}>
+                            {% for title in titles %}
+                            <option value="{{ title.title_id }}" {% if title.is_current %}selected{% endif %}>
+                                {{ title.name }}{% if title.is_current %}（当前）{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-primary" type="submit" {% if not titles %}disabled{% endif %}>
+                            <i class="fas fa-medal"></i> 佩戴
+                        </button>
+                    </div>
+                </form>
+                {% if titles %}
+                    {% set current = titles | selectattr('is_current') | list %}
+                    <p class="text-muted small mb-0 mt-3">
+                        当前称号：{{ current[0].name if current else '未佩戴' }}
+                    </p>
+                {% else %}
+                    <p class="text-muted small mb-0 mt-3">还没有可佩戴的称号。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-key"></i> 修改登录密钥</h5>
+                <form method="post" action="{{ url_for('player_bp.update_profile_password') }}">
+                    <div class="mb-3">
+                        <label class="form-label" for="old_password">旧密码</label>
+                        <input type="password" class="form-control" id="old_password" name="old_password" autocomplete="current-password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="new_password">新密码</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" autocomplete="new-password" minlength="5" required>
+                    </div>
+                    <button class="btn btn-primary" type="submit">
+                        <i class="fas fa-check"></i> 确认修改
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

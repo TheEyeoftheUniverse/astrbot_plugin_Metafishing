@@ -39,6 +39,39 @@ def _load_migration_module(migrations_dir: str, filename: str):
     return module
 
 
+def _schema_latest_table_names(migrations_dir: str) -> set[str]:
+    schema_path = os.path.join(os.path.dirname(migrations_dir), "schema_latest.sql")
+    if not os.path.exists(schema_path):
+        return set()
+
+    with open(schema_path, "r", encoding="utf-8") as schema_file:
+        schema_sql = schema_file.read()
+
+    return {
+        match.group(1)
+        for match in re.finditer(
+            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[\"`]?([A-Za-z_][A-Za-z0-9_]*)[\"`]?",
+            schema_sql,
+            flags=re.IGNORECASE,
+        )
+    }
+
+
+def _database_matches_latest_schema(cursor: sqlite3.Cursor, migrations_dir: str) -> bool:
+    required_tables = _schema_latest_table_names(migrations_dir)
+    if not required_tables:
+        return False
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    existing_tables = {row[0] for row in cursor.fetchall()}
+    missing_tables = sorted(required_tables - existing_tables)
+    if missing_tables:
+        logger.debug(f"数据库尚未满足最新基线结构，缺少表: {missing_tables}")
+        return False
+
+    return True
+
+
 def run_migrations(db_path: str, migrations_dir: str):
     """
     运行所有待处理的数据库迁移脚本。
@@ -61,6 +94,16 @@ def run_migrations(db_path: str, migrations_dir: str):
             logger.info("schema_version 表已初始化。")
         current_version = get_current_version(cursor)
         logger.info(f"当前数据库版本: {current_version}")
+
+        if current_version != latest_version and _database_matches_latest_schema(cursor, migrations_dir):
+            set_version(cursor, latest_version)
+            conn.commit()
+            logger.warning(
+                "数据库结构已符合最新基线，已将 schema_version "
+                f"从 {current_version} 对齐到 {latest_version}，跳过旧迁移。"
+            )
+            return
+
         conn.commit()
 
     if current_version > latest_version:

@@ -15,6 +15,9 @@ async def register_user(self: "FishingPlugin", event: AstrMessageEvent):
     user_id = self._get_effective_user_id(event)
     nickname = event.get_sender_name() if event.get_sender_name() is not None else user_id
     if result := self.user_service.register(user_id, nickname):
+        if result.get("success"):
+            from ..player.server import ensure_initial_password
+            ensure_initial_password(user_id)
         yield event.plain_result(result["message"])
     else:
         yield event.plain_result("❌ 出错啦！请稍后再试。")

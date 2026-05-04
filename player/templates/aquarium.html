@@ -3,6 +3,7 @@
 {% block title %}水族箱 - 钓鱼游戏{% endblock %}
 
 {% block content %}
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-0">
@@ -13,70 +14,58 @@
 </div>
 
 <!-- 统计信息 -->
-<div class="row mb-4">
+<div class="row g-0 metric-strip">
     <div class="col-md-4">
-        <div class="card bg-primary text-white h-100">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title"><i class="fas fa-layer-group"></i> 容量</h5>
-                <h2 class="mb-0">{{ capacity_info.current_quantity or 0 }} / {{ capacity_info.current_capacity or 0 }}</h2>
-                <div class="progress mt-2" style="height: 8px;">
-                    <div class="progress-bar bg-white" role="progressbar" 
-                         style="width: {{ (capacity_info.current_quantity / capacity_info.current_capacity * 100) if capacity_info.current_capacity > 0 else 0 }}%">
-                    </div>
+        <div class="editorial-metric h-100">
+            <h5><i class="fas fa-layer-group"></i> 容量</h5>
+            <div class="metric-value">{{ capacity_info.current_quantity or 0 }} / {{ capacity_info.current_capacity or 0 }}</div>
+            <div class="progress mt-2">
+                <div class="progress-bar" role="progressbar"
+                     style="width: {{ (capacity_info.current_quantity / capacity_info.current_capacity * 100) if capacity_info.current_capacity > 0 else 0 }}%">
                 </div>
-                {% if capacity_info.next_upgrade %}
-                <small class="d-block mt-3">
-                    下一级：{{ capacity_info.next_upgrade.capacity }} 容量
-                    · 花费 {{ "{:,}".format(capacity_info.next_upgrade.cost_coins) }} 金币
-                    {% if capacity_info.next_upgrade.cost_premium > 0 %}
-                    · {{ "{:,}".format(capacity_info.next_upgrade.cost_premium) }} 钻石
-                    {% endif %}
-                </small>
-                <button class="btn btn-light btn-sm mt-3 align-self-start" onclick="upgradeAquariumCapacity()">
-                    <i class="fas fa-up-right-and-down-left-from-center"></i> 升级水族箱容量
-                </button>
-                {% else %}
-                <small class="text-white-50 mt-3">当前已达到最高容量</small>
+            </div>
+            {% if capacity_info.next_upgrade %}
+            <span class="metric-note">
+                下一级 {{ capacity_info.next_upgrade.capacity }}
+                · {{ "{:,}".format(capacity_info.next_upgrade.cost_coins) }} 金币
+                {% if capacity_info.next_upgrade.cost_premium > 0 %}
+                · {{ "{:,}".format(capacity_info.next_upgrade.cost_premium) }} 钻石
                 {% endif %}
-            </div>
+            </span>
+            <button class="btn btn-outline-secondary btn-sm mt-2" onclick="upgradeAquariumCapacity()">
+                <i class="fas fa-up-right-and-down-left-from-center"></i> 升级容量
+            </button>
+            {% else %}
+            <span class="metric-note">当前已达到最高容量</span>
+            {% endif %}
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-fish"></i> 鱼类总数</h5>
-                <h2 class="mb-0">{{ stats.total_count or 0 }}</h2>
-                <small>条鱼</small>
-            </div>
+        <div class="editorial-metric h-100">
+            <h5><i class="fas fa-fish"></i> 鱼类总数</h5>
+            <div class="metric-value">{{ stats.total_count or 0 }}</div>
+            <span class="metric-note">条鱼</span>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-coins"></i> 总价值</h5>
-                <h2 class="mb-0">{{ stats.total_value or 0 }}</h2>
-                <small>金币</small>
-            </div>
+        <div class="editorial-metric h-100">
+            <h5><i class="fas fa-coins"></i> 总价值</h5>
+            <div class="metric-value">{{ stats.total_value or 0 }}</div>
+            <span class="metric-note">金币</span>
         </div>
     </div>
 </div>
 
 <!-- 批量操作 -->
-<div class="row mb-3">
-    <div class="col-12">
-        <div class="card bg-warning text-white">
-            <div class="card-body py-2">
-                <button class="btn btn-light btn-sm" onclick="showBatchRemoveFromAquarium()">
-                    <i class="fas fa-arrow-left"></i> 批量移回鱼塘
-                </button>
-            </div>
-        </div>
-    </div>
+<div class="compact-toolbar mb-3">
+    <button class="btn btn-outline-secondary btn-sm" onclick="showBatchRemoveFromAquarium()">
+        <i class="fas fa-arrow-left"></i> 批量移回鱼塘
+    </button>
 </div>
 
 <!-- 稀有度筛选 -->
-<div class="row mb-3">
-    <div class="col-12">
+<div class="compact-toolbar mb-3">
+    <div class="flex-grow-1">
         <div class="btn-group" role="group">
             <button type="button" class="btn btn-outline-primary btn-sm active" onclick="filterByRarity('all')">
                 <i class="fas fa-th"></i> 全部
@@ -99,90 +88,59 @@
 {% if fish_by_rarity %}
     {% for rarity in [10, 9, 8, 7, 6, 5, 4, 3, 2, 1] %}
         {% if rarity in fish_by_rarity %}
-        <div class="row mb-2 rarity-section" data-rarity="{{ rarity }}">
-            <div class="col-12">
-                <h5>
-                    <i class="fas fa-star"></i> 
-                    {% if rarity == 1 %}普通
-                    {% elif rarity == 2 %}常见
-                    {% elif rarity == 3 %}优质
-                    {% elif rarity == 4 %}稀有
-                    {% elif rarity == 5 %}史诗
-                    {% elif rarity == 6 %}传说
-                    {% elif rarity == 7 %}神话
-                    {% elif rarity == 8 %}远古
-                    {% elif rarity == 9 %}永恒
-                    {% elif rarity == 10 %}至高
-                    {% else %}未知
-                    {% endif %}
-                    ({{ fish_by_rarity[rarity]|length }} 种)
-                </h5>
-            </div>
+        <div class="rarity-heading rarity-section" data-rarity="{{ rarity }}">
+            <i class="fas fa-star"></i>
+            {% if rarity == 1 %}普通
+            {% elif rarity == 2 %}常见
+            {% elif rarity == 3 %}优质
+            {% elif rarity == 4 %}稀有
+            {% elif rarity == 5 %}史诗
+            {% elif rarity == 6 %}传说
+            {% elif rarity == 7 %}神话
+            {% elif rarity == 8 %}远古
+            {% elif rarity == 9 %}永恒
+            {% elif rarity == 10 %}至高
+            {% else %}未知
+            {% endif %}
+            <span class="text-muted">({{ fish_by_rarity[rarity]|length }} 种)</span>
         </div>
-        
-        <div class="row g-2 mb-3 rarity-section" data-rarity="{{ rarity }}">
+
+        <div class="row g-3 mb-3 rarity-section" data-rarity="{{ rarity }}">
             {% for fish in fish_by_rarity[rarity] %}
-            <div class="col-md-4 col-lg-3">
-                <div class="card h-100 border-info">
-                    <div class="card-body p-2">
-                        <div class="d-flex justify-content-between align-items-start mb-1">
-                            <div class="flex-grow-1">
-                                <h6 class="card-title mb-0">
-                                    {{ fish.name }}
-                                    {% if fish.quality_level == 1 %}
-                                        <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">✨</span>
-                                    {% endif %}
-                                </h6>
-                                <small class="badge bg-info" style="font-size: 0.65rem;">
-                                    {% for i in range(fish.rarity) %}★{% endfor %}
-                                </small>
-                            </div>
-                            <h6 class="mb-0 text-primary">×{{ fish.quantity }}</h6>
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 collection-card">
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+                            <h5 class="card-title mb-0">
+                                {{ fish.name }} <span class="star-inline">{{ star_label(fish.rarity) }}</span>
+                                {% if fish.quality_level == 1 %}<span class="badge">✨</span>{% endif %}
+                            </h5>
+                            <span class="card-quantity">×{{ fish.quantity }}</span>
                         </div>
-                        
-                        <hr class="my-1">
-                        
-                        <div class="small mb-1">
-                            <p class="mb-0">
-                                <i class="fas fa-coins text-success"></i> 
-                                {{ fish.actual_value }}
-                            </p>
-                            <p class="mb-0 text-muted" style="font-size: 0.7rem;">
-                                <i class="fas fa-clock"></i> 
-                                {{ fish.added_at }}
-                            </p>
+                        <div class="small text-muted mb-3">
+                            <div><i class="fas fa-coins text-success"></i> {{ fish.actual_value }}</div>
+                            <div><i class="fas fa-clock"></i> {{ fish.added_at }}</div>
                         </div>
-                        
-                        <div class="d-grid">
-                            <button class="btn btn-sm btn-warning" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="removeFromAquarium({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
-                                <i class="fas fa-undo"></i> 移回鱼塘
-                            </button>
-                        </div>
-                        
-                        <!-- 展览评论显示 -->
+                        <button class="btn btn-outline-secondary btn-sm align-self-start mt-auto" onclick="removeFromAquarium({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
+                            <i class="fas fa-undo"></i> 移回鱼塘
+                        </button>
+
                         {% set fish_key = fish.fish_id|string + '-' + fish.quality_level|string %}
                         {% if exhibition_comments and fish_key in exhibition_comments and exhibition_comments[fish_key]|length > 0 %}
-                        <div class="mt-2 pt-2 border-top">
-                            <div class="small">
-                                <strong class="text-info"><i class="fas fa-comment"></i> 展览留言 ({{ exhibition_comments[fish_key]|length }})</strong>
-                                <div class="mt-1" style="max-height: 150px; overflow-y: auto;">
-                                    {% for comment in exhibition_comments[fish_key] %}
-                                    <div class="alert alert-light py-1 mb-1" style="font-size: 0.75rem;" data-comment-id="{{ comment.id }}">
-                                        <div class="d-flex justify-content-between">
-                                            <div>
-                                                <strong>{{ comment.username }}:</strong>
-                                                {{ comment.content }}
-                                            </div>
-                                            <button class="btn btn-sm btn-link text-danger p-0 ms-1" 
-                                                    style="font-size: 0.7rem;"
-                                                    onclick="deleteExhibitionCommentFromAquarium('{{ fish_key }}', '{{ comment.id }}')">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-                                        <div class="text-muted" style="font-size: 0.65rem;">{{ comment.timestamp }}</div>
+                        <div class="mt-3 pt-2 border-top small">
+                            <strong class="text-info"><i class="fas fa-comment"></i> 展览留言 ({{ exhibition_comments[fish_key]|length }})</strong>
+                            <div class="mt-1" style="max-height: 120px; overflow-y: auto;">
+                                {% for comment in exhibition_comments[fish_key] %}
+                                <div class="alert alert-light py-1 mb-1" data-comment-id="{{ comment.id }}">
+                                    <div class="d-flex justify-content-between">
+                                        <div><strong>{{ comment.username }}:</strong> {{ comment.content }}</div>
+                                        <button class="btn btn-sm btn-link text-danger p-0 ms-1" style="font-size: 0.7rem;" onclick="deleteExhibitionCommentFromAquarium('{{ fish_key }}', '{{ comment.id }}')">
+                                            <i class="fas fa-times"></i>
+                                        </button>
                                     </div>
-                                    {% endfor %}
+                                    <div class="text-muted" style="font-size: 0.65rem;">{{ comment.timestamp }}</div>
                                 </div>
+                                {% endfor %}
                             </div>
                         </div>
                         {% endif %}
@@ -224,11 +182,11 @@
 function filterByRarity(rarity) {
     const sections = document.querySelectorAll('.rarity-section');
     const buttons = document.querySelectorAll('.btn-group button');
-    
+
     // 更新按钮状态
     buttons.forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
-    
+
     if (rarity === 'all') {
         sections.forEach(section => section.style.display = '');
     } else {
@@ -268,13 +226,13 @@ async function upgradeAquariumCapacity() {
 async function removeFromAquarium(fishId, qualityLevel, fishName, maxQuantity) {
     const quantity = prompt(`请输入要移回鱼塘的数量 (最多 ${maxQuantity} 条):`, '1');
     if (!quantity || quantity <= 0) return;
-    
+
     const qty = parseInt(quantity);
     if (isNaN(qty) || qty <= 0 || qty > maxQuantity) {
         showToast('数量无效', 'error');
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_remove_from_aquarium") }}', {
             method: 'POST',
@@ -285,7 +243,7 @@ async function removeFromAquarium(fishId, qualityLevel, fishName, maxQuantity) {
                 quantity: qty
             })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -313,43 +271,43 @@ function showBatchRemoveFromAquarium() {
                         <div id="rarityCheckboxes" class="d-flex flex-column gap-2">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="1" id="rarity1">
-                                <label class="form-check-label" for="rarity1">⭐ 1星 - 普通</label>
+                                <label class="form-check-label" for="rarity1">1☆ - 普通</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="2" id="rarity2">
-                                <label class="form-check-label" for="rarity2">⭐⭐ 2星 - 常见</label>
+                                <label class="form-check-label" for="rarity2">2☆ - 常见</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="3" id="rarity3">
-                                <label class="form-check-label" for="rarity3">⭐⭐⭐ 3星 - 优质</label>
+                                <label class="form-check-label" for="rarity3">3☆ - 优质</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="4" id="rarity4">
-                                <label class="form-check-label" for="rarity4">⭐⭐⭐⭐ 4星 - 稀有</label>
+                                <label class="form-check-label" for="rarity4">4☆ - 稀有</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="5" id="rarity5">
-                                <label class="form-check-label" for="rarity5">⭐⭐⭐⭐⭐ 5星 - 史诗</label>
+                                <label class="form-check-label" for="rarity5">5☆ - 史诗</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="6" id="rarity6">
-                                <label class="form-check-label" for="rarity6">🌟 6星 - 传说</label>
+                                <label class="form-check-label" for="rarity6">6★ - 传说</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="7" id="rarity7">
-                                <label class="form-check-label" for="rarity7">🌟 7星 - 神话</label>
+                                <label class="form-check-label" for="rarity7">7★ - 神话</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="8" id="rarity8">
-                                <label class="form-check-label" for="rarity8">🌟 8星 - 远古</label>
+                                <label class="form-check-label" for="rarity8">8★ - 远古</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="9" id="rarity9">
-                                <label class="form-check-label" for="rarity9">💫 9星 - 永恒</label>
+                                <label class="form-check-label" for="rarity9">9★ - 永恒</label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" value="10" id="rarity10">
-                                <label class="form-check-label" for="rarity10">✨ 10星 - 至高</label>
+                                <label class="form-check-label" for="rarity10">10★ - 至高</label>
                             </div>
                         </div>
                     </div>
@@ -363,12 +321,12 @@ function showBatchRemoveFromAquarium() {
             </div>
         </div>
     `;
-    
+
     // 添加到页面
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     const modal = new bootstrap.Modal(document.getElementById('batchRemoveModal'));
     modal.show();
-    
+
     // 关闭时移除DOM
     document.getElementById('batchRemoveModal').addEventListener('hidden.bs.modal', function() {
         this.remove();
@@ -383,25 +341,25 @@ async function executeBatchRemoveFromAquarium() {
             selectedRarities.push(i);
         }
     }
-    
+
     if (selectedRarities.length === 0) {
         showToast('请至少选择一个稀有度', 'warning');
         return;
     }
-    
+
     // 关闭模态框
     bootstrap.Modal.getInstance(document.getElementById('batchRemoveModal')).hide();
-    
+
     // 显示加载提示
     showToast('正在批量移回...', 'info');
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_batch_remove_from_aquarium") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ rarities: selectedRarities })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -419,19 +377,19 @@ async function deleteExhibitionCommentFromAquarium(fishKey, commentId) {
     if (!confirm('确认删除这条留言吗？')) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_delete_exhibition_comment") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 fish_key: fishKey,
-                comment_id: commentId 
+                comment_id: commentId
             })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showToast('留言已删除', 'success');
             // 移除评论元素

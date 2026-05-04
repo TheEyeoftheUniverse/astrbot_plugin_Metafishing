@@ -412,6 +412,25 @@ class FishingPlugin(Star):
         admin_id = event.get_sender_id()
         return self.impersonation_map.get(admin_id, admin_id)
 
+    def _is_group_message_event(self, event: AstrMessageEvent) -> bool:
+        """尽量兼容不同平台适配器的群聊判断。"""
+        get_group_id = getattr(event, "get_group_id", None)
+        if callable(get_group_id):
+            try:
+                if get_group_id():
+                    return True
+            except Exception:
+                pass
+
+        message_obj = getattr(event, "message_obj", None)
+        for attr in ("group_id", "group", "room_id"):
+            value = getattr(message_obj, attr, None)
+            if value:
+                return True
+
+        message_type = str(getattr(message_obj, "message_type", "") or "").lower()
+        return message_type in {"group", "guild", "channel"}
+
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
         logger.info("""
@@ -619,6 +638,20 @@ class FishingPlugin(Star):
         async for r in common_handlers.update_nickname(self, event):
             yield r
 
+    @filter.command("初始密码获取")
+    async def get_initial_password(self, event: AstrMessageEvent):
+        """私聊获取 WebUI/App 初始登录密码"""
+        if self._is_group_message_event(event):
+            yield event.plain_result("❌ 为保护账号安全，请在私聊中使用 /初始密码获取。")
+            return
+        user_id = self._get_effective_user_id(event)
+        if not self.user_repo.check_exists(user_id):
+            yield event.plain_result("❌ 你还没有注册，请先使用 /注册。")
+            return
+        from .player.server import ensure_initial_password
+        initial_password = ensure_initial_password(user_id)
+        yield event.plain_result(f"你的 WebUI/App 初始密码是：{initial_password}")
+
     @filter.command("高级货币", alias={"钻石", "星石"})
     async def premium(self, event: AstrMessageEvent):
         """查看你当前拥有的高级货币（钻石/星石）数量"""
@@ -643,6 +676,18 @@ class FishingPlugin(Star):
     async def pokedex_reward(self, event: AstrMessageEvent):
         """领取图鉴奖励或查看当前图鉴奖励进度"""
         async for r in self.fishing_handlers.pokedex_reward(event):
+            yield r
+
+    @filter.command("装备图鉴", alias={"装备收集"})
+    async def equipment_pokedex(self, event: AstrMessageEvent):
+        """查看装备图鉴，了解已收集的鱼竿、饰品和鱼饵"""
+        async for r in self.fishing_handlers.equipment_pokedex(event):
+            yield r
+
+    @filter.command("装备图鉴奖励")
+    async def equipment_pokedex_reward(self, event: AstrMessageEvent):
+        """领取装备图鉴奖励或查看当前装备图鉴奖励进度"""
+        async for r in self.fishing_handlers.equipment_pokedex_reward(event):
             yield r
 
     # =========== 市场与商店 ==========

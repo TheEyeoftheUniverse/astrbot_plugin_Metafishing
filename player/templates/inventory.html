@@ -3,6 +3,7 @@
 {% block title %}背包 - 钓鱼游戏{% endblock %}
 
 {% block content %}
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-0">
@@ -16,7 +17,7 @@
 <ul class="nav nav-tabs mb-4" id="inventoryTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active" id="rods-tab" data-bs-toggle="tab" data-bs-target="#rods" type="button">
-            <i class="fas fa-fishing-rod"></i> 鱼竿 ({{ rods|length }})
+            <span class="icon-fishing-rod" aria-hidden="true"></span> 鱼竿 ({{ rods|length }})
         </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -44,62 +45,56 @@
         <div class="row g-3">
             {% for rod in rods %}
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 {% if rod.is_equipped %}border-success{% endif %} d-flex flex-column">
-                    <div class="card-header bg-{% if rod.is_equipped %}success{% else %}secondary{% endif %} text-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">{{ rod.name }}</h6>
-                            {% if rod.is_equipped %}
-                                <span class="badge bg-light text-success">
-                                    <i class="fas fa-check"></i> 装备中
-                                </span>
-                            {% endif %}
-                        </div>
-                    </div>
+                <div class="card h-100 inventory-card {% if rod.is_equipped %}border-success{% endif %} d-flex flex-column">
                     <div class="card-body d-flex flex-column">
-                        <div class="mb-2">
-                            <span class="badge bg-info">
-                                {% for i in range(rod.rarity) %}★{% endfor %}
-                            </span>
-                            <span class="badge bg-warning text-dark">+{{ rod.refine_level }}</span>
-                            {% if rod.is_locked %}
-                                <span class="badge bg-danger"><i class="fas fa-lock"></i></span>
-                            {% endif %}
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <h5 class="card-title mb-0">
+                                {{ rod.name }} <span class="star-inline">{{ star_label(rod.rarity) }}{% if rod.refine_level %} +{{ rod.refine_level }}{% endif %}</span>
+                                {% if rod.is_locked %}<span class="badge bg-danger"><i class="fas fa-lock"></i></span>{% endif %}
+                            </h5>
+                            <div class="card-icon-actions">
+                                {% if rod.is_equipped %}
+                                <button class="btn btn-sm btn-success" title="取消装备" onclick="unequipRod('{{ rod.name }}')">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-secondary" title="装备" onclick="equipRod('{{ rod.display_code }}', '{{ rod.name }}')">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                {% endif %}
+                                {% if rod.can_refine %}
+                                <button class="btn btn-sm btn-outline-secondary" title="精炼" onclick="refineRod('{{ rod.display_code }}', '{{ rod.name }}', {{ rod.refine_level }})">
+                                    <i class="fas fa-hammer"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-secondary" title="暂无可用于精炼的同名未装备装备" disabled>
+                                    <i class="fas fa-hammer"></i>
+                                </button>
+                                {% endif %}
+                                {% if not rod.is_equipped and not rod.is_locked %}
+                                <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteRod('{{ rod.display_code }}', '{{ rod.name }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
-                        
-                        <p class="text-muted small mb-2" style="min-height: 40px;">{{ rod.description }}</p>
-                        <p class="mb-1 small"><strong>编号:</strong> {{ rod.display_code }}</p>
-                        
-                        <hr>
-                        
-                        <div class="small flex-grow-1">
+
+                        <p class="text-muted small mb-2 inventory-description">{{ rod.description }}</p>
+                        <hr class="inventory-divider">
+                        <div class="small flex-grow-1 inventory-stats">
                             <p class="mb-1"><i class="fas fa-arrow-up text-success"></i> 品质: +{{ "%.1f" | format((rod.bonus_fish_quality_modifier - 1) * 100) }}%</p>
                             <p class="mb-1"><i class="fas fa-layer-group text-primary"></i> 数量: +{{ "%.1f" | format((rod.bonus_fish_quantity_modifier - 1) * 100) }}%</p>
                             <p class="mb-1"><i class="fas fa-star text-warning"></i> 稀有: +{{ "%.1f" | format(rod.bonus_rare_fish_chance * 100) }}%</p>
-                            
                             {% if rod.max_durability %}
-                            <p class="mb-1">
+                            <div class="mb-1">
                                 <i class="fas fa-heart"></i> 耐久: {{ rod.current_durability }} / {{ rod.max_durability }}
                                 <div class="progress" style="height: 5px;">
                                     <div class="progress-bar bg-success" style="width: {{ (rod.current_durability / rod.max_durability * 100) if rod.max_durability > 0 else 0 }}%"></div>
                                 </div>
-                            </p>
+                            </div>
                             {% endif %}
                         </div>
-                        
-                        <div class="d-grid gap-2 mt-auto">
-                            {% if not rod.is_equipped %}
-                                <button class="btn btn-sm btn-success" onclick="equipRod('{{ rod.display_code }}', '{{ rod.name }}')">
-                                    <i class="fas fa-check"></i> 装备
-                                </button>
-                            {% else %}
-                                <button class="btn btn-sm btn-secondary" disabled>
-                                    <i class="fas fa-check"></i> 已装备
-                                </button>
-                            {% endif %}
-                            <button class="btn btn-sm btn-primary" onclick="refineRod('{{ rod.display_code }}', '{{ rod.name }}', {{ rod.refine_level }})">
-                                <i class="fas fa-hammer"></i> 精炼 (+{{ rod.refine_level }})
-                            </button>
-                        </div>
+                        <div class="inventory-code">编号 {{ rod.display_code }}</div>
                     </div>
                 </div>
             </div>
@@ -111,60 +106,55 @@
         </div>
         {% endif %}
     </div>
-    
+
     <!-- 饰品标签页 -->
     <div class="tab-pane fade" id="accessories" role="tabpanel">
         {% if accessories %}
         <div class="row g-3">
             {% for acc in accessories %}
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 {% if acc.is_equipped %}border-success{% endif %} d-flex flex-column">
-                    <div class="card-header bg-{% if acc.is_equipped %}success{% else %}secondary{% endif %} text-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">{{ acc.name }}</h6>
-                            {% if acc.is_equipped %}
-                                <span class="badge bg-light text-success">
-                                    <i class="fas fa-check"></i> 装备中
-                                </span>
-                            {% endif %}
-                        </div>
-                    </div>
+                <div class="card h-100 inventory-card {% if acc.is_equipped %}border-success{% endif %} d-flex flex-column">
                     <div class="card-body d-flex flex-column">
-                        <div class="mb-2">
-                            <span class="badge bg-info">
-                                {% for i in range(acc.rarity) %}★{% endfor %}
-                            </span>
-                            <span class="badge bg-warning text-dark">+{{ acc.refine_level }}</span>
-                            {% if acc.is_locked %}
-                                <span class="badge bg-danger"><i class="fas fa-lock"></i></span>
-                            {% endif %}
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <h5 class="card-title mb-0">
+                                {{ acc.name }} <span class="star-inline">{{ star_label(acc.rarity) }}{% if acc.refine_level %} +{{ acc.refine_level }}{% endif %}</span>
+                                {% if acc.is_locked %}<span class="badge bg-danger"><i class="fas fa-lock"></i></span>{% endif %}
+                            </h5>
+                            <div class="card-icon-actions">
+                                {% if acc.is_equipped %}
+                                <button class="btn btn-sm btn-success" title="取消装备" onclick="unequipAccessory('{{ acc.name }}')">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-secondary" title="装备" onclick="equipAccessory('{{ acc.display_code }}', '{{ acc.name }}')">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                {% endif %}
+                                {% if acc.can_refine %}
+                                <button class="btn btn-sm btn-outline-secondary" title="精炼" onclick="refineAccessory('{{ acc.display_code }}', '{{ acc.name }}', {{ acc.refine_level }})">
+                                    <i class="fas fa-hammer"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-secondary" title="暂无可用于精炼的同名未装备装备" disabled>
+                                    <i class="fas fa-hammer"></i>
+                                </button>
+                                {% endif %}
+                                {% if not acc.is_equipped and not acc.is_locked %}
+                                <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteAccessory('{{ acc.display_code }}', '{{ acc.name }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
-                        
-                        <p class="text-muted small mb-2" style="min-height: 40px;">{{ acc.description }}</p>
-                        <p class="mb-1 small"><strong>编号:</strong> {{ acc.display_code }}</p>
-                        
-                        <hr>
-                        
-                        <div class="small flex-grow-1">
+
+                        <p class="text-muted small mb-2 inventory-description">{{ acc.description }}</p>
+                        <hr class="inventory-divider">
+                        <div class="small flex-grow-1 inventory-stats">
                             <p class="mb-1"><i class="fas fa-arrow-up text-success"></i> 品质: +{{ "%.1f" | format((acc.bonus_fish_quality_modifier - 1) * 100) }}%</p>
                             <p class="mb-1"><i class="fas fa-layer-group text-primary"></i> 数量: +{{ "%.1f" | format((acc.bonus_fish_quantity_modifier - 1) * 100) }}%</p>
                             <p class="mb-1"><i class="fas fa-star text-warning"></i> 稀有: +{{ "%.1f" | format(acc.bonus_rare_fish_chance * 100) }}%</p>
                         </div>
-                        
-                        <div class="d-grid gap-2 mt-auto">
-                            {% if not acc.is_equipped %}
-                                <button class="btn btn-sm btn-success" onclick="equipAccessory('{{ acc.display_code }}', '{{ acc.name }}')">
-                                    <i class="fas fa-check"></i> 装备
-                                </button>
-                            {% else %}
-                                <button class="btn btn-sm btn-secondary" disabled>
-                                    <i class="fas fa-check"></i> 已装备
-                                </button>
-                            {% endif %}
-                            <button class="btn btn-sm btn-primary" onclick="refineAccessory('{{ acc.display_code }}', '{{ acc.name }}', {{ acc.refine_level }})">
-                                <i class="fas fa-hammer"></i> 精炼 (+{{ acc.refine_level }})
-                            </button>
-                        </div>
+                        <div class="inventory-code">编号 {{ acc.display_code }}</div>
                     </div>
                 </div>
             </div>
@@ -176,38 +166,48 @@
         </div>
         {% endif %}
     </div>
-    
+
     <!-- 道具标签页 -->
     <div class="tab-pane fade" id="items" role="tabpanel">
         {% if items %}
         <div class="row g-3">
             {% for item in items %}
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 d-flex flex-column">
+                <div class="card h-100 inventory-card d-flex flex-column">
                     <div class="card-body d-flex flex-column">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="flex-grow-1">
-                                <h5 class="card-title mb-1">{{ item.name }}</h5>
-                                <span class="badge bg-info">
-                                    {% for i in range(item.rarity) %}★{% endfor %}
-                                </span>
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <h5 class="card-title mb-1">{{ item.name }} <span class="star-inline">{{ star_label(item.rarity) }}</span></h5>
+                            <div class="card-icon-actions">
+                                <span class="card-quantity">×{{ item.quantity }}</span>
+                                {% if item.supports_armed_state %}
+                                    {% if item.is_armed %}
+                                    <button class="btn btn-sm btn-success" title="停用" onclick="toggleItemState({{ item.item_id }})">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-outline-secondary" title="启用" onclick="toggleItemState({{ item.item_id }})">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                    {% endif %}
+                                {% elif item.is_consumable and item.effect_type != 'zone_pass' %}
+                                    <button class="btn btn-sm btn-outline-secondary" title="使用" onclick="useItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})">
+                                        <i class="fas fa-hand-sparkles"></i>
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-sm btn-outline-secondary" title="不可直接使用" disabled>
+                                        <i class="fas fa-hand-sparkles"></i>
+                                    </button>
+                                {% endif %}
+                                {% if not item.is_armed %}
+                                    <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                {% endif %}
                             </div>
-                            <h4 class="mb-0 text-primary">×{{ item.quantity }}</h4>
                         </div>
-                        
-                        <p class="text-muted small mb-2 flex-grow-1" style="min-height: 40px;">
+                        <p class="text-muted small mb-2 flex-grow-1 inventory-description">
                             {{ item.user_friendly_description or '暂无描述' }}
                         </p>
-                        
-                        <div class="mt-auto">
-                            {% if item.is_consumable and item.effect_type != 'zone_pass' %}
-                            <div class="d-grid">
-                                <button class="btn btn-sm btn-info" onclick="useItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})">
-                                    <i class="fas fa-hand-sparkles"></i> 使用
-                                </button>
-                            </div>
-                            {% endif %}
-                        </div>
                     </div>
                 </div>
             </div>
@@ -219,30 +219,40 @@
         </div>
         {% endif %}
     </div>
-    
+
     <!-- 鱼饵标签页 -->
     <div class="tab-pane fade" id="baits" role="tabpanel">
         {% if baits %}
         <div class="row g-3">
             {% for bait in baits %}
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 d-flex flex-column">
+                <div class="card h-100 inventory-card d-flex flex-column">
                     <div class="card-body d-flex flex-column">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <h5 class="card-title mb-1">{{ bait.name }}</h5>
-                                <span class="badge bg-info">
-                                    {% for i in range(bait.rarity) %}★{% endfor %}
-                                </span>
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <h5 class="card-title mb-1">{{ bait.name }} <span class="star-inline">{{ star_label(bait.rarity) }}</span></h5>
+                            <div class="card-icon-actions">
+                                <span class="card-quantity">×{{ bait.quantity }}</span>
+                                {% set bait_active = bait.bait_id == current_bait_id or bait.is_armed %}
+                                {% if bait_active %}
+                                    <button class="btn btn-sm btn-success" title="停用" onclick="deactivateBait({{ bait.bait_id }}, '{{ bait.name }}')">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-sm btn-outline-secondary" title="使用" onclick="useBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                {% endif %}
+                                {% if not bait_active %}
+                                    <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                {% endif %}
                             </div>
-                            <h4 class="mb-0 text-primary">×{{ bait.quantity }}</h4>
                         </div>
-                        
-                        <p class="text-muted small mb-2 flex-grow-1" style="min-height: 40px;">
+                        <p class="text-muted small mb-2 flex-grow-1 inventory-description">
                             {{ bait.effect_description or '暂无描述' }}
                         </p>
-                        
-                        <div class="small mb-2">
+                        <div class="small mb-2 inventory-stats">
                             {% if bait.fish_quality_bonus %}
                             <p class="mb-1"><i class="fas fa-arrow-up text-success"></i> 品质加成: +{{ "%.1f" | format((bait.fish_quality_bonus - 1) * 100) }}%</p>
                             {% endif %}
@@ -256,14 +266,6 @@
                             <p class="mb-1"><i class="fas fa-clock text-info"></i> 持续时间: {{ bait.duration_minutes }} 分钟</p>
                             {% endif %}
                         </div>
-                        
-                        <div class="mt-auto">
-                            <div class="d-grid">
-                                <button class="btn btn-sm btn-success" onclick="useBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})">
-                                    <i class="fas fa-hand-sparkles"></i> 使用
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -275,6 +277,7 @@
         </div>
         {% endif %}
     </div>
+
 </div>
 
 <!-- 提示信息 -->
@@ -313,7 +316,7 @@ function restoreActiveTab() {
 // 监听标签页切换
 document.addEventListener('DOMContentLoaded', function() {
     restoreActiveTab();
-    
+
     const tabButtons = document.querySelectorAll('button[data-bs-toggle="tab"]');
     tabButtons.forEach(button => {
         button.addEventListener('shown.bs.tab', function(e) {
@@ -329,7 +332,7 @@ async function equipRod(code, name) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ rod_code: code })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -349,7 +352,7 @@ async function equipAccessory(code, name) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ accessory_code: code })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -362,6 +365,14 @@ async function equipAccessory(code, name) {
     }
 }
 
+async function unequipRod(name) {
+    await postInventoryAction('{{ url_for("player_bp.api_unequip_rod") }}', {});
+}
+
+async function unequipAccessory(name) {
+    await postInventoryAction('{{ url_for("player_bp.api_unequip_accessory") }}', {});
+}
+
 async function refineRod(code, name, currentLevel) {
     try {
         const response = await fetch('{{ url_for("player_bp.api_refine_rod") }}', {
@@ -369,7 +380,7 @@ async function refineRod(code, name, currentLevel) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ rod_code: code })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -389,7 +400,7 @@ async function refineAccessory(code, name, currentLevel) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ accessory_code: code })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -405,20 +416,20 @@ async function refineAccessory(code, name, currentLevel) {
 async function useItem(itemId, itemName, quantity) {
     const qty = prompt(`请输入要使用的 ${itemName} 数量 (最多 ${quantity} 个):`, '1');
     if (!qty || qty <= 0) return;
-    
+
     const amount = parseInt(qty);
     if (isNaN(amount) || amount <= 0 || amount > quantity) {
         showToast('数量无效', 'error');
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_use_item") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ item_id: itemId, quantity: amount })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -431,18 +442,22 @@ async function useItem(itemId, itemName, quantity) {
     }
 }
 
+async function toggleItemState(itemId) {
+    await postInventoryAction('{{ url_for("player_bp.api_use_item") }}', {item_id: itemId, quantity: 1});
+}
+
 async function useBait(baitId, baitName, quantity) {
     if (!confirm(`确认使用鱼饵【${baitName}】吗？\n使用后将激活鱼饵效果。`)) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_use_bait") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ bait_id: baitId })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -454,5 +469,49 @@ async function useBait(baitId, baitName, quantity) {
         showToast('网络错误，请稍后重试', 'error');
     }
 }
+
+async function deactivateBait(baitId, baitName) {
+    await postInventoryAction('{{ url_for("player_bp.api_use_bait") }}', {bait_id: baitId, deactivate: true});
+}
+
+async function deleteRod(code, name) {
+    if (!confirm(`确认删除鱼竿【${name}】吗？`)) return;
+    await postInventoryAction('{{ url_for("player_bp.api_delete_rod") }}', {rod_code: code});
+}
+
+async function deleteAccessory(code, name) {
+    if (!confirm(`确认删除饰品【${name}】吗？`)) return;
+    await postInventoryAction('{{ url_for("player_bp.api_delete_accessory") }}', {accessory_code: code});
+}
+
+async function deleteItem(itemId, name, quantity) {
+    if (!confirm(`确认删除全部【${name}】x${quantity} 吗？`)) return;
+    await postInventoryAction('{{ url_for("player_bp.api_delete_item") }}', {item_id: itemId, quantity: quantity});
+}
+
+async function deleteBait(baitId, name, quantity) {
+    if (!confirm(`确认删除全部鱼饵【${name}】x${quantity} 吗？`)) return;
+    await postInventoryAction('{{ url_for("player_bp.api_delete_bait") }}', {bait_id: baitId, quantity: quantity});
+}
+
+async function postInventoryAction(url, payload) {
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
 </script>
 {% endblock %}

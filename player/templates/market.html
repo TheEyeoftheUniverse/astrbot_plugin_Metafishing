@@ -3,6 +3,7 @@
 {% block title %}交易市场 - 钓鱼游戏{% endblock %}
 
 {% block content %}
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-0">
@@ -24,7 +25,7 @@
                 <ul class="nav nav-tabs mb-3" id="marketTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="rods-tab" data-bs-toggle="tab" data-bs-target="#rods" type="button">
-                            <i class="fas fa-fishing-rod"></i> 鱼竿 ({{ rods|length }})
+                            <span class="icon-fishing-rod" aria-hidden="true"></span> 鱼竿 ({{ rods|length }})
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -58,10 +59,10 @@
                                             <div>
                                                 <h6 class="mb-1">{{ listing.item_name }}</h6>
                                                 <span class="badge bg-info">
-                                                    {% for i in range(listing.rarity) %}★{% endfor %}
+                                                    {{ star_label(listing.rarity) }}
                                                 </span>
                                                 {% if listing.refine_level > 0 %}
-                                                <span class="badge bg-warning text-dark">+{{ listing.refine_level }}</span>
+                                                <span class="star-inline">+{{ listing.refine_level }}</span>
                                                 {% endif %}
                                             </div>
                                             <div class="text-end">
@@ -108,10 +109,10 @@
                                             <div>
                                                 <h6 class="mb-1">{{ listing.item_name }}</h6>
                                                 <span class="badge bg-info">
-                                                    {% for i in range(listing.rarity) %}★{% endfor %}
+                                                    {{ star_label(listing.rarity) }}
                                                 </span>
                                                 {% if listing.refine_level > 0 %}
-                                                <span class="badge bg-warning text-dark">+{{ listing.refine_level }}</span>
+                                                <span class="star-inline">+{{ listing.refine_level }}</span>
                                                 {% endif %}
                                             </div>
                                             <div class="text-end">
@@ -158,7 +159,7 @@
                                             <div>
                                                 <h6 class="mb-1">{{ listing.item_name }}</h6>
                                                 <span class="badge bg-info">
-                                                    {% for i in range(listing.rarity) %}★{% endfor %}
+                                                    {{ star_label(listing.rarity) }}
                                                 </span>
                                                 {% if listing.quality_level > 1 %}
                                                 <span class="badge bg-success">{{ listing.quality_level }}星品质</span>
@@ -206,7 +207,7 @@
                                             <div>
                                                 <h6 class="mb-1">{{ listing.item_name }}</h6>
                                                 <span class="badge bg-info">
-                                                    {% for i in range(listing.rarity) %}★{% endfor %}
+                                                    {{ star_label(listing.rarity) }}
                                                 </span>
                                             </div>
                                             <div class="text-end">
@@ -268,11 +269,11 @@
                         <label class="form-label">稀有度筛选</label>
                         <select class="form-select" id="rarityFilter" onchange="updateItemOptions()">
                             <option value="">全部稀有度</option>
-                            <option value="1">★ 1星</option>
-                            <option value="2">★★ 2星</option>
-                            <option value="3">★★★ 3星</option>
-                            <option value="4">★★★★ 4星</option>
-                            <option value="5">★★★★★ 5星</option>
+                            <option value="1">1☆</option>
+                            <option value="2">2☆</option>
+                            <option value="3">3☆</option>
+                            <option value="4">4☆</option>
+                            <option value="5">5☆</option>
                         </select>
                     </div>
 
@@ -311,7 +312,7 @@
                     </button>
                 </form>
 
-                <hr>
+                <hr class="card-section-divider">
 
                 <!-- 我的上架列表 -->
                 <div>
@@ -358,49 +359,49 @@ function updateItemOptions() {
     const itemSelectGroup = document.getElementById('itemSelectGroup');
     const quantityGroup = document.getElementById('quantityGroup');
     const rarityFilterGroup = document.getElementById('rarityFilterGroup');
-    
+
     itemSelect.innerHTML = '<option value="">请选择...</option>';
-    
+
     if (!itemType) {
         itemSelectGroup.style.display = 'none';
         quantityGroup.style.display = 'none';
         rarityFilterGroup.style.display = 'none';
         return;
     }
-    
+
     itemSelectGroup.style.display = 'block';
     rarityFilterGroup.style.display = 'block';
-    
+
     // 根据类型显示/隐藏数量输入
     if (itemType === 'fish' || itemType === 'item') {
         quantityGroup.style.display = 'block';
     } else {
         quantityGroup.style.display = 'none';
     }
-    
+
     // 填充选项（应用稀有度筛选）
     let inventory = userInventory[itemType] || [];
-    
+
     // 按稀有度筛选
     if (rarityFilter) {
         const targetRarity = parseInt(rarityFilter);
         inventory = inventory.filter(item => item.rarity === targetRarity);
     }
-    
+
     // 按稀有度降序排序
     inventory.sort((a, b) => (b.rarity || 0) - (a.rarity || 0));
-    
+
     inventory.forEach(item => {
         const option = document.createElement('option');
         option.value = JSON.stringify(item);
-        
+
         let text = item.name;
-        
+
         // 显示稀有度星级
         if (item.rarity) {
-            text += ' ' + '★'.repeat(item.rarity);
+            text += ' ' + formatRarityStars(item.rarity);
         }
-        
+
         if (item.refine_level > 0) {
             text += ` (+${item.refine_level})`;
         }
@@ -413,11 +414,11 @@ function updateItemOptions() {
         if (item.display_code) {
             text += ` [${item.display_code}]`;
         }
-        
+
         option.textContent = text;
         itemSelect.appendChild(option);
     });
-    
+
     // 显示筛选结果数量
     if (rarityFilter && inventory.length === 0) {
         const noResultOption = document.createElement('option');
@@ -434,19 +435,19 @@ async function listItem() {
     const price = parseInt(document.getElementById('price').value);
     const isAnonymous = document.getElementById('isAnonymous').checked;
     const quantity = parseInt(document.getElementById('quantity').value) || 1;
-    
+
     if (!itemType || !itemSelectValue) {
         showToast('请选择要上架的物品', 'error');
         return;
     }
-    
+
     if (!price || price <= 0) {
         showToast('请输入有效的价格', 'error');
         return;
     }
-    
+
     const selectedItem = JSON.parse(itemSelectValue);
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_list_item") }}', {
             method: 'POST',
@@ -460,7 +461,7 @@ async function listItem() {
                 quality_level: selectedItem.quality_level || 0
             })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -478,14 +479,14 @@ async function buyMarketItem(marketId, itemName, price) {
     if (!confirm(`确认购买【${itemName}】吗？\n价格: ${price} 金币`)) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_buy_market_item") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ market_id: marketId })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -503,14 +504,14 @@ async function delistItem(marketId, itemName) {
     if (!confirm(`确认下架【${itemName}】吗？`)) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_delist_item") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ market_id: marketId })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');

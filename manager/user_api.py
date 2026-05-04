@@ -2557,6 +2557,51 @@ async def get_pokedex():
         return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
 
 
+@user_api_bp.route("/equipment-pokedex", methods=["GET"])
+@user_api_bp.route("/equipment_pokedex", methods=["GET"])
+@api_login_required
+async def get_equipment_pokedex():
+    """获取用户装备图鉴数据"""
+    user_id = session.get("user_id")
+
+    try:
+        fishing_service = current_app.config["FISHING_SERVICE"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: FISHING_SERVICE未找到 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    equipment_type = request.args.get("equipment_type", "all")
+    rarity_text = request.args.get("rarity", "all")
+    rarity = int(rarity_text) if str(rarity_text).isdigit() else None
+    owned_only = request.args.get("owned", "0") == "1"
+    page_size_text = request.args.get("page_size", "500")
+    page_size = int(page_size_text) if str(page_size_text).isdigit() else 500
+
+    try:
+        result = fishing_service.get_user_equipment_pokedex(
+            user_id,
+            page=1,
+            page_size=max(1, min(page_size, 1000)),
+            equipment_type=equipment_type,
+            rarity=rarity,
+            owned_only=owned_only,
+        )
+
+        if result.get("success"):
+            result["reward_status"] = fishing_service.get_equipment_pokedex_reward_status(user_id)
+            logger.info(
+                f"[WebUI] 装备图鉴查询成功: {user_id}, "
+                f"解锁 {result.get('unlocked_equipment_count', 0)}/{result.get('total_equipment_count', 0)}"
+            )
+            return jsonify(result)
+
+        logger.warning(f"[WebUI] 装备图鉴查询失败: {user_id} - {result.get('message', '未知错误')}")
+        return jsonify(result), 400
+    except Exception as e:
+        logger.error(f"获取装备图鉴失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
 @user_api_bp.route("/titles", methods=["GET"])
 @api_login_required
 async def get_user_titles():
@@ -2656,4 +2701,46 @@ async def claim_pokedex_reward():
         return jsonify(result), 200 if result.get("success") else 400
     except Exception as e:
         logger.error(f"领取图鉴奖励失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"领取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/equipment-pokedex/reward/status", methods=["GET"])
+@user_api_bp.route("/equipment_pokedex/reward/status", methods=["GET"])
+@api_login_required
+async def get_equipment_pokedex_reward_status():
+    """获取用户装备图鉴奖励状态"""
+    user_id = session.get("user_id")
+
+    try:
+        fishing_service = current_app.config["FISHING_SERVICE"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: FISHING_SERVICE未找到 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = fishing_service.get_equipment_pokedex_reward_status(user_id)
+        return jsonify(result), 200 if result.get("success") else 400
+    except Exception as e:
+        logger.error(f"获取装备图鉴奖励状态失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/equipment-pokedex/reward/claim", methods=["POST"])
+@user_api_bp.route("/equipment_pokedex/reward/claim", methods=["POST"])
+@api_login_required
+async def claim_equipment_pokedex_reward():
+    """领取用户当前所有可领取的装备图鉴奖励"""
+    user_id = session.get("user_id")
+
+    try:
+        fishing_service = current_app.config["FISHING_SERVICE"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: FISHING_SERVICE未找到 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        result = fishing_service.claim_equipment_pokedex_rewards(user_id)
+        return jsonify(result), 200 if result.get("success") else 400
+    except Exception as e:
+        logger.error(f"领取装备图鉴奖励失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": f"领取失败: {str(e)}"}), 500

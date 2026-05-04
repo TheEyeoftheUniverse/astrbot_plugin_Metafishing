@@ -3,66 +3,74 @@
 {% block title %}主页 - 钓鱼游戏{% endblock %}
 
 {% block content %}
-<div class="row mb-3">
-    <div class="col-12 d-flex justify-content-between align-items-center">
-        <h2 class="mb-0">
-            <i class="fas fa-home"></i> 欢迎回来，{{ session.get('nickname', session.get('user_id')) }}！
-        </h2>
-        <button class="btn btn-primary" onclick="location.reload()">
-            <i class="fas fa-sync-alt"></i> 刷新状态
-        </button>
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
+<section class="page-hero mb-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+        <div>
+            <div class="editorial-kicker"><i class="fas fa-feather-pointed"></i> Fishing Desk</div>
+            <h2>欢迎回来，{{ session.get('nickname', session.get('user_id')) }}</h2>
+            <p class="text-muted mb-0 mt-2">整理装备、查看鱼塘，并从这里开始今天的钓鱼。</p>
+        </div>
+        <div class="editorial-actions">
+            <a href="{{ url_for('player_bp.fishing') }}" class="btn btn-primary">
+                <i class="fas fa-fish"></i> 开始钓鱼
+            </a>
+            <button class="btn btn-outline-secondary" onclick="location.reload()">
+                <i class="fas fa-sync-alt"></i> 刷新状态
+            </button>
+        </div>
     </div>
-</div>
+</section>
 
-<!-- 基础统计卡片 -->
-<div class="row g-3 mb-4">
+<!-- 基础统计 -->
+<div class="row g-0 metric-strip">
     <div class="col-md-6 col-lg-3">
-        <div class="card text-white bg-warning h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-coins"></i> 金币</h5>
-                <h2 class="mb-0">{{ "{:,}".format(stats.coins) }}</h2>
+        <div class="editorial-metric metric-coin h-100">
+            <h5><i class="fas fa-coins"></i> 金币</h5>
+            <div class="metric-value">{{ "{:,}".format(stats.coins) }}</div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="editorial-metric metric-gem h-100">
+            <h5><i class="fas fa-gem"></i> 高级货币</h5>
+            <div class="metric-value">{{ "{:,}".format(stats.premium_currency) }}</div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="editorial-metric metric-fish h-100 position-relative">
+            <button class="btn btn-sm {% if user_state.auto_fishing_enabled %}btn-outline-secondary{% else %}btn-primary{% endif %} metric-action"
+                    onclick="toggleAutoFishing()" id="autoFishingBtn">
+                <i class="fas fa-power-off"></i>
+                {% if user_state.auto_fishing_enabled %}关闭{% else %}开启{% endif %}
+            </button>
+            <h5><i class="fas fa-robot"></i> 自动钓鱼</h5>
+            <div class="metric-value {% if not user_state.auto_fishing_enabled %}text-danger{% endif %}">
+                {% if user_state.auto_fishing_enabled %}已开启{% else %}未开启{% endif %}
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6 col-lg-3">
-        <div class="card text-white bg-primary h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-gem"></i> 高级货币</h5>
-                <h2 class="mb-0">{{ "{:,}".format(stats.premium_currency) }}</h2>
+        <div class="editorial-metric metric-streak h-100 position-relative">
+            <div class="metric-action">
+                {% if stats.has_checked_in_today %}
+                    <span class="badge"><i class="fas fa-check"></i> 已签到</span>
+                {% else %}
+                    <button class="btn btn-outline-secondary btn-sm" onclick="dailyCheckin()">
+                        <i class="fas fa-hand-point-up"></i> 签到
+                    </button>
+                {% endif %}
             </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6 col-lg-3">
-        <div class="card text-white bg-info h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-fish"></i> 总钓鱼次数</h5>
-                <h2 class="mb-0">{{ "{:,}".format(stats.total_fishing_count) }}</h2>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6 col-lg-3">
-        <div class="card text-white bg-success h-100">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-calendar-check"></i> 连续签到</h5>
-                <h2 class="mb-0">{{ stats.consecutive_login_days }} 天</h2>
-                <div class="mt-2">
-                    {% if stats.has_checked_in_today %}
-                        <span class="badge bg-light text-success"><i class="fas fa-check"></i> 今日已签到</span>
-                    {% else %}
-                        <button class="btn btn-light btn-sm" onclick="dailyCheckin()">
-                            <i class="fas fa-hand-point-up"></i> 立即签到
-                        </button>
-                    {% endif %}
-                </div>
-            </div>
+            <h5><i class="fas fa-calendar-check"></i> 连续签到</h5>
+            <div class="metric-value">{{ stats.consecutive_login_days }} 天</div>
         </div>
     </div>
 </div>
 
 <!-- 详细状态信息 -->
+<div class="section-title"><i class="fas fa-list-check"></i> 状态手稿</div>
 <div class="row g-4">
     <!-- 装备信息 -->
     <div class="col-lg-6">
@@ -76,48 +84,45 @@
                     <h6 class="text-muted mb-2"><i class="fas fa-fish"></i> 鱼竿</h6>
                     {% if user_state.current_rod %}
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">{{ user_state.current_rod.name }}</span>
-                            <span class="badge bg-warning">{{ '★' * user_state.current_rod.rarity }}</span>
+                            <span class="fw-bold">
+                                {{ user_state.current_rod.name }}
+                                <span class="star-inline">{{ star_label(user_state.current_rod.rarity) }}{% if user_state.current_rod.refine_level %} +{{ user_state.current_rod.refine_level }}{% endif %}</span>
+                            </span>
                         </div>
                         <div class="mt-2">
-                            <small class="text-muted">精炼等级:</small>
-                            <span class="badge bg-danger">+{{ user_state.current_rod.refine_level }}</span>
                             {% if user_state.current_rod.current_durability is not none %}
-                                <small class="text-muted ms-2">耐久:</small>
+                                <small class="text-muted">耐久:</small>
                                 <span class="text-info">{{ user_state.current_rod.current_durability }}/{{ user_state.current_rod.max_durability }}</span>
                             {% else %}
-                                <span class="badge bg-success ms-2">永久耐久</span>
+                                <span class="text-success">永久耐久</span>
                             {% endif %}
                         </div>
                     {% else %}
                         <span class="text-muted">未装备</span>
                     {% endif %}
                 </div>
-                
+
                 <!-- 饰品 -->
                 <div class="mb-3 pb-3 border-bottom">
                     <h6 class="text-muted mb-2"><i class="fas fa-gem"></i> 饰品</h6>
                     {% if user_state.current_accessory %}
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">{{ user_state.current_accessory.name }}</span>
-                            <span class="badge bg-warning">{{ '★' * user_state.current_accessory.rarity }}</span>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">精炼等级:</small>
-                            <span class="badge bg-danger">+{{ user_state.current_accessory.refine_level }}</span>
+                            <span class="fw-bold">
+                                {{ user_state.current_accessory.name }}
+                                <span class="star-inline">{{ star_label(user_state.current_accessory.rarity) }}{% if user_state.current_accessory.refine_level %} +{{ user_state.current_accessory.refine_level }}{% endif %}</span>
+                            </span>
                         </div>
                     {% else %}
                         <span class="text-muted">未装备</span>
                     {% endif %}
                 </div>
-                
+
                 <!-- 鱼饵 -->
                 <div>
                     <h6 class="text-muted mb-2"><i class="fas fa-bug"></i> 鱼饵</h6>
                     {% if user_state.current_bait %}
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">{{ user_state.current_bait.name }}</span>
-                            <span class="badge bg-warning">{{ '★' * user_state.current_bait.rarity }}</span>
+                            <span class="fw-bold">{{ user_state.current_bait.name }} <span class="star-inline">{{ star_label(user_state.current_bait.rarity) }}</span></span>
                         </div>
                         <div class="mt-2">
                             <small class="text-muted">剩余数量:</small>
@@ -130,7 +135,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- 状态信息 -->
     <div class="col-lg-6">
         <div class="card h-100">
@@ -156,127 +161,31 @@
                         <span class="text-muted">未知区域</span>
                     {% endif %}
                 </div>
-                
-                <!-- 称号 -->
-                <div class="mb-3 pb-3 border-bottom">
-                    <h6 class="text-muted mb-2"><i class="fas fa-trophy"></i> 当前称号</h6>
-                    {% if user_state.current_title %}
-                        <span class="badge bg-primary fs-6">{{ user_state.current_title.name }}</span>
-                    {% else %}
-                        <span class="text-muted">无</span>
-                    {% endif %}
-                </div>
-                
-                <!-- 自动钓鱼 -->
-                <div class="mb-3 pb-3 border-bottom">
-                    <h6 class="text-muted mb-2"><i class="fas fa-robot"></i> 自动钓鱼</h6>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            {% if user_state.auto_fishing_enabled %}
-                                <span class="badge bg-success">已开启</span>
-                            {% else %}
-                                <span class="badge bg-secondary">已关闭</span>
-                            {% endif %}
-                        </div>
-                        <button class="btn btn-sm {% if user_state.auto_fishing_enabled %}btn-warning{% else %}btn-success{% endif %}" 
-                                onclick="toggleAutoFishing()" id="autoFishingBtn">
-                            <i class="fas fa-power-off"></i> 
-                            {% if user_state.auto_fishing_enabled %}关闭{% else %}开启{% endif %}
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- 冷却时间 -->
-                <div>
-                    <h6 class="text-muted mb-2"><i class="fas fa-clock"></i> 冷却状态</h6>
-                    <div class="small">
-                        <div class="mb-2">
-                            <i class="fas fa-fish text-info"></i> 钓鱼CD: 
-                            {% if user_state.fishing_cooldown_remaining > 0 %}
-                                <span class="text-danger">{{ user_state.fishing_cooldown_remaining }}秒</span>
-                            {% else %}
-                                <span class="text-success">可以钓鱼</span>
-                            {% endif %}
-                        </div>
-                        <div class="mb-2">
-                            <i class="fas fa-hand-holding text-warning"></i> 偷鱼CD: 
-                            {% if user_state.steal_cooldown_remaining > 0 %}
-                                <span class="text-danger">{{ user_state.steal_cooldown_remaining }}秒</span>
-                            {% else %}
-                                <span class="text-success">已就绪</span>
-                            {% endif %}
-                        </div>
-                        {% if user_state.electric_fish_cooldown_remaining is defined %}
-                        <div>
-                            <i class="fas fa-bolt text-primary"></i> 电鱼CD: 
-                            {% if user_state.electric_fish_cooldown_remaining > 0 %}
-                                <span class="text-danger">{{ user_state.electric_fish_cooldown_remaining }}秒</span>
-                            {% else %}
-                                <span class="text-success">已就绪</span>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- 鱼塘和快捷功能 -->
-<div class="row mt-4 g-4">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="fas fa-water"></i> 鱼塘状态</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-1">
+                <!-- 总钓鱼次数 -->
+                <div class="mb-3 pb-3 border-bottom">
+                    <h6 class="text-muted mb-2"><i class="fas fa-fish"></i> 总钓鱼次数</h6>
+                    <div class="fw-bold">{{ "{:,}".format(stats.total_fishing_count) }}</div>
+                </div>
+
+                <!-- 鱼塘状态 -->
+                <div>
+                    <h6 class="text-muted mb-2"><i class="fas fa-water"></i> 鱼塘状态</h6>
+                    <div class="d-flex justify-content-between mb-1 small">
                         <span>容量</span>
-                        <span><strong>{{ stats.fish_count }} / {{ stats.fish_pond_capacity }}</strong></span>
+                        <strong>{{ stats.fish_count }} / {{ stats.fish_pond_capacity }}</strong>
                     </div>
-                    <div class="progress" style="height: 25px;">
+                    <div class="progress mb-2" style="height: 8px;">
                         {% set fish_percent = (stats.fish_count / stats.fish_pond_capacity * 100) | int %}
-                        <div class="progress-bar bg-info" role="progressbar" 
-                             style="width: {{ fish_percent }}%;" 
-                             aria-valuenow="{{ fish_percent }}" 
-                             aria-valuemin="0" 
-                             aria-valuemax="100">
-                            {{ fish_percent }}%
+                        <div class="progress-bar bg-info" role="progressbar" style="width: {{ fish_percent }}%;" aria-valuenow="{{ fish_percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center small">
+                        <span><i class="fas fa-coins text-warning"></i> 总价值 {{ "{:,}".format(stats.fish_pond_value) }} 金币</span>
+                        <a href="{{ url_for('player_bp.fishpond') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-fish"></i> 查看
+                        </a>
+                    </div>
                         </div>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span><i class="fas fa-coins text-warning"></i> 总价值</span>
-                        <span class="fw-bold text-warning">{{ "{:,}".format(stats.fish_pond_value) }} 金币</span>
-                    </div>
-                </div>
-                <a href="{{ url_for('player_bp.fishpond') }}" class="btn btn-info w-100">
-                    <i class="fas fa-fish"></i> 查看鱼塘
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0"><i class="fas fa-bolt"></i> 快捷功能</h5>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('player_bp.fishing') }}" class="btn btn-primary">
-                        <i class="fas fa-fish"></i> 开始钓鱼
-                    </a>
-                    <a href="{{ url_for('player_bp.shop') }}" class="btn btn-success">
-                        <i class="fas fa-shopping-cart"></i> 前往商店
-                    </a>
-                    <a href="{{ url_for('player_bp.gacha') }}" class="btn btn-warning">
-                        <i class="fas fa-dice"></i> 试试手气
-                    </a>
-                </div>
             </div>
         </div>
     </div>
@@ -291,7 +200,7 @@ async function dailyCheckin() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'}
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -307,7 +216,7 @@ async function dailyCheckin() {
 async function toggleAutoFishing() {
     const btn = document.getElementById('autoFishingBtn');
     btn.disabled = true;
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.toggle_auto_fishing") }}', {
             method: 'POST',
@@ -315,9 +224,9 @@ async function toggleAutoFishing() {
                 'Content-Type': 'application/x-www-form-urlencoded',
             }
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             // 刷新页面以更新状态
             location.reload();

@@ -4,7 +4,7 @@ import random
 import threading
 import time
 import zlib
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import timedelta
 from astrbot.api import logger
 
@@ -22,18 +22,32 @@ from ..services.wipe_bomb_daily_service import add_wipe_bomb_jackpot
 from ..utils import get_now, get_fish_template, get_today, get_last_reset_time, calculate_after_refine
 
 POKEDEX_REWARD_MILESTONES = [
-    (5, 66),
-    (10, 88),
-    (20, 120),
-    (30, 180),
-    (40, 260),
-    (50, 360),
-    (60, 520),
-    (70, 760),
-    (80, 1066),
-    (90, 1400),
-    (100, 1846),
+    (5, "coins", 5000),
+    (10, "coins", 12000),
+    (20, "coins", 30000),
+    (25, "premium", 188),
+    (30, "premium", 288),
+    (40, "premium", 520),
+    (50, "premium", 888),
+    (60, "premium", 1288),
+    (70, "premium", 1888),
+    (80, "premium", 2888),
+    (90, "premium", 6666),
+    (100, "premium", 66666),
 ]
+
+EQUIPMENT_POKEDEX_REWARD_MILESTONES = POKEDEX_REWARD_MILESTONES
+
+EQUIPMENT_TYPE_META = {
+    "rod": {"label": "鱼竿", "order": 0},
+    "accessory": {"label": "饰品", "order": 1},
+    "bait": {"label": "鱼饵", "order": 2},
+}
+
+
+def _format_reward_text(reward_type: str, reward_amount: int) -> str:
+    unit = "金币" if reward_type == "coins" else "钻石"
+    return f"{reward_amount} {unit}"
 
 
 class FishingService:
@@ -624,6 +638,21 @@ class FishingService:
             "unlocked_percentage": (unlock_fish_count / all_fish_count) if all_fish_count > 0 else 0
     }
 
+    def _sum_rewards_by_type(self, rewards: List[Dict[str, Any]]) -> Dict[str, int]:
+        totals = {"coins": 0, "premium": 0}
+        for reward in rewards:
+            reward_type = reward.get("reward_type", "premium")
+            totals[reward_type] = totals.get(reward_type, 0) + int(reward.get("reward_amount", 0) or 0)
+        return totals
+
+    def _sum_claimed_rewards_by_type(self, rewards: List[Dict[str, Any]]) -> Dict[str, int]:
+        totals = {"coins": 0, "premium": 0}
+        for reward in rewards:
+            reward_type = reward.get("claimed_reward_type", reward.get("reward_type", "premium"))
+            reward_amount = reward.get("claimed_reward_amount", reward.get("reward_amount", 0))
+            totals[reward_type] = totals.get(reward_type, 0) + int(reward_amount or 0)
+        return totals
+
     def _build_pokedex_reward_status(self, user_id: str, user) -> Dict[str, Any]:
         stats = self.log_repo.get_user_fish_stats(user_id)
         claims = self.log_repo.get_user_pokedex_reward_claims(user_id)
@@ -634,7 +663,7 @@ class FishingService:
         unlocked_ratio = (unlocked_fish_count / total_fish_count) if total_fish_count > 0 else 0.0
 
         milestones = []
-        for milestone_percent, reward_premium in POKEDEX_REWARD_MILESTONES:
+        for milestone_percent, reward_type, reward_amount in POKEDEX_REWARD_MILESTONES:
             required_fish_count = (
                 math.ceil(total_fish_count * milestone_percent / 100.0)
                 if total_fish_count > 0
@@ -642,6 +671,8 @@ class FishingService:
             )
             claim_record = claim_map.get(milestone_percent)
             claimed = claim_record is not None
+            claimed_reward_type = getattr(claim_record, "reward_type", None) if claim_record else None
+            claimed_reward_amount = getattr(claim_record, "reward_amount", None) if claim_record else None
             claimable = (
                 not claimed
                 and total_fish_count > 0
@@ -652,7 +683,12 @@ class FishingService:
             milestones.append(
                 {
                     "milestone_percent": milestone_percent,
-                    "reward_premium": reward_premium,
+                    "reward_type": reward_type,
+                    "reward_amount": reward_amount,
+                    "reward_text": _format_reward_text(reward_type, reward_amount),
+                    "reward_premium": reward_amount if reward_type == "premium" else 0,
+                    "claimed_reward_type": claimed_reward_type,
+                    "claimed_reward_amount": claimed_reward_amount,
                     "required_fish_count": required_fish_count,
                     "claimed": claimed,
                     "claimable": claimable,
@@ -663,12 +699,14 @@ class FishingService:
 
         claimable_rewards = [item for item in milestones if item["claimable"]]
         next_milestone = next((item for item in milestones if not item["claimed"]), None)
-        total_reward_amount = sum(reward for _, reward in POKEDEX_REWARD_MILESTONES)
-        total_claimed_premium = sum(item["reward_premium"] for item in milestones if item["claimed"])
+        total_rewards_by_type = self._sum_rewards_by_type(milestones)
+        claimed_rewards_by_type = self._sum_claimed_rewards_by_type([item for item in milestones if item["claimed"]])
+        claimable_rewards_by_type = self._sum_rewards_by_type(claimable_rewards)
 
         return {
             "success": True,
             "user_id": user_id,
+            "current_coins": user.coins,
             "current_premium_currency": user.premium_currency,
             "unlocked_fish_count": unlocked_fish_count,
             "total_fish_count": total_fish_count,
@@ -676,11 +714,17 @@ class FishingService:
             "unlocked_percentage_text": f"{unlocked_ratio * 100:.1f}%",
             "milestones": milestones,
             "claimable_rewards": claimable_rewards,
-            "claimable_reward_total": sum(item["reward_premium"] for item in claimable_rewards),
+            "claimable_rewards_by_type": claimable_rewards_by_type,
+            "claimable_reward_total": claimable_rewards_by_type.get("premium", 0),
+            "claimable_coins_total": claimable_rewards_by_type.get("coins", 0),
+            "claimable_premium_total": claimable_rewards_by_type.get("premium", 0),
             "claimed_count": sum(1 for item in milestones if item["claimed"]),
             "total_milestones": len(milestones),
-            "total_claimed_premium": total_claimed_premium,
-            "total_reward_amount": total_reward_amount,
+            "total_claimed_coins": claimed_rewards_by_type.get("coins", 0),
+            "total_claimed_premium": claimed_rewards_by_type.get("premium", 0),
+            "total_reward_coins": total_rewards_by_type.get("coins", 0),
+            "total_reward_premium": total_rewards_by_type.get("premium", 0),
+            "total_reward_amount": total_rewards_by_type.get("premium", 0),
             "next_milestone": next_milestone,
             "all_claimed": all(item["claimed"] for item in milestones) if milestones else True,
         }
@@ -708,7 +752,8 @@ class FishingService:
                 claimed = self.log_repo.claim_pokedex_reward(
                     user_id,
                     reward["milestone_percent"],
-                    reward["reward_premium"],
+                    reward["reward_type"],
+                    reward["reward_amount"],
                     status["unlocked_fish_count"],
                     status["total_fish_count"],
                 )
@@ -716,6 +761,9 @@ class FishingService:
                     newly_claimed_rewards.append(
                         {
                             "milestone_percent": reward["milestone_percent"],
+                            "reward_type": reward["reward_type"],
+                            "reward_amount": reward["reward_amount"],
+                            "reward_text": reward["reward_text"],
                             "reward_premium": reward["reward_premium"],
                             "required_fish_count": reward["required_fish_count"],
                         }
@@ -726,10 +774,288 @@ class FishingService:
             refreshed_status = self._build_pokedex_reward_status(user_id, refreshed_user or user)
             refreshed_status["newly_claimed_rewards"] = newly_claimed_rewards
             refreshed_status["newly_claimed_premium"] = newly_claimed_premium
+            refreshed_status["newly_claimed_by_type"] = self._sum_rewards_by_type(newly_claimed_rewards)
             if newly_claimed_rewards:
-                refreshed_status["message"] = f"成功领取 {newly_claimed_premium} 高级货币"
+                claimed_totals = refreshed_status["newly_claimed_by_type"]
+                parts = []
+                if claimed_totals.get("coins", 0) > 0:
+                    parts.append(f"{claimed_totals['coins']} 金币")
+                if claimed_totals.get("premium", 0) > 0:
+                    parts.append(f"{claimed_totals['premium']} 钻石")
+                refreshed_status["message"] = "成功领取 " + "、".join(parts)
             else:
                 refreshed_status["message"] = "当前没有可领取的图鉴奖励"
+            return refreshed_status
+
+    def _get_all_equipment_templates(self) -> List[Dict[str, Any]]:
+        equipment = []
+        for rod in self.item_template_repo.get_all_rods():
+            equipment.append(
+                {
+                    "equipment_type": "rod",
+                    "equipment_type_label": EQUIPMENT_TYPE_META["rod"]["label"],
+                    "id": rod.rod_id,
+                    "name": rod.name,
+                    "rarity": rod.rarity,
+                    "description": rod.description,
+                }
+            )
+        for accessory in self.item_template_repo.get_all_accessories():
+            equipment.append(
+                {
+                    "equipment_type": "accessory",
+                    "equipment_type_label": EQUIPMENT_TYPE_META["accessory"]["label"],
+                    "id": accessory.accessory_id,
+                    "name": accessory.name,
+                    "rarity": accessory.rarity,
+                    "description": accessory.description,
+                }
+            )
+        for bait in self.item_template_repo.get_all_baits():
+            equipment.append(
+                {
+                    "equipment_type": "bait",
+                    "equipment_type_label": EQUIPMENT_TYPE_META["bait"]["label"],
+                    "id": bait.bait_id,
+                    "name": bait.name,
+                    "rarity": bait.rarity,
+                    "description": bait.description,
+                    "effect_description": bait.effect_description,
+                }
+            )
+        equipment.sort(
+            key=lambda item: (
+                EQUIPMENT_TYPE_META[item["equipment_type"]]["order"],
+                -int(item.get("rarity", 0) or 0),
+                int(item["id"]),
+            )
+        )
+        return equipment
+
+    def _sync_user_equipment_stats(self, user_id: str) -> None:
+        self.inventory_repo.sync_user_equipment_stats_from_inventory(user_id)
+
+    def get_user_equipment_pokedex(self, user_id: str, page: int = 1, page_size: int = 20, equipment_type: str | None = None, rarity: int | None = None, owned_only: bool = False) -> Dict[str, Any]:
+        """获取用户装备图鉴。"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+
+        self._sync_user_equipment_stats(user_id)
+        stats = self.inventory_repo.get_user_equipment_stats(user_id)
+        stat_map = {
+            (item["equipment_type"], item["equipment_id"]): item
+            for item in stats
+        }
+        all_equipment = self._get_all_equipment_templates()
+        items = []
+        categories = {
+            key: {
+                "equipment_type": key,
+                "label": meta["label"],
+                "total_count": 0,
+                "unlocked_count": 0,
+                "unlocked_percentage": 0.0,
+            }
+            for key, meta in EQUIPMENT_TYPE_META.items()
+        }
+
+        for template in all_equipment:
+            key = (template["equipment_type"], template["id"])
+            stat = stat_map.get(key)
+            is_collected = stat is not None
+            category = categories[template["equipment_type"]]
+            category["total_count"] += 1
+            if is_collected:
+                category["unlocked_count"] += 1
+
+            item = dict(template)
+            item.update(
+                {
+                    "is_collected": is_collected,
+                    "total_obtained": int(stat.get("total_obtained", 0)) if stat else 0,
+                    "first_obtained_at": stat.get("first_obtained_at") if stat else None,
+                    "last_obtained_at": stat.get("last_obtained_at") if stat else None,
+                }
+            )
+            items.append(item)
+
+        for category in categories.values():
+            total = category["total_count"]
+            category["unlocked_percentage"] = (category["unlocked_count"] / total) if total > 0 else 0.0
+            category["unlocked_percentage_text"] = f"{category['unlocked_percentage'] * 100:.1f}%"
+
+        total_equipment_count = len(all_equipment)
+        unlocked_equipment_count = len(stat_map)
+        valid_equipment_types = set(EQUIPMENT_TYPE_META.keys())
+        normalized_equipment_type = equipment_type if equipment_type in valid_equipment_types else "all"
+        filtered_items = items
+        if normalized_equipment_type != "all":
+            filtered_items = [item for item in filtered_items if item.get("equipment_type") == normalized_equipment_type]
+        if rarity is not None:
+            filtered_items = [item for item in filtered_items if int(item.get("rarity", 0) or 0) == rarity]
+        if owned_only:
+            filtered_items = [item for item in filtered_items if item.get("is_collected")]
+
+        total_pages = max(1, math.ceil(len(filtered_items) / page_size)) if page_size > 0 else 1
+        page = min(max(page, 1), total_pages)
+        start = (page - 1) * page_size
+        paged_items = filtered_items[start:start + page_size]
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "pokedex": items,
+            "page_items": paged_items,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "filtered_count": len(filtered_items),
+            "filters": {
+                "equipment_type": normalized_equipment_type,
+                "rarity": rarity if rarity is not None else "all",
+                "owned": "1" if owned_only else "0",
+            },
+            "categories": categories,
+            "total_equipment_count": total_equipment_count,
+            "unlocked_equipment_count": unlocked_equipment_count,
+            "unlocked_percentage": (unlocked_equipment_count / total_equipment_count) if total_equipment_count > 0 else 0.0,
+            "unlocked_percentage_text": (
+                f"{(unlocked_equipment_count / total_equipment_count * 100) if total_equipment_count > 0 else 0:.1f}%"
+            ),
+        }
+
+    def _build_equipment_pokedex_reward_status(self, user_id: str, user) -> Dict[str, Any]:
+        self._sync_user_equipment_stats(user_id)
+        stats = self.inventory_repo.get_user_equipment_stats(user_id)
+        claims = self.inventory_repo.get_user_equipment_pokedex_reward_claims(user_id)
+        claim_map = {claim["milestone_percent"]: claim for claim in claims}
+
+        total_equipment_count = len(self._get_all_equipment_templates())
+        unlocked_equipment_count = len(stats)
+        unlocked_ratio = (unlocked_equipment_count / total_equipment_count) if total_equipment_count > 0 else 0.0
+
+        milestones = []
+        for milestone_percent, reward_type, reward_amount in EQUIPMENT_POKEDEX_REWARD_MILESTONES:
+            required_equipment_count = (
+                math.ceil(total_equipment_count * milestone_percent / 100.0)
+                if total_equipment_count > 0
+                else 0
+            )
+            claim_record = claim_map.get(milestone_percent)
+            claimed = claim_record is not None
+            claimed_reward_type = claim_record.get("reward_type") if claim_record else None
+            claimed_reward_amount = claim_record.get("reward_amount") if claim_record else None
+            claimable = (
+                not claimed
+                and total_equipment_count > 0
+                and unlocked_equipment_count >= required_equipment_count
+            )
+            remaining_equipment_count = (
+                0 if claimed or claimable else max(required_equipment_count - unlocked_equipment_count, 0)
+            )
+
+            milestones.append(
+                {
+                    "milestone_percent": milestone_percent,
+                    "reward_type": reward_type,
+                    "reward_amount": reward_amount,
+                    "reward_text": _format_reward_text(reward_type, reward_amount),
+                    "reward_premium": reward_amount if reward_type == "premium" else 0,
+                    "claimed_reward_type": claimed_reward_type,
+                    "claimed_reward_amount": claimed_reward_amount,
+                    "required_equipment_count": required_equipment_count,
+                    "claimed": claimed,
+                    "claimable": claimable,
+                    "remaining_equipment_count": remaining_equipment_count,
+                    "claimed_at": claim_record.get("claimed_at") if claim_record else None,
+                }
+            )
+
+        claimable_rewards = [item for item in milestones if item["claimable"]]
+        next_milestone = next((item for item in milestones if not item["claimed"]), None)
+        total_rewards_by_type = self._sum_rewards_by_type(milestones)
+        claimed_rewards_by_type = self._sum_claimed_rewards_by_type([item for item in milestones if item["claimed"]])
+        claimable_rewards_by_type = self._sum_rewards_by_type(claimable_rewards)
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "current_coins": user.coins,
+            "current_premium_currency": user.premium_currency,
+            "unlocked_equipment_count": unlocked_equipment_count,
+            "total_equipment_count": total_equipment_count,
+            "unlocked_percentage": unlocked_ratio,
+            "unlocked_percentage_text": f"{unlocked_ratio * 100:.1f}%",
+            "milestones": milestones,
+            "claimable_rewards": claimable_rewards,
+            "claimable_rewards_by_type": claimable_rewards_by_type,
+            "claimable_coins_total": claimable_rewards_by_type.get("coins", 0),
+            "claimable_premium_total": claimable_rewards_by_type.get("premium", 0),
+            "claimed_count": sum(1 for item in milestones if item["claimed"]),
+            "total_milestones": len(milestones),
+            "total_claimed_coins": claimed_rewards_by_type.get("coins", 0),
+            "total_claimed_premium": claimed_rewards_by_type.get("premium", 0),
+            "total_reward_coins": total_rewards_by_type.get("coins", 0),
+            "total_reward_premium": total_rewards_by_type.get("premium", 0),
+            "next_milestone": next_milestone,
+            "all_claimed": all(item["claimed"] for item in milestones) if milestones else True,
+        }
+
+    def get_equipment_pokedex_reward_status(self, user_id: str) -> Dict[str, Any]:
+        """获取用户装备图鉴奖励状态。"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+        return self._build_equipment_pokedex_reward_status(user_id, user)
+
+    def claim_equipment_pokedex_rewards(self, user_id: str) -> Dict[str, Any]:
+        """领取当前所有可领取的装备图鉴奖励。"""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+
+        with self.pokedex_reward_claim_lock:
+            status = self._build_equipment_pokedex_reward_status(user_id, user)
+            claimable_rewards = status.get("claimable_rewards", [])
+            newly_claimed_rewards = []
+
+            for reward in claimable_rewards:
+                claimed = self.inventory_repo.claim_equipment_pokedex_reward(
+                    user_id,
+                    reward["milestone_percent"],
+                    reward["reward_type"],
+                    reward["reward_amount"],
+                    status["unlocked_equipment_count"],
+                    status["total_equipment_count"],
+                )
+                if claimed:
+                    newly_claimed_rewards.append(
+                        {
+                            "milestone_percent": reward["milestone_percent"],
+                            "reward_type": reward["reward_type"],
+                            "reward_amount": reward["reward_amount"],
+                            "reward_text": reward["reward_text"],
+                            "reward_premium": reward["reward_premium"],
+                            "required_equipment_count": reward["required_equipment_count"],
+                        }
+                    )
+
+            refreshed_user = self.user_repo.get_by_id(user_id)
+            refreshed_status = self._build_equipment_pokedex_reward_status(user_id, refreshed_user or user)
+            refreshed_status["newly_claimed_rewards"] = newly_claimed_rewards
+            refreshed_status["newly_claimed_by_type"] = self._sum_rewards_by_type(newly_claimed_rewards)
+            refreshed_status["newly_claimed_premium"] = refreshed_status["newly_claimed_by_type"].get("premium", 0)
+            if newly_claimed_rewards:
+                claimed_totals = refreshed_status["newly_claimed_by_type"]
+                parts = []
+                if claimed_totals.get("coins", 0) > 0:
+                    parts.append(f"{claimed_totals['coins']} 金币")
+                if claimed_totals.get("premium", 0) > 0:
+                    parts.append(f"{claimed_totals['premium']} 钻石")
+                refreshed_status["message"] = "成功领取 " + "、".join(parts)
+            else:
+                refreshed_status["message"] = "当前没有可领取的装备图鉴奖励"
             return refreshed_status
 
     def get_user_fishing_zones(self, user_id: str) -> Dict[str, Any]:

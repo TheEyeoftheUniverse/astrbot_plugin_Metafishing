@@ -67,6 +67,7 @@ def _build_fish_message(result, fishing_cost):
 
 
 def _build_pokedex_reward_message(result: Dict[str, Any]) -> str:
+    claimed_totals = result.get("newly_claimed_by_type", {}) or {}
     lines = [
         "【图鉴奖励】",
         f"当前进度：{result.get('unlocked_fish_count', 0)}/{result.get('total_fish_count', 0)}（{result.get('unlocked_percentage_text', '0.0%')}）",
@@ -78,27 +79,112 @@ def _build_pokedex_reward_message(result: Dict[str, Any]) -> str:
         lines.append("本次领取：")
         for reward in newly_claimed_rewards:
             lines.append(
-                f" - {reward['milestone_percent']}% 节点：{reward['reward_premium']} 高级货币"
+                f" - {reward['milestone_percent']}% 节点：{reward.get('reward_text', '')}"
             )
-        lines.append(f"合计获得：{result.get('newly_claimed_premium', 0)} 高级货币")
+        parts = []
+        if claimed_totals.get("coins", 0) > 0:
+            parts.append(f"{claimed_totals['coins']} 金币")
+        if claimed_totals.get("premium", 0) > 0:
+            parts.append(f"{claimed_totals['premium']} 钻石")
+        lines.append(f"合计获得：{'、'.join(parts)}")
     else:
         lines.append("")
         lines.append("当前没有可领取奖励")
 
     lines.append("")
     lines.append(f"已领取节点：{result.get('claimed_count', 0)}/{result.get('total_milestones', 0)}")
-    lines.append(f"累计已领取：{result.get('total_claimed_premium', 0)} 高级货币")
+    lines.append(
+        f"累计已领取：{result.get('total_claimed_coins', 0)}/{result.get('total_reward_coins', 0)} 金币，"
+        f"{result.get('total_claimed_premium', 0)}/{result.get('total_reward_premium', 0)} 钻石"
+    )
 
     next_milestone = result.get("next_milestone")
     if next_milestone:
-        lines.append(f"下一奖励：{next_milestone['milestone_percent']}% 节点")
+        lines.append(
+            f"下一奖励：{next_milestone['milestone_percent']}% 节点（{next_milestone.get('reward_text', '')}）"
+        )
         lines.append(
             f"还需数量：{next_milestone['remaining_fish_count']} 种（目标 {next_milestone['required_fish_count']}/{result.get('total_fish_count', 0)}）"
         )
     else:
         lines.append("下一奖励：已全部领取完毕")
 
-    lines.append(f"当前高级货币：{result.get('current_premium_currency', 0)}")
+    lines.append(f"当前资产：{result.get('current_coins', 0)} 金币，{result.get('current_premium_currency', 0)} 钻石")
+    return "\n".join(lines)
+
+
+def _build_equipment_pokedex_message(result: Dict[str, Any]) -> str:
+    lines = [
+        "【装备图鉴】",
+        f"总进度：{result.get('unlocked_equipment_count', 0)}/{result.get('total_equipment_count', 0)}（{result.get('unlocked_percentage_text', '0.0%')}）",
+    ]
+    categories = result.get("categories", {}) or {}
+    for key in ("rod", "accessory", "bait"):
+        category = categories.get(key)
+        if not category:
+            continue
+        lines.append(
+            f"{category['label']}：{category['unlocked_count']}/{category['total_count']}（{category['unlocked_percentage_text']}）"
+        )
+
+    lines.append("")
+    lines.append(f"第 {result.get('page', 1)}/{result.get('total_pages', 1)} 页")
+    for item in result.get("page_items", []):
+        stars = "★" * int(item.get("rarity", 0) or 0)
+        if item.get("is_collected"):
+            lines.append(
+                f"✅ [{item['equipment_type_label']}] {item['name']}（{stars}，累计获得 {item.get('total_obtained', 0)}）"
+            )
+        else:
+            lines.append(f"❔ [{item['equipment_type_label']}] ???（{stars}，ID: {item['id']}）")
+
+    lines.append("")
+    lines.append("使用「/装备图鉴 页码」翻页，使用「/装备图鉴奖励」领取节点奖励。")
+    return "\n".join(lines)
+
+
+def _build_equipment_pokedex_reward_message(result: Dict[str, Any]) -> str:
+    claimed_totals = result.get("newly_claimed_by_type", {}) or {}
+    lines = [
+        "【装备图鉴奖励】",
+        f"当前进度：{result.get('unlocked_equipment_count', 0)}/{result.get('total_equipment_count', 0)}（{result.get('unlocked_percentage_text', '0.0%')}）",
+    ]
+
+    newly_claimed_rewards = result.get("newly_claimed_rewards", [])
+    if newly_claimed_rewards:
+        lines.append("")
+        lines.append("本次领取：")
+        for reward in newly_claimed_rewards:
+            lines.append(f" - {reward['milestone_percent']}% 节点：{reward.get('reward_text', '')}")
+        parts = []
+        if claimed_totals.get("coins", 0) > 0:
+            parts.append(f"{claimed_totals['coins']} 金币")
+        if claimed_totals.get("premium", 0) > 0:
+            parts.append(f"{claimed_totals['premium']} 钻石")
+        lines.append(f"合计获得：{'、'.join(parts)}")
+    else:
+        lines.append("")
+        lines.append("当前没有可领取奖励")
+
+    lines.append("")
+    lines.append(f"已领取节点：{result.get('claimed_count', 0)}/{result.get('total_milestones', 0)}")
+    lines.append(
+        f"累计已领取：{result.get('total_claimed_coins', 0)}/{result.get('total_reward_coins', 0)} 金币，"
+        f"{result.get('total_claimed_premium', 0)}/{result.get('total_reward_premium', 0)} 钻石"
+    )
+
+    next_milestone = result.get("next_milestone")
+    if next_milestone:
+        lines.append(
+            f"下一奖励：{next_milestone['milestone_percent']}% 节点（{next_milestone.get('reward_text', '')}）"
+        )
+        lines.append(
+            f"还需数量：{next_milestone['remaining_equipment_count']} 件（目标 {next_milestone['required_equipment_count']}/{result.get('total_equipment_count', 0)}）"
+        )
+    else:
+        lines.append("下一奖励：已全部领取完毕")
+
+    lines.append(f"当前资产：{result.get('current_coins', 0)} 金币，{result.get('current_premium_currency', 0)} 钻石")
     return "\n".join(lines)
 
 
@@ -289,3 +375,32 @@ class FishingHandlers:
             return
 
         yield event.plain_result(_build_pokedex_reward_message(result))
+
+    async def equipment_pokedex(self, event: AstrMessageEvent):
+        """查看装备图鉴"""
+        user_id = self.plugin._get_effective_user_id(event)
+        args = event.message_str.split()
+        page = 1
+        if len(args) > 1 and args[1].isdigit():
+            page = int(args[1])
+
+        result = self.fishing_service.get_user_equipment_pokedex(user_id, page=page)
+        if not result or not result.get("success"):
+            yield event.plain_result(
+                f"❌ 查看装备图鉴失败：{(result or {}).get('message', '未知错误')}"
+            )
+            return
+
+        yield event.plain_result(_build_equipment_pokedex_message(result))
+
+    async def equipment_pokedex_reward(self, event: AstrMessageEvent):
+        """领取或查看装备图鉴奖励进度"""
+        user_id = self.plugin._get_effective_user_id(event)
+        result = self.fishing_service.claim_equipment_pokedex_rewards(user_id)
+        if not result or not result.get("success"):
+            yield event.plain_result(
+                f"❌ 装备图鉴奖励处理失败：{(result or {}).get('message', '未知错误')}"
+            )
+            return
+
+        yield event.plain_result(_build_equipment_pokedex_reward_message(result))

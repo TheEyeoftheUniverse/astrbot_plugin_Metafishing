@@ -3,13 +3,15 @@
 {% block title %}登录 - 钓鱼游戏{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow-lg">
-            <div class="card-header bg-info text-white text-center">
-                <h4 class="mb-0"><i class="fas fa-sign-in-alt"></i> 玩家登录</h4>
+<div class="row justify-content-center mt-4">
+    <div class="col-md-7 col-lg-5">
+        <section class="editorial-auth-panel">
+            <div class="text-center">
+                <div class="editorial-kicker"><i class="fas fa-key"></i> Player Access</div>
+                <h1 class="auth-title mb-2">玩家登录</h1>
+                <p class="text-muted mb-0">进入你的钓鱼记录、鱼塘和交易工作台。</p>
             </div>
-            <div class="card-body">
+            <div class="auth-body">
                 {% if oauth_misconfigured %}
                 <div class="alert alert-warning">
                     <i class="fas fa-triangle-exclamation"></i>
@@ -19,7 +21,7 @@
 
                 {% if oauth_configured and oauth_login_url %}
                 <div class="d-grid mb-3">
-                    <a href="{{ oauth_login_url }}" class="btn btn-dark">
+                    <a href="{{ oauth_login_url }}" class="btn btn-primary">
                         <i class="fas fa-right-to-bracket"></i>
                         使用 Linux.do 登录
                     </a>
@@ -38,7 +40,7 @@
                 <form method="POST">
                     <div class="mb-3">
                         <label for="user_id" class="form-label">用户ID</label>
-                        <input type="text" class="form-control" id="user_id" name="user_id" 
+                        <input type="text" class="form-control" id="user_id" name="user_id"
                                {% if first_login %}value="{{ user_id }}" readonly{% endif %}
                                placeholder="输入您在游戏中的用户ID" required>
                         <div class="form-text">
@@ -53,8 +55,8 @@
                         <label for="password" class="form-label">
                             {% if first_login %}设置密钥{% else %}登录密钥{% endif %}
                         </label>
-                        <input type="password" class="form-control" id="password" name="password" 
-                               placeholder="{% if first_login %}设置一个登录密钥{% else %}输入您的登录密钥{% endif %}" 
+                        <input type="password" class="form-control" id="password" name="password"
+                               placeholder="{% if first_login %}设置一个登录密钥{% else %}输入您的登录密钥{% endif %}"
                                {% if not first_login %}required{% endif %}>
                         <div class="form-text">
                             {% if first_login %}
@@ -65,8 +67,8 @@
                         </div>
                     </div>
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-info">
-                            <i class="fas fa-sign-in-alt"></i> 
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt"></i>
                             {% if first_login %}设置密钥并登录{% else %}登录{% endif %}
                         </button>
                     </div>
@@ -78,13 +80,13 @@
                 </div>
                 {% endif %}
             </div>
-            <div class="card-footer text-center">
+            <div class="auth-footer text-center">
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i>
                     若未开启自动注册，请先在游戏中使用 <code>,注册</code> 命令创建账号
                 </small>
             </div>
-        </div>
+        </section>
     </div>
 </div>
 {% endblock %}

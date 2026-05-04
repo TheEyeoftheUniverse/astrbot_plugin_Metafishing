@@ -27,6 +27,46 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
         """获取一个线程安全的数据库连接。"""
         return self._connection_manager.get_connection()
 
+    def _record_equipment_obtained_with_cursor(
+        self,
+        cursor: sqlite3.Cursor,
+        user_id: str,
+        equipment_type: str,
+        equipment_id: int,
+        quantity: int = 1,
+        obtained_at: Optional[datetime] = None,
+    ) -> None:
+        if quantity <= 0:
+            return
+        now = obtained_at or datetime.now()
+        cursor.execute(
+            """
+            INSERT INTO user_equipment_stats (
+                user_id, equipment_type, equipment_id,
+                first_obtained_at, last_obtained_at, total_obtained
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, equipment_type, equipment_id) DO UPDATE SET
+                last_obtained_at = excluded.last_obtained_at,
+                total_obtained = total_obtained + excluded.total_obtained
+            """,
+            (user_id, equipment_type, equipment_id, now, now, quantity),
+        )
+
+    def record_equipment_obtained(
+        self,
+        user_id: str,
+        equipment_type: str,
+        equipment_id: int,
+        quantity: int = 1,
+        obtained_at: Optional[datetime] = None,
+    ) -> None:
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            self._record_equipment_obtained_with_cursor(
+                cursor, user_id, equipment_type, equipment_id, quantity, obtained_at
+            )
+            conn.commit()
+
     # --- 私有映射辅助方法 ---
     def _row_to_fish_item(self, row: sqlite3.Row) -> Optional[UserFishInventoryItem]:
         if not row:
@@ -325,9 +365,155 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
                 VALUES (?, ?, MAX(0, ?))
                 ON CONFLICT(user_id, bait_id) DO UPDATE SET quantity = MAX(0, quantity + ?)
             """, (user_id, bait_id, delta, delta))
+            if delta > 0:
+                self._record_equipment_obtained_with_cursor(cursor, user_id, "bait", bait_id, delta)
             # 删除数量为0的行，保持数据整洁
             cursor.execute("DELETE FROM user_bait_inventory WHERE user_id = ? AND quantity <= 0", (user_id,))
             conn.commit()
+
+    def sync_user_equipment_stats_from_inventory(self, user_id: str) -> None:
+        """将当前装备库存作为图鉴初始解锁记录，重复执行不会累加数量。"""
+        now = datetime.now()
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO user_equipment_stats (
+                    user_id, equipment_type, equipment_id,
+                    first_obtained_at, last_obtained_at, total_obtained
+                )
+                SELECT user_id, 'rod', rod_id, MIN(obtained_at), MAX(obtained_at), COUNT(*)
+                FROM user_rods
+                WHERE user_id = ?
+                GROUP BY user_id, rod_id
+                """,
+                (user_id,),
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO user_equipment_stats (
+                    user_id, equipment_type, equipment_id,
+                    first_obtained_at, last_obtained_at, total_obtained
+                )
+                SELECT user_id, 'accessory', accessory_id, MIN(obtained_at), MAX(obtained_at), COUNT(*)
+                FROM user_accessories
+                WHERE user_id = ?
+                GROUP BY user_id, accessory_id
+                """,
+                (user_id,),
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO user_equipment_stats (
+                    user_id, equipment_type, equipment_id,
+                    first_obtained_at, last_obtained_at, total_obtained
+                )
+                SELECT user_id, 'bait', bait_id, ?, ?, quantity
+                FROM user_bait_inventory
+                WHERE user_id = ? AND quantity > 0
+                """,
+                (now, now, user_id),
+            )
+            conn.commit()
+
+    def get_user_equipment_stats(self, user_id: str) -> List[Dict[str, Any]]:
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT user_id, equipment_type, equipment_id,
+                       first_obtained_at, last_obtained_at, total_obtained
+                FROM user_equipment_stats
+                WHERE user_id = ?
+                ORDER BY equipment_type, equipment_id
+                """,
+                (user_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_user_equipment_pokedex_reward_claims(self, user_id: str) -> List[Dict[str, Any]]:
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT user_id, milestone_percent, reward_type, reward_amount,
+                       claimed_unlocked_equipment_count, claimed_total_equipment_count, claimed_at
+                FROM user_equipment_pokedex_reward_claims
+                WHERE user_id = ?
+                ORDER BY milestone_percent ASC
+                """,
+                (user_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def claim_equipment_pokedex_reward(
+        self,
+        user_id: str,
+        milestone_percent: int,
+        reward_type: str,
+        reward_amount: int,
+        unlocked_equipment_count: int,
+        total_equipment_count: int,
+    ) -> bool:
+        claimed_at = datetime.now()
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE")
+            try:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO user_equipment_pokedex_reward_claims (
+                        user_id,
+                        milestone_percent,
+                        reward_type,
+                        reward_amount,
+                        claimed_unlocked_equipment_count,
+                        claimed_total_equipment_count,
+                        claimed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        milestone_percent,
+                        reward_type,
+                        reward_amount,
+                        unlocked_equipment_count,
+                        total_equipment_count,
+                        claimed_at,
+                    ),
+                )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return False
+
+                if reward_type == "coins":
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET coins = coins + ?,
+                            max_coins = MAX(max_coins, coins + ?)
+                        WHERE user_id = ?
+                        """,
+                        (reward_amount, reward_amount, user_id),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET premium_currency = premium_currency + ?
+                        WHERE user_id = ?
+                        """,
+                        (reward_amount, user_id),
+                    )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return False
+
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                raise
 
     # --- Item Inventory Methods ---
     def get_user_item_inventory(self, user_id: str) -> Dict[int, int]:
@@ -436,6 +622,7 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
                 VALUES (?, ?, ?, ?, ?, 0, 0)
             """, (user_id, rod_id, durability, now, refine_level))
             instance_id = cursor.lastrowid
+            self._record_equipment_obtained_with_cursor(cursor, user_id, "rod", rod_id, 1, now)
             conn.commit()
             return UserRodInstance(
                 rod_instance_id=instance_id, user_id=user_id, rod_id=rod_id,
@@ -464,6 +651,7 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
                 VALUES (?, ?, ?, ?, 0, 0)
             """, (user_id, accessory_id, now, refine_level))
             instance_id = cursor.lastrowid
+            self._record_equipment_obtained_with_cursor(cursor, user_id, "accessory", accessory_id, 1, now)
             conn.commit()
             return UserAccessoryInstance(
                 accessory_instance_id=instance_id, user_id=user_id, accessory_id=accessory_id,

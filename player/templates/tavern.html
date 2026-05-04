@@ -3,6 +3,7 @@
 {% block title %}酒馆 - 钓鱼插件{% endblock %}
 
 {% block content %}
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
 <div class="row mb-4" id="pageHeaderRow">
     <div class="col-12">
         <h2><i class="fas fa-beer"></i> 渔夫酒馆</h2>
@@ -37,7 +38,7 @@
         <div class="card">
             <div class="card-header bg-success text-white">
                 <div class="d-flex justify-content-between align-items-center">
-                    <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0" 
+                    <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0"
                             type="button" data-bs-toggle="collapse" data-bs-target="#leaderboardCollapse">
                         <h5 class="mb-0">
                             <i class="fas fa-trophy"></i> 钓鱼佬排行榜
@@ -54,19 +55,19 @@
                     <!-- 排行榜标签页 -->
                     <ul class="nav nav-tabs mb-3" id="leaderboardTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="coins-tab" data-bs-toggle="tab" 
+                            <button class="nav-link active" id="coins-tab" data-bs-toggle="tab"
                                     data-bs-target="#coins-leaderboard" type="button" role="tab">
                                 <i class="fas fa-coins text-warning"></i> 金币榜
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="fishing-tab" data-bs-toggle="tab" 
+                            <button class="nav-link" id="fishing-tab" data-bs-toggle="tab"
                                     data-bs-target="#fishing-leaderboard" type="button" role="tab">
                                 <i class="fas fa-fish text-info"></i> 钓鱼次数榜
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="earned-tab" data-bs-toggle="tab" 
+                            <button class="nav-link" id="earned-tab" data-bs-toggle="tab"
                                     data-bs-target="#earned-leaderboard" type="button" role="tab">
                                 <i class="fas fa-chart-line text-success"></i> 累计收入榜
                             </button>
@@ -213,7 +214,7 @@
     <div class="col-12">
         <div class="card border-info">
             <div class="card-header bg-info text-white">
-                <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0" 
+                <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0"
                         type="button" data-bs-toggle="collapse" data-bs-target="#expeditionCollapse">
                     <h5 class="mb-0">
                         <i class="fas fa-compass"></i> 科学考察公告板
@@ -257,11 +258,11 @@
                                                 <small class="text-muted">{{ (exp.total_progress * 100)|round(1) }}%</small>
                                             </div>
                                             <div class="progress" style="height: 20px;">
-                                                <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" 
-                                                     role="progressbar" 
+                                                <div class="progress-bar bg-info progress-bar-striped progress-bar-animated"
+                                                     role="progressbar"
                                                      style="width: {{ (exp.total_progress * 100)|round(1) }}%"
-                                                     aria-valuenow="{{ (exp.total_progress * 100)|round(1) }}" 
-                                                     aria-valuemin="0" 
+                                                     aria-valuenow="{{ (exp.total_progress * 100)|round(1) }}"
+                                                     aria-valuemin="0"
                                                      aria-valuemax="100">
                                                     {{ (exp.total_progress * 100)|round(1) }}%
                                                 </div>
@@ -273,7 +274,7 @@
                                                 {% for key, target in exp.targets.items() %}
                                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                                     <span class="small">
-                                                        {{ '⭐' * target.rarity }} {{ target.fish_name }}
+                                                        {{ star_label(target.rarity) }} {{ target.fish_name }}
                                                     </span>
                                                     <span class="small text-muted">{{ target.caught }}/{{ target.required }}</span>
                                                 </div>
@@ -282,7 +283,7 @@
                                         </div>
                                         <div class="mt-auto">
                                             <div class="d-grid gap-2">
-                                                <button class="btn btn-sm btn-outline-primary w-100" 
+                                                <button class="btn btn-sm btn-outline-primary w-100"
                                                         onclick="copyExpeditionCode('{{ exp.expedition_id }}')">
                                                     <i class="fas fa-copy"></i> 复制邀请码
                                                 </button>
@@ -406,7 +407,7 @@
     <div class="col-12">
         <div class="card border-info">
             <div class="card-header bg-info text-white">
-                <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0" 
+                <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0"
                         type="button" data-bs-toggle="collapse" data-bs-target="#exhibitionCollapse">
                     <h5 class="mb-0">
                         <i class="fas fa-fish"></i> 今日水族箱展览会
@@ -432,10 +433,10 @@
                         <div class="col-md-4">
                             <div class="card bg-light">
                                 <div class="card-body">
-                                    <h6 class="card-title"><i class="fas fa-fishing-rod text-primary"></i> 鱼竿</h6>
+                                    <h6 class="card-title"><span class="icon-fishing-rod" aria-hidden="true"></span> 鱼竿</h6>
                                     {% if exhibition.featured_user.equipped_rod %}
                                         <p class="mb-1">{{ exhibition.featured_user.equipped_rod.name }}</p>
-                                        <small class="text-warning">{{ '★' * exhibition.featured_user.equipped_rod.rarity }}</small>
+                                        <small class="text-warning">{{ star_label(exhibition.featured_user.equipped_rod.rarity) }}</small>
                                         {% if exhibition.featured_user.equipped_rod.refine_level > 0 %}
                                         <small class="text-success"> +{{ exhibition.featured_user.equipped_rod.refine_level }}</small>
                                         {% endif %}
@@ -451,7 +452,7 @@
                                     <h6 class="card-title"><i class="fas fa-ring text-info"></i> 饰品</h6>
                                     {% if exhibition.featured_user.equipped_accessory %}
                                         <p class="mb-1">{{ exhibition.featured_user.equipped_accessory.name }}</p>
-                                        <small class="text-warning">{{ '★' * exhibition.featured_user.equipped_accessory.rarity }}</small>
+                                        <small class="text-warning">{{ star_label(exhibition.featured_user.equipped_accessory.rarity) }}</small>
                                         {% if exhibition.featured_user.equipped_accessory.refine_level > 0 %}
                                         <small class="text-success"> +{{ exhibition.featured_user.equipped_accessory.refine_level }}</small>
                                         {% endif %}
@@ -467,7 +468,7 @@
                                     <h6 class="card-title"><i class="fas fa-cookie-bite text-warning"></i> 鱼饵</h6>
                                     {% if exhibition.featured_user.current_bait %}
                                         <p class="mb-1">{{ exhibition.featured_user.current_bait.name }}</p>
-                                        <small class="text-warning">{{ '★' * exhibition.featured_user.current_bait.rarity }}</small>
+                                        <small class="text-warning">{{ star_label(exhibition.featured_user.current_bait.rarity) }}</small>
                                         <small class="text-muted"> (剩余 {{ exhibition.featured_user.current_bait.quantity }})</small>
                                     {% else %}
                                         <p class="text-muted mb-0">未使用</p>
@@ -506,7 +507,7 @@
                         <div class="col-md-4 col-lg-3 exhibition-fish-card" data-rarity="{{ fish.rarity }}">
                             <div class="card h-100 {% if fish.quality_level == 1 %}border-warning{% else %}border-info{% endif %}">
                                 <div class="card-body p-2 d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <div class="d-flex justify-content-between align-items-start mb-1 exhibition-fish-head">
                                         <div class="flex-grow-1">
                                             <h6 class="card-title mb-0">
                                                 {{ fish.name }}
@@ -515,19 +516,19 @@
                                                 {% endif %}
                                             </h6>
                                             <small class="badge bg-info" style="font-size: 0.65rem;">
-                                                {% for i in range(fish.rarity) %}★{% endfor %}
+                                                {{ star_label(fish.rarity) }}
                                             </small>
                                         </div>
                                         <h6 class="mb-0 text-primary">×{{ fish.quantity }}</h6>
                                     </div>
-                                    
-                                    <hr class="my-1">
-                                    
+
+                                    <hr class="card-section-divider my-1">
+
                                     <!-- 鱼类描述（固定高度，可滚动） -->
                                     <p class="card-text mb-2 text-muted" style="font-size: 0.8rem; height: 60px; overflow-y: auto;">
                                         {{ fish.description | default('暂无描述') }}
                                     </p>
-                                    
+
                                     <!-- 价值信息（参考图鉴页，左对齐） -->
                                     <div class="mb-2">
                                         <small class="text-muted">
@@ -538,9 +539,9 @@
                                     <!-- 评论区（使用 mt-auto 推到底部） -->
                                     <div class="border-top pt-2 mt-auto">
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <button class="btn btn-sm btn-outline-primary w-100" 
+                                            <button class="btn btn-sm btn-outline-primary w-100"
                                                     type="button"
-                                                    data-bs-toggle="collapse" 
+                                                    data-bs-toggle="collapse"
                                                     data-bs-target="#comments-collapse-{{ fish_key }}"
                                                     aria-expanded="false">
                                                 <i class="fas fa-comment"></i> 留言板
@@ -548,23 +549,23 @@
                                                 <span class="badge {% if fish_comments %}bg-primary{% else %}bg-secondary{% endif %} ms-1">{{ fish_comments|length if fish_comments else 0 }}</span>
                                             </button>
                                         </div>
-                                        
+
                                         <!-- 评论区域（默认折叠，展开时自动显示输入框） -->
                                         <div class="collapse mt-2" id="comments-collapse-{{ fish_key }}">
                                             <!-- 评论输入框（展开时自动显示） -->
                                             <div id="comment-box-{{ fish_key }}" class="mb-2">
-                                                <textarea class="form-control form-control-sm mb-1" 
-                                                          id="comment-input-{{ fish_key }}" 
-                                                          rows="2" 
-                                                          placeholder="发表你的想法（如求购信息）..." 
+                                                <textarea class="form-control form-control-sm mb-1"
+                                                          id="comment-input-{{ fish_key }}"
+                                                          rows="2"
+                                                          placeholder="发表你的想法（如求购信息）..."
                                                           maxlength="200"></textarea>
                                                 <div class="text-end">
-                                                    <button class="btn btn-sm btn-primary" 
+                                                    <button class="btn btn-sm btn-primary"
                                                             onclick="postExhibitionComment('{{ fish_key }}')">发送</button>
                                                 </div>
                                             </div>
-                                            
-                                            <hr class="my-2">
+
+                                            <hr class="card-section-divider">
 
                                             <!-- 评论列表 -->
                                             <div id="comments-{{ fish_key }}" style="max-height: 200px; overflow-y: auto;">
@@ -577,7 +578,7 @@
                                                                 {{ comment.content }}
                                                             </div>
                                                             {% if comment.user_id == current_user_id or exhibition.featured_user.user_id == current_user_id %}
-                                                            <button class="btn btn-sm btn-link text-danger p-0 ms-1" 
+                                                            <button class="btn btn-sm btn-link text-danger p-0 ms-1"
                                                                     onclick="deleteExhibitionComment('{{ fish_key }}', '{{ comment.id }}')">
                                                                 <i class="fas fa-times"></i>
                                                             </button>
@@ -609,7 +610,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0" 
+                <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0"
                         type="button" data-bs-toggle="collapse" data-bs-target="#messageboardCollapse">
                     <h5 class="mb-0">
                         <i class="fas fa-comments"></i> 留言板
@@ -628,7 +629,7 @@
                 <div class="card bg-light mb-4">
                     <div class="card-body">
                         <h6 class="mb-3"><i class="fas fa-pen"></i> 发表留言</h6>
-                        <textarea id="messageInput" class="form-control mb-3" rows="3" 
+                        <textarea id="messageInput" class="form-control mb-3" rows="3"
                                   placeholder="分享你的钓鱼故事、空军经历或是吐槽..." maxlength="500"></textarea>
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">
@@ -650,7 +651,7 @@
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <div>
                                         <strong class="text-primary">
-                                            <i class="fas fa-user-circle"></i> 
+                                            <i class="fas fa-user-circle"></i>
                                             {{ msg.username }}
                                             {% if msg.user_id == '2645956495' %}
                                             <span class="badge bg-danger ms-1">管理员</span>
@@ -686,13 +687,13 @@
                             <a class="page-link" href="?page={{ page - 1 }}">上一页</a>
                         </li>
                         {% endif %}
-                        
+
                         {% for p in range(1, total_pages + 1) %}
                         <li class="page-item {% if p == page %}active{% endif %}">
                             <a class="page-link" href="?page={{ p }}">{{ p }}</a>
                         </li>
                         {% endfor %}
-                        
+
                         {% if page < total_pages %}
                         <li class="page-item">
                             <a class="page-link" href="?page={{ page + 1 }}">下一页</a>
@@ -718,7 +719,7 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">公告内容（支持HTML）</label>
-                    <textarea id="announcementEdit" class="form-control" rows="8" 
+                    <textarea id="announcementEdit" class="form-control" rows="8"
                               placeholder="可以使用HTML格式...">{{ announcement }}</textarea>
                     <small class="text-muted">提示：支持HTML标签，如 &lt;strong&gt;、&lt;em&gt;、&lt;br&gt; 等</small>
                 </div>
@@ -741,7 +742,7 @@
 document.getElementById('messageInput').addEventListener('input', function() {
     const count = this.value.length;
     document.getElementById('charCount').textContent = count;
-    
+
     if (count > 500) {
         this.value = this.value.substring(0, 500);
         document.getElementById('charCount').textContent = 500;
@@ -751,26 +752,26 @@ document.getElementById('messageInput').addEventListener('input', function() {
 // 发表留言
 async function postMessage() {
     const content = document.getElementById('messageInput').value.trim();
-    
+
     if (!content) {
         showToast('请输入留言内容', 'error');
         return;
     }
-    
+
     if (content.length > 500) {
         showToast('留言内容不能超过500字', 'error');
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_post_message") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ content: content })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showToast('留言发表成功！', 'success');
             setTimeout(() => location.reload(), 500);
@@ -787,16 +788,16 @@ async function deleteMessage(messageId) {
     if (!confirm('确认删除这条留言吗？')) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_delete_message") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ message_id: messageId })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showToast('留言已删除', 'success');
             // 移除元素
@@ -823,16 +824,16 @@ function editAnnouncement() {
 // 保存公告
 async function saveAnnouncement() {
     const content = document.getElementById('announcementEdit').value;
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_update_announcement") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ content: content })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showToast('公告更新成功！', 'success');
             setTimeout(() => location.reload(), 500);
@@ -871,29 +872,29 @@ function hideCommentBox(fishKey) {
 // 发表展览评论
 async function postExhibitionComment(fishKey) {
     const content = document.getElementById(`comment-input-${fishKey}`).value.trim();
-    
+
     if (!content) {
         showToast('请输入评论内容', 'error');
         return;
     }
-    
+
     if (content.length > 200) {
         showToast('评论内容不能超过200字', 'error');
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_add_exhibition_comment") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 fish_key: fishKey,
-                content: content 
+                content: content
             })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showToast('评论发表成功！', 'success');
             setTimeout(() => location.reload(), 500);
@@ -910,19 +911,19 @@ async function deleteExhibitionComment(fishKey, commentId) {
     if (!confirm('确认删除这条评论吗？')) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_delete_exhibition_comment") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 fish_key: fishKey,
-                comment_id: commentId 
+                comment_id: commentId
             })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showToast('评论已删除', 'success');
             // 移除评论元素
@@ -944,11 +945,11 @@ async function deleteExhibitionComment(fishKey, commentId) {
 function filterExhibitionByRarity(rarity) {
     const cards = document.querySelectorAll('.exhibition-fish-card');
     const buttons = document.querySelectorAll('.btn-group button');
-    
+
     // 更新按钮状态
     buttons.forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
-    
+
     if (rarity === 'all') {
         cards.forEach(card => card.style.display = '');
     } else {
@@ -968,18 +969,18 @@ function copyExpeditionCode(code) {
     const tempInput = document.createElement('input');
     tempInput.value = code;
     document.body.appendChild(tempInput);
-    
+
     // 选中并复制
     tempInput.select();
     tempInput.setSelectionRange(0, 99999); // 兼容移动设备
-    
+
     try {
         document.execCommand('copy');
         showToast('邀请码已复制：' + code, 'success');
     } catch (err) {
         showToast('复制失败，请手动复制：' + code, 'error');
     }
-    
+
     // 移除临时输入框
     document.body.removeChild(tempInput);
 }

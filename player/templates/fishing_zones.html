@@ -69,7 +69,7 @@
             </div>
             <div class="card-body d-flex flex-column">
                 <p class="card-text" style="min-height: 60px;">{{ zone.description }}</p>
-                
+
                 <div class="mt-auto">
                     {% if zone.required_pass %}
                         <div class="alert alert-warning small mb-3">
@@ -80,7 +80,7 @@
                             <i class="fas fa-unlock"></i> 自由进入
                         </div>
                     {% endif %}
-                    
+
                     {% if zone.is_current %}
                         <button class="btn btn-secondary w-100" disabled>
                             <i class="fas fa-check"></i> 已在此区域
@@ -118,15 +118,15 @@
 async function changeZone(zoneId, zoneName) {
     const formData = new FormData();
     formData.append('zone_id', zoneId);
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.change_zone") }}', {
             method: 'POST',
             body: formData
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showToast(data.message, 'success');
             setTimeout(() => location.reload(), 800);

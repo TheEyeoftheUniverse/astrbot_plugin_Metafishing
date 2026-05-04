@@ -407,6 +407,8 @@ class PokedexRewardClaim:
     claimed_unlocked_fish_count: int
     claimed_total_fish_count: int
     claimed_at: Optional[datetime]
+    reward_type: str = "premium"
+    reward_amount: int = 0
 
 # ---------------------------------
 # 商店实体 (Shop Entities) - 新设计

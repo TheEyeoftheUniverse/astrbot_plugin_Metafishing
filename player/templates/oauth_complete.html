@@ -23,9 +23,12 @@
                     {% else %}
                     <p class="text-muted mb-4">浏览器登录已经完成，但游戏同步票据未生成，请回到游戏后重新发起一次登录。</p>
                     {% endif %}
+                    <p id="closeFallback" class="alert alert-info d-none mb-3">
+                        当前浏览器禁止网页主动关闭窗口。Unity 已经能同步登录结果，请直接切回游戏或使用系统返回键。
+                    </p>
                     <div class="d-flex flex-column gap-2">
-                        <button type="button" class="btn btn-success" onclick="window.close()">
-                            <i class="fas fa-door-open"></i> 关闭当前页面
+                        <button type="button" class="btn btn-success" onclick="closeLoginPage()">
+                            <i class="fas fa-door-open"></i> 关闭当前页面 / 返回游戏
                         </button>
                         <a href="{{ url_for('player_bp.index') }}" class="btn btn-outline-secondary">
                             <i class="fas fa-globe"></i> 改为进入玩家 WebUI
@@ -37,9 +40,29 @@
     </div>
 </main>
 <script>
-window.setTimeout(function () {
-    window.close();
-}, 1500);
+function showCloseFallback() {
+    var fallback = document.getElementById('closeFallback');
+    if (fallback) {
+        fallback.classList.remove('d-none');
+    }
+}
+
+function closeLoginPage() {
+    try {
+        window.open('', '_self');
+        window.close();
+    } catch (error) {
+        // Some mobile browsers reject scripted window closing for OAuth redirects.
+    }
+
+    window.setTimeout(function () {
+        if (!document.hidden) {
+            showCloseFallback();
+        }
+    }, 300);
+}
+
+window.setTimeout(closeLoginPage, 1500);
 </script>
 </body>
 </html>

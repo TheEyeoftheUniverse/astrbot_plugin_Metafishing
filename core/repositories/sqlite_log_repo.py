@@ -55,6 +55,8 @@ class SqliteLogRepository(AbstractLogRepository):
             claimed_unlocked_fish_count=data["claimed_unlocked_fish_count"],
             claimed_total_fish_count=data["claimed_total_fish_count"],
             claimed_at=data.get("claimed_at"),
+            reward_type=data.get("reward_type", "premium"),
+            reward_amount=data.get("reward_amount") or data["reward_premium"],
         )
 
     def _row_to_tax_record(self, row: sqlite3.Row) -> Optional[TaxRecord]:
@@ -308,7 +310,7 @@ class SqliteLogRepository(AbstractLogRepository):
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT user_id, milestone_percent, reward_premium,
+                SELECT user_id, milestone_percent, reward_premium, reward_type, reward_amount,
                        claimed_unlocked_fish_count, claimed_total_fish_count, claimed_at
                 FROM user_pokedex_reward_claims
                 WHERE user_id = ?
@@ -322,11 +324,13 @@ class SqliteLogRepository(AbstractLogRepository):
         self,
         user_id: str,
         milestone_percent: int,
-        reward_premium: int,
+        reward_type: str,
+        reward_amount: int,
         unlocked_fish_count: int,
         total_fish_count: int,
     ) -> bool:
         claimed_at = datetime.now(self.UTC8)
+        reward_premium = reward_amount if reward_type == "premium" else 0
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -338,15 +342,19 @@ class SqliteLogRepository(AbstractLogRepository):
                         user_id,
                         milestone_percent,
                         reward_premium,
+                        reward_type,
+                        reward_amount,
                         claimed_unlocked_fish_count,
                         claimed_total_fish_count,
                         claimed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
                         milestone_percent,
                         reward_premium,
+                        reward_type,
+                        reward_amount,
                         unlocked_fish_count,
                         total_fish_count,
                         claimed_at,
@@ -356,14 +364,25 @@ class SqliteLogRepository(AbstractLogRepository):
                     conn.rollback()
                     return False
 
-                cursor.execute(
-                    """
-                    UPDATE users
-                    SET premium_currency = premium_currency + ?
-                    WHERE user_id = ?
-                    """,
-                    (reward_premium, user_id),
-                )
+                if reward_type == "coins":
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET coins = coins + ?,
+                            max_coins = MAX(max_coins, coins + ?)
+                        WHERE user_id = ?
+                        """,
+                        (reward_amount, reward_amount, user_id),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET premium_currency = premium_currency + ?
+                        WHERE user_id = ?
+                        """,
+                        (reward_amount, user_id),
+                    )
                 if cursor.rowcount == 0:
                     conn.rollback()
                     return False

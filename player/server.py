@@ -2,7 +2,7 @@ import functools
 import asyncio
 import os
 from typing import Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import secrets
 from urllib.parse import urlencode
@@ -67,6 +67,65 @@ def _save_credentials(credentials):
 
 # 在启动时加载凭证
 USER_CREDENTIALS = _load_credentials()
+
+INITIAL_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def _generate_initial_password() -> str:
+    return "".join(secrets.choice(INITIAL_PASSWORD_ALPHABET) for _ in range(5))
+
+
+def _get_credential_entry(user_id: str) -> Dict[str, str]:
+    user_id = str(user_id or "").strip()
+    raw_entry = USER_CREDENTIALS.get(user_id)
+    changed = False
+
+    if isinstance(raw_entry, dict):
+        entry = {
+            "password": str(raw_entry.get("password", "") or ""),
+            "initial_password": str(raw_entry.get("initial_password", "") or ""),
+        }
+    elif raw_entry:
+        entry = {"password": str(raw_entry), "initial_password": ""}
+        changed = True
+    else:
+        entry = {"password": "", "initial_password": ""}
+        changed = True
+
+    if not entry["initial_password"]:
+        entry["initial_password"] = _generate_initial_password()
+        changed = True
+
+    if changed:
+        USER_CREDENTIALS[user_id] = entry
+        _save_credentials(USER_CREDENTIALS)
+
+    return entry
+
+
+def ensure_initial_password(user_id: str) -> str:
+    """为玩家懒生成并返回 5 位初始密码。"""
+    if not str(user_id or "").strip():
+        return ""
+    return _get_credential_entry(user_id).get("initial_password", "")
+
+
+def verify_user_password(user_id: str, password: str) -> bool:
+    password = str(password or "")
+    if not password:
+        return False
+    entry = _get_credential_entry(user_id)
+    return password in {
+        entry.get("password", ""),
+        entry.get("initial_password", ""),
+    }
+
+
+def set_user_password(user_id: str, new_password: str) -> None:
+    entry = _get_credential_entry(user_id)
+    entry["password"] = str(new_password or "")
+    USER_CREDENTIALS[str(user_id)] = entry
+    _save_credentials(USER_CREDENTIALS)
 
 
 def _get_next_pond_upgrade(inventory_service, current_capacity: int) -> Dict[str, Any] | None:
@@ -826,22 +885,10 @@ async def login():
             logger.warning(f"未注册用户 {user_id} 尝试登录")
             return await _render_login_page()
 
-        # 检查是否首次登录（需要设置密钥）
-        if user_id not in USER_CREDENTIALS:
-            if not password:
-                await flash("首次登录，请设置登录密钥", "warning")
-                return await _render_login_page(first_login=True, user_id=user_id)
-            
-            # 设置新密钥并保存
-            USER_CREDENTIALS[user_id] = password
-            _save_credentials(USER_CREDENTIALS)
-            _login_player_session(user)
-            await flash(f"欢迎，{user.nickname or user_id}！密钥已设置", "success")
-            logger.info(f"用户 {user_id} 首次登录并设置密钥")
-            return redirect(url_for("player_bp.index"))
-        
-        # 验证密钥
-        if USER_CREDENTIALS.get(user_id) != password:
+        ensure_initial_password(user_id)
+
+        # 验证密钥，兼容旧登录密钥与自动生成的初始密码
+        if not verify_user_password(user_id, password):
             await flash("密钥错误", "danger")
             return await _render_login_page()
         
@@ -946,6 +993,7 @@ async def linuxdo_oauth_callback():
             await flash(error_message, "warning")
             return redirect(url_for("player_bp.login"))
 
+        ensure_initial_password(user.user_id)
         _login_player_session(user, auth_provider="linuxdo")
         await flash(f"欢迎来到钓鱼世界，{user.nickname or user.user_id}！", "success")
         logger.info(f"Linux.do 用户登录成功: {user.user_id}")
@@ -1529,6 +1577,56 @@ async def api_equip_accessory():
         logger.error(f"装备饰品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+
+@player_bp.route("/api/unequip_rod", methods=["POST"])
+@login_required
+async def api_unequip_rod():
+    """取消装备鱼竿API"""
+    user_id = session.get("user_id")
+    user_repo = current_app.config.get("USER_REPO")
+    inventory_repo = current_app.config.get("INVENTORY_REPO")
+
+    try:
+        user = user_repo.get_by_id(user_id)
+        if not user:
+            return jsonify({"success": False, "message": "用户不存在"}), 404
+        user.equipped_rod_instance_id = None
+        inventory_repo.set_equipment_status(
+            user_id,
+            rod_instance_id=None,
+            accessory_instance_id=user.equipped_accessory_instance_id,
+        )
+        user_repo.update(user)
+        return jsonify({"success": True, "message": "已取消装备鱼竿"})
+    except Exception as e:
+        logger.error(f"取消装备鱼竿失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@player_bp.route("/api/unequip_accessory", methods=["POST"])
+@login_required
+async def api_unequip_accessory():
+    """取消装备饰品API"""
+    user_id = session.get("user_id")
+    user_repo = current_app.config.get("USER_REPO")
+    inventory_repo = current_app.config.get("INVENTORY_REPO")
+
+    try:
+        user = user_repo.get_by_id(user_id)
+        if not user:
+            return jsonify({"success": False, "message": "用户不存在"}), 404
+        user.equipped_accessory_instance_id = None
+        inventory_repo.set_equipment_status(
+            user_id,
+            rod_instance_id=user.equipped_rod_instance_id,
+            accessory_instance_id=None,
+        )
+        user_repo.update(user)
+        return jsonify({"success": True, "message": "已取消装备饰品"})
+    except Exception as e:
+        logger.error(f"取消装备饰品失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @player_bp.route("/api/refine_rod", methods=["POST"])
 @login_required
 async def api_refine_rod():
@@ -1579,6 +1677,110 @@ async def api_refine_accessory():
         logger.error(f"精炼饰品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+@player_bp.route("/api/delete_rod", methods=["POST"])
+@login_required
+async def api_delete_rod():
+    """删除鱼竿API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        rod_code = data.get("rod_code")
+        if not rod_code:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        instance_id = inventory_service.resolve_rod_instance_id(user_id, rod_code)
+        if not instance_id:
+            return jsonify({"success": False, "message": "无效的鱼竿编号"}), 400
+        rods = inventory_service.inventory_repo.get_user_rod_instances(user_id)
+        rod = next((item for item in rods if item.rod_instance_id == instance_id), None)
+        if not rod:
+            return jsonify({"success": False, "message": "鱼竿不存在或不属于你"}), 400
+        if rod.is_equipped:
+            return jsonify({"success": False, "message": "装备中的鱼竿不能删除"}), 400
+        if rod.is_locked:
+            return jsonify({"success": False, "message": "锁定的鱼竿不能删除"}), 400
+        inventory_service.inventory_repo.delete_rod_instance(instance_id)
+        return jsonify({"success": True, "message": "已删除鱼竿"})
+    except Exception as e:
+        logger.error(f"删除鱼竿失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@player_bp.route("/api/delete_accessory", methods=["POST"])
+@login_required
+async def api_delete_accessory():
+    """删除饰品API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        accessory_code = data.get("accessory_code")
+        if not accessory_code:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        instance_id = inventory_service.resolve_accessory_instance_id(user_id, accessory_code)
+        if not instance_id:
+            return jsonify({"success": False, "message": "无效的饰品编号"}), 400
+        accessories = inventory_service.inventory_repo.get_user_accessory_instances(user_id)
+        accessory = next((item for item in accessories if item.accessory_instance_id == instance_id), None)
+        if not accessory:
+            return jsonify({"success": False, "message": "饰品不存在或不属于你"}), 400
+        if accessory.is_equipped:
+            return jsonify({"success": False, "message": "装备中的饰品不能删除"}), 400
+        if accessory.is_locked:
+            return jsonify({"success": False, "message": "锁定的饰品不能删除"}), 400
+        inventory_service.inventory_repo.delete_accessory_instance(instance_id)
+        return jsonify({"success": True, "message": "已删除饰品"})
+    except Exception as e:
+        logger.error(f"删除饰品失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@player_bp.route("/api/delete_item", methods=["POST"])
+@login_required
+async def api_delete_item():
+    """删除道具API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        item_id = int(data.get("item_id") or 0)
+        quantity = int(data.get("quantity", 1) or 1)
+        if item_id <= 0 or quantity <= 0:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        owned = inventory_service.inventory_repo.get_user_items(user_id).get(item_id, 0)
+        if owned <= 0:
+            return jsonify({"success": False, "message": "道具不存在或数量不足"}), 400
+        delete_quantity = min(quantity, owned)
+        inventory_service.inventory_repo.decrease_item_quantity(user_id, item_id, delete_quantity)
+        return jsonify({"success": True, "message": f"已删除道具 x{delete_quantity}"})
+    except Exception as e:
+        logger.error(f"删除道具失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@player_bp.route("/api/delete_bait", methods=["POST"])
+@login_required
+async def api_delete_bait():
+    """删除鱼饵API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        bait_id = int(data.get("bait_id") or 0)
+        quantity = int(data.get("quantity", 1) or 1)
+        if bait_id <= 0 or quantity <= 0:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        owned = inventory_service.inventory_repo.get_user_bait_inventory(user_id).get(bait_id, 0)
+        if owned <= 0:
+            return jsonify({"success": False, "message": "鱼饵不存在或数量不足"}), 400
+        delete_quantity = min(quantity, owned)
+        inventory_service.inventory_repo.update_bait_quantity(user_id, bait_id, -delete_quantity)
+        return jsonify({"success": True, "message": f"已删除鱼饵 x{delete_quantity}"})
+    except Exception as e:
+        logger.error(f"删除鱼饵失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @player_bp.route("/api/use_item", methods=["POST"])
 @login_required
 async def api_use_item():
@@ -1613,6 +1815,22 @@ async def api_use_bait():
         
         if not bait_id:
             return jsonify({"success": False, "message": "参数无效"}), 400
+
+        bait_id = int(bait_id)
+        if data.get("deactivate"):
+            user_repo = current_app.config.get("USER_REPO")
+            item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
+            user = user_repo.get_by_id(user_id)
+            if not user:
+                return jsonify({"success": False, "message": "用户不存在"}), 404
+            if user.current_bait_id == bait_id:
+                user.current_bait_id = None
+                user.bait_start_time = None
+                user_repo.update(user)
+            bait_template = item_template_repo.get_bait_by_id(bait_id)
+            if bait_template and inventory_service._supports_bait_armed_state(bait_template):
+                inventory_service.set_template_armed_state(user_id, "bait", bait_id, False)
+            return jsonify({"success": True, "message": "已停用鱼饵"})
         
         # use_bait方法只使用一个鱼饵并设置为当前使用的鱼饵
         result = inventory_service.use_bait(user_id, bait_id)
@@ -2126,12 +2344,90 @@ async def index():
 @player_bp.route("/profile")
 @login_required
 async def profile():
-    """个人状态页面"""
+    """个人信息页面"""
     user_id = session.get("user_id")
-    return await render_template("placeholder.html", 
-                                  page_title="个人状态", 
-                                  page_icon="fa-user",
-                                  description="查看您的详细信息、装备、称号等")
+    user_repo = current_app.config.get("USER_REPO")
+    user_service = current_app.config.get("USER_SERVICE")
+
+    user = user_repo.get_by_id(user_id)
+    if not user:
+        await flash("用户数据异常", "danger")
+        return redirect(url_for("player_bp.logout"))
+
+    initial_password = ensure_initial_password(user_id)
+    titles_result = user_service.get_user_titles(user_id) if user_service else {"success": False, "titles": []}
+    titles = titles_result.get("titles", []) if titles_result.get("success") else []
+
+    return await render_template(
+        "profile.html",
+        user=user,
+        initial_password=initial_password,
+        titles=titles,
+    )
+
+
+@player_bp.route("/profile/nickname", methods=["POST"])
+@login_required
+async def update_profile_nickname():
+    """更新玩家昵称"""
+    user_id = session.get("user_id")
+    user_repo = current_app.config.get("USER_REPO")
+    form = await request.form
+    nickname = str(form.get("nickname", "") or "").strip()
+    if not nickname:
+        await flash("昵称不能为空", "danger")
+        return redirect(url_for("player_bp.profile"))
+    if len(nickname) > 24:
+        await flash("昵称最多 24 个字符", "danger")
+        return redirect(url_for("player_bp.profile"))
+
+    user = user_repo.get_by_id(user_id)
+    if not user:
+        await flash("用户数据异常", "danger")
+        return redirect(url_for("player_bp.logout"))
+    user.nickname = nickname
+    user_repo.update(user)
+    session["nickname"] = nickname
+    await flash("昵称已更新", "success")
+    return redirect(url_for("player_bp.profile"))
+
+
+@player_bp.route("/profile/title", methods=["POST"])
+@login_required
+async def update_profile_title():
+    """佩戴称号"""
+    user_id = session.get("user_id")
+    user_service = current_app.config.get("USER_SERVICE")
+    form = await request.form
+    title_text = str(form.get("title_id", "") or "").strip()
+    if not title_text.isdigit():
+        await flash("请选择有效称号", "danger")
+        return redirect(url_for("player_bp.profile"))
+
+    result = user_service.use_title(user_id, int(title_text)) if user_service else {"success": False, "message": "称号服务不可用"}
+    await flash(result.get("message", "称号操作完成"), "success" if result.get("success") else "danger")
+    return redirect(url_for("player_bp.profile"))
+
+
+@player_bp.route("/profile/password", methods=["POST"])
+@login_required
+async def update_profile_password():
+    """修改 WebUI 登录密钥"""
+    user_id = session.get("user_id")
+    form = await request.form
+    old_password = str(form.get("old_password", "") or "")
+    new_password = str(form.get("new_password", "") or "")
+
+    if not verify_user_password(user_id, old_password):
+        await flash("旧密码不正确", "danger")
+        return redirect(url_for("player_bp.profile"))
+    if len(new_password.strip()) < 5:
+        await flash("新密码至少 5 位", "danger")
+        return redirect(url_for("player_bp.profile"))
+
+    set_user_password(user_id, new_password.strip())
+    await flash("登录密钥已修改", "success")
+    return redirect(url_for("player_bp.profile"))
 
 @player_bp.route("/pokedex")
 @login_required
@@ -2184,6 +2480,18 @@ async def pokedex():
     for rarity in fish_by_rarity:
         fish_by_rarity[rarity].sort(key=lambda x: x["id"])
 
+    rarity_progress = []
+    for rarity in range(1, 11):
+        rarity_fishes = fish_by_rarity.get(rarity, [])
+        total_for_rarity = len(rarity_fishes)
+        caught_for_rarity = sum(1 for fish in rarity_fishes if fish.get("is_caught"))
+        rarity_progress.append({
+            "rarity": rarity,
+            "caught": caught_for_rarity,
+            "total": total_for_rarity,
+            "percent": (caught_for_rarity / total_for_rarity * 100) if total_for_rarity > 0 else 0,
+        })
+
     pokedex_reward_status = (
         fishing_service.get_pokedex_reward_status(user_id)
         if fishing_service
@@ -2194,6 +2502,7 @@ async def pokedex():
                                   fish_by_rarity=fish_by_rarity,
                                   total_fish=len(all_fish),
                                   caught_count=len(caught_fish_map),
+                                  rarity_progress=rarity_progress,
                                   pokedex_reward_status=pokedex_reward_status)
 
 
@@ -2212,12 +2521,78 @@ async def claim_pokedex_reward():
         await flash(result.get("message", "图鉴奖励领取失败"), "danger")
         return redirect(url_for("player_bp.pokedex"))
 
-    newly_claimed_premium = int(result.get("newly_claimed_premium", 0) or 0)
-    if newly_claimed_premium > 0:
-        await flash(f"成功领取图鉴奖励：{newly_claimed_premium} 钻石", "success")
+    claimed_totals = result.get("newly_claimed_by_type", {}) or {}
+    parts = []
+    if int(claimed_totals.get("coins", 0) or 0) > 0:
+        parts.append(f"{claimed_totals['coins']} 金币")
+    if int(claimed_totals.get("premium", 0) or 0) > 0:
+        parts.append(f"{claimed_totals['premium']} 钻石")
+    if parts:
+        await flash(f"成功领取图鉴奖励：{'、'.join(parts)}", "success")
     else:
         await flash(result.get("message", "当前没有可领取的图鉴奖励"), "info")
     return redirect(url_for("player_bp.pokedex"))
+
+
+@player_bp.route("/equipment_pokedex")
+@login_required
+async def equipment_pokedex():
+    """装备图鉴页面"""
+    user_id = session.get("user_id")
+    fishing_service = current_app.config.get("FISHING_SERVICE")
+    if not fishing_service:
+        await flash("装备图鉴服务不可用", "danger")
+        return redirect(url_for("player_bp.index"))
+
+    page_text = request.args.get("page", "1")
+    page = int(page_text) if str(page_text).isdigit() else 1
+    equipment_type = request.args.get("equipment_type", "all")
+    rarity_text = request.args.get("rarity", "all")
+    rarity = int(rarity_text) if str(rarity_text).isdigit() else None
+    owned_only = request.args.get("owned", "0") == "1"
+    pokedex_data = fishing_service.get_user_equipment_pokedex(
+        user_id,
+        page=page,
+        page_size=24,
+        equipment_type=equipment_type,
+        rarity=rarity,
+        owned_only=owned_only,
+    )
+    reward_status = fishing_service.get_equipment_pokedex_reward_status(user_id)
+
+    return await render_template(
+        "equipment_pokedex.html",
+        pokedex_data=pokedex_data,
+        reward_status=reward_status,
+    )
+
+
+@player_bp.route("/equipment_pokedex/reward/claim", methods=["POST"])
+@login_required
+async def claim_equipment_pokedex_reward():
+    """领取装备图鉴奖励"""
+    user_id = session.get("user_id")
+    fishing_service = current_app.config.get("FISHING_SERVICE")
+    if not fishing_service:
+        await flash("装备图鉴奖励服务不可用", "danger")
+        return redirect(url_for("player_bp.equipment_pokedex"))
+
+    result = fishing_service.claim_equipment_pokedex_rewards(user_id)
+    if not result.get("success"):
+        await flash(result.get("message", "装备图鉴奖励领取失败"), "danger")
+        return redirect(url_for("player_bp.equipment_pokedex"))
+
+    claimed_totals = result.get("newly_claimed_by_type", {}) or {}
+    parts = []
+    if int(claimed_totals.get("coins", 0) or 0) > 0:
+        parts.append(f"{claimed_totals['coins']} 金币")
+    if int(claimed_totals.get("premium", 0) or 0) > 0:
+        parts.append(f"{claimed_totals['premium']} 钻石")
+    if parts:
+        await flash(f"成功领取装备图鉴奖励：{'、'.join(parts)}", "success")
+    else:
+        await flash(result.get("message", "当前没有可领取的装备图鉴奖励"), "info")
+    return redirect(url_for("player_bp.equipment_pokedex"))
 
 @player_bp.route("/inventory")
 @login_required
@@ -2225,6 +2600,8 @@ async def inventory():
     """背包页面"""
     user_id = session.get("user_id")
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
+    user_repo = current_app.config.get("USER_REPO")
+    user = user_repo.get_by_id(user_id) if user_repo else None
     
     # 获取鱼竿、饰品、道具、鱼饵
     rods_result = inventory_service.get_user_rod_inventory(user_id)
@@ -2236,7 +2613,8 @@ async def inventory():
                                   rods=rods_result.get("rods", []),
                                   accessories=accessories_result.get("accessories", []),
                                   items=items_result.get("items", []),
-                                  baits=baits_result.get("baits", []))
+                                  baits=baits_result.get("baits", []),
+                                  current_bait_id=user.current_bait_id if user else None)
 
 @player_bp.route("/fishpond")
 @login_required
@@ -2467,6 +2845,7 @@ async def shop():
         if shop_details.get("success"):
             # 为每个商品的成本检查是否满足
             for item_data in shop_details.get("items", []):
+                item = item_data.get("item", {})
                 for cost in item_data.get("costs", []):
                     cost_type = cost.get("cost_type")
                     cost_item_id = cost.get("cost_item_id")
@@ -2492,6 +2871,58 @@ async def shop():
                         satisfied = user_inventory["baits"].get(cost_item_id, 0) >= cost_amount
                     
                     cost["satisfied"] = satisfied
+
+                valid_costs = [
+                    cost for cost in item_data.get("costs", [])
+                    if cost.get("cost_type") and int(cost.get("cost_amount", 0) or 0) > 0
+                ]
+                cost_groups = {}
+                for cost in valid_costs:
+                    group_id = cost.get("group_id") or 0
+                    cost_groups.setdefault(group_id, []).append(cost)
+
+                can_pay = True
+                for group_costs in cost_groups.values():
+                    relation = str(group_costs[0].get("cost_relation", "and") or "and").lower()
+                    if relation == "or" and len(group_costs) > 1:
+                        group_ok = any(cost.get("satisfied") for cost in group_costs)
+                    else:
+                        group_ok = all(cost.get("satisfied") for cost in group_costs)
+                    if not group_ok:
+                        can_pay = False
+                        break
+
+                can_purchase = can_pay
+                disabled_reason = "" if can_pay else "资源不足"
+                stock_total = item.get("stock_total")
+                if stock_total is not None and int(item.get("stock_sold", 0) or 0) >= int(stock_total or 0):
+                    can_purchase = False
+                    disabled_reason = "库存不足"
+
+                per_user_limit = item.get("per_user_limit")
+                if can_purchase and per_user_limit is not None:
+                    purchased_total = shop_service.shop_repo.get_user_purchased_count(user_id, item.get("item_id"))
+                    if purchased_total >= int(per_user_limit or 0):
+                        can_purchase = False
+                        disabled_reason = "已达限购"
+
+                per_user_daily_limit = item.get("per_user_daily_limit")
+                if can_purchase and per_user_daily_limit is not None and int(per_user_daily_limit or 0) > 0:
+                    now_utc = datetime.now(timezone.utc)
+                    now_local = now_utc.astimezone(timezone(timedelta(hours=8)))
+                    local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+                    start_of_day_utc = local_midnight.astimezone(timezone.utc).replace(tzinfo=None)
+                    purchased_today = shop_service.shop_repo.get_user_purchased_count(
+                        user_id,
+                        item.get("item_id"),
+                        since=start_of_day_utc,
+                    )
+                    if purchased_today >= int(per_user_daily_limit or 0):
+                        can_purchase = False
+                        disabled_reason = "今日已达限购"
+
+                item_data["can_purchase"] = can_purchase
+                item_data["purchase_disabled_reason"] = disabled_reason
             
             shops_with_items.append({
                 "shop_id": shop["shop_id"],

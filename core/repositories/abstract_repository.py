@@ -239,6 +239,29 @@ class AbstractInventoryRepository(ABC):
     # 更新用户的鱼饵数量
     @abstractmethod
     def update_bait_quantity(self, user_id: str, bait_id: int, delta: int) -> None: pass
+    # 记录用户曾经获得过的装备
+    @abstractmethod
+    def record_equipment_obtained(self, user_id: str, equipment_type: str, equipment_id: int, quantity: int = 1, obtained_at: Optional[datetime] = None) -> None: pass
+    # 将当前装备库存同步为图鉴已获得记录，兼容旧数据
+    @abstractmethod
+    def sync_user_equipment_stats_from_inventory(self, user_id: str) -> None: pass
+    # 获取用户装备图鉴聚合统计
+    @abstractmethod
+    def get_user_equipment_stats(self, user_id: str) -> List[Dict[str, Any]]: pass
+    # 获取装备图鉴奖励领取记录
+    @abstractmethod
+    def get_user_equipment_pokedex_reward_claims(self, user_id: str) -> List[Dict[str, Any]]: pass
+    # 领取装备图鉴节点奖励
+    @abstractmethod
+    def claim_equipment_pokedex_reward(
+        self,
+        user_id: str,
+        milestone_percent: int,
+        reward_type: str,
+        reward_amount: int,
+        unlocked_equipment_count: int,
+        total_equipment_count: int,
+    ) -> bool: pass
     # 获取用户的道具库存
     @abstractmethod
     def get_user_item_inventory(self, user_id: str) -> Dict[int, int]: pass
@@ -534,7 +557,8 @@ class AbstractLogRepository(ABC):
         self,
         user_id: str,
         milestone_percent: int,
-        reward_premium: int,
+        reward_type: str,
+        reward_amount: int,
         unlocked_fish_count: int,
         total_fish_count: int,
     ) -> bool:

@@ -3,71 +3,92 @@
 {% block title %}鱼类图鉴 - 钓鱼游戏{% endblock %}
 
 {% block content %}
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-0">
             <i class="fas fa-book"></i> 鱼类图鉴
         </h2>
         <p class="text-muted mt-2">收集图鉴，探索更多鱼类品种</p>
+        <div class="btn-group mt-2" role="group" aria-label="图鉴类型切换">
+            <a class="btn btn-primary active" aria-current="page" href="{{ url_for('player_bp.pokedex') }}">
+                <i class="fas fa-fish"></i> 鱼类
+            </a>
+            <a class="btn btn-outline-primary" href="{{ url_for('player_bp.equipment_pokedex') }}">
+                <i class="fas fa-toolbox"></i> 装备
+            </a>
+        </div>
     </div>
 </div>
 
 {% set reward_status = pokedex_reward_status if pokedex_reward_status and pokedex_reward_status.success else None %}
 {% set next_reward = reward_status.next_milestone if reward_status else None %}
 
+<!-- 统计信息 -->
+<div class="row g-0 metric-strip">
+    <div class="col-md-6">
+        <div class="editorial-metric h-100">
+            <h5><i class="fas fa-chart-pie"></i> 收集进度</h5>
+            <div class="metric-value">{{ caught_count }} / {{ total_fish }}</div>
+            <div class="progress mt-2">
+                <div class="progress-bar" role="progressbar" style="width: {{ (caught_count / total_fish * 100) if total_fish > 0 else 0 }}%"></div>
+            </div>
+            <span class="metric-note">{{ "%.1f" | format((caught_count / total_fish * 100) if total_fish > 0 else 0) }}% 完成</span>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="editorial-metric h-100 rarity-progress-panel">
+            <h5><i class="fas fa-layer-group"></i> 星级进度</h5>
+            <div class="rarity-progress-grid">
+                {% for item in rarity_progress %}
+                <div class="rarity-progress-item">
+                    <span>{{ star_label(item.rarity) }}</span>
+                    <strong>{{ item.caught }}/{{ item.total }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
 {% if reward_status %}
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card border-warning shadow-sm">
+        <div class="card border-warning">
             <div class="card-body">
                 <div class="row g-3 align-items-center">
                     <div class="col-lg-8">
-                        <h5 class="card-title mb-3"><i class="fas fa-gem text-warning"></i> 图鉴奖励</h5>
-                        <div class="row g-2">
-                            <div class="col-md-6">
-                                <div class="small text-muted">当前可领取</div>
-                                <div class="fw-bold fs-5 text-warning">{{ reward_status.claimable_reward_total }} 钻石</div>
+                        <h5 class="card-title mb-2"><i class="fas fa-gift text-warning"></i> 图鉴奖励</h5>
+                        <div class="row g-2 small">
+                            <div class="col-md-4">
+                                <div class="text-muted">当前可领取</div>
+                                <div class="fw-bold text-warning">{{ reward_status.claimable_coins_total }} 金币 / {{ reward_status.claimable_premium_total }} 钻石</div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="small text-muted">累计已领取</div>
-                                <div class="fw-bold fs-5">{{ reward_status.total_claimed_premium }} / {{ reward_status.total_reward_amount }} 钻石</div>
+                            <div class="col-md-4">
+                                <div class="text-muted">累计已领取</div>
+                                <div class="fw-bold">{{ reward_status.total_claimed_coins }} 金币 / {{ reward_status.total_claimed_premium }} 钻石</div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="small text-muted">已领取节点</div>
+                            <div class="col-md-4">
+                                <div class="text-muted">已领取节点</div>
                                 <div class="fw-bold">{{ reward_status.claimed_count }} / {{ reward_status.total_milestones }}</div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="small text-muted">当前高级货币</div>
-                                <div class="fw-bold">{{ reward_status.current_premium_currency }}</div>
-                            </div>
                         </div>
-                        <hr>
                         {% if next_reward %}
-                        <p class="mb-1">
-                            <strong>下一奖励：</strong>{{ next_reward.milestone_percent }}% 节点
-                            <span class="text-muted">({{ next_reward.reward_premium }} 钻石)</span>
+                        <p class="mb-0 mt-2 text-muted small">
+                            下一奖励：{{ next_reward.milestone_percent }}% 节点 · 还需 {{ next_reward.remaining_fish_count }} 种鱼
                         </p>
-                        <p class="mb-0 text-muted">
-                            还需 {{ next_reward.remaining_fish_count }} 种鱼
-                            · 目标 {{ next_reward.required_fish_count }} / {{ reward_status.total_fish_count }}
-                        </p>
-                        {% else %}
-                        <p class="mb-0 text-success"><strong>全部图鉴奖励已领取完毕。</strong></p>
                         {% endif %}
                     </div>
                     <div class="col-lg-4">
-                        <form method="post" action="{{ url_for('player_bp.claim_pokedex_reward') }}" class="d-grid gap-2">
-                            <button type="submit" class="btn btn-warning btn-lg" {% if reward_status.claimable_reward_total <= 0 %}disabled{% endif %}>
+                        <form method="post" action="{{ url_for('player_bp.claim_pokedex_reward') }}" class="d-grid">
+                            <button type="submit" class="btn btn-warning" {% if reward_status.claimable_coins_total <= 0 and reward_status.claimable_premium_total <= 0 %}disabled{% endif %}>
                                 <i class="fas fa-gift"></i>
-                                {% if reward_status.claimable_reward_total > 0 %}
-                                    领取 {{ reward_status.claimable_reward_total }} 钻石
+                                {% if reward_status.claimable_coins_total > 0 or reward_status.claimable_premium_total > 0 %}
+                                    领取奖励
                                 {% else %}
                                     暂无可领取奖励
                                 {% endif %}
                             </button>
-                            <div class="small text-muted text-center">
-                                命令端也可使用 <code>/图鉴奖励</code> 领取或查看进度
-                            </div>
                         </form>
                     </div>
                 </div>
@@ -77,70 +98,27 @@
 </div>
 {% endif %}
 
-<!-- 统计信息 -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-chart-pie"></i> 收集进度</h5>
-                <h2 class="mb-0">{{ caught_count }} / {{ total_fish }}</h2>
-                <div class="progress mt-2" style="height: 8px;">
-                    <div class="progress-bar bg-white" role="progressbar" 
-                         style="width: {{ (caught_count / total_fish * 100) if total_fish > 0 else 0 }}%">
-                    </div>
-                </div>
-                <small>{{ "%.1f" | format((caught_count / total_fish * 100) if total_fish > 0 else 0) }}% 完成</small>
-            </div>
-        </div>
+<!-- 筛选与搜索 -->
+<div class="filter-strip mb-3">
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-outline-primary btn-sm active" onclick="setFishRarity('all', this)">
+            <i class="fas fa-th"></i> 全部
+        </button>
+        {% for value in range(1, 11) %}
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="setFishRarity('{{ value }}', this)">{{ star_label(value) }}</button>
+        {% endfor %}
     </div>
-    <div class="col-md-6">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-trophy"></i> 收集成就</h5>
-                <h2 class="mb-0">
-                    {% if caught_count >= total_fish %}
-                        图鉴大师
-                    {% elif caught_count >= total_fish * 0.8 %}
-                        资深钓手
-                    {% elif caught_count >= total_fish * 0.5 %}
-                        钓鱼达人
-                    {% else %}
-                        新手钓手
-                    {% endif %}
-                </h2>
-                <small>继续加油，收集更多鱼类！</small>
-            </div>
-        </div>
+    <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="fishOwnedOnly" onchange="applyFishFilters()">
+        <label class="form-check-label" for="fishOwnedOnly">显示已拥有</label>
     </div>
 </div>
 
-<!-- 稀有度筛选 -->
-<div class="row mb-3">
-    <div class="col-12">
-        <div class="btn-group" role="group">
-            <button type="button" class="btn btn-outline-primary btn-sm active" onclick="filterByRarity('all')">
-                <i class="fas fa-th"></i> 全部
-            </button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(1)">普通</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(2)">常见</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(3)">优质</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(4)">稀有</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(5)">史诗</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(6)">传说</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(7)">神话</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(8)">远古</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(9)">永恒</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterByRarity(10)">至高</button>
-        </div>
-    </div>
-</div>
-
-<!-- 名字搜索 -->
 <div class="row mb-3">
     <div class="col-md-6">
         <div class="input-group">
             <span class="input-group-text"><i class="fas fa-search"></i></span>
-            <input type="text" class="form-control" id="fishNameSearch" placeholder="输入鱼类名字进行搜索..." oninput="filterByName()">
+            <input type="text" class="form-control" id="fishNameSearch" placeholder="输入鱼类名字进行搜索..." oninput="applyFishFilters()">
             <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
                 <i class="fas fa-times"></i> 清除
             </button>
@@ -151,91 +129,46 @@
 <!-- 按稀有度分组显示 -->
 {% for rarity in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] %}
     {% if rarity in fish_by_rarity %}
-    <div class="row mb-2 rarity-section" data-rarity="{{ rarity }}">
-        <div class="col-12">
-            <h5>
-                <i class="fas fa-star"></i> 
-                {% if rarity == 1 %}普通
-                {% elif rarity == 2 %}常见
-                {% elif rarity == 3 %}优质
-                {% elif rarity == 4 %}稀有
-                {% elif rarity == 5 %}史诗
-                {% elif rarity == 6 %}传说
-                {% elif rarity == 7 %}神话
-                {% elif rarity == 8 %}远古
-                {% elif rarity == 9 %}永恒
-                {% elif rarity == 10 %}至高
-                {% else %}未知
-                {% endif %}
-                ({{ fish_by_rarity[rarity]|length }})
-            </h5>
-        </div>
+    <div class="rarity-heading rarity-section" data-rarity="{{ rarity }}">
+        <i class="fas fa-star"></i>
+        {% if rarity == 1 %}普通
+        {% elif rarity == 2 %}常见
+        {% elif rarity == 3 %}优质
+        {% elif rarity == 4 %}稀有
+        {% elif rarity == 5 %}史诗
+        {% elif rarity == 6 %}传说
+        {% elif rarity == 7 %}神话
+        {% elif rarity == 8 %}远古
+        {% elif rarity == 9 %}永恒
+        {% elif rarity == 10 %}至高
+        {% else %}未知
+        {% endif %}
+        <span class="text-muted">({{ fish_by_rarity[rarity]|length }})</span>
     </div>
-    
+
     <div class="row g-3 mb-4 rarity-section" data-rarity="{{ rarity }}">
         {% for fish in fish_by_rarity[rarity] %}
-        <div class="col-md-6 col-lg-4 fish-card" data-fish-name="{{ fish.name }}">
-            <div class="card h-100 {% if not fish.is_caught %}border-secondary{% else %}border-primary{% endif %}">
-                <!-- 图片位置 -->
-                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 180px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    {% if fish.is_caught %}
-                        <div class="text-center text-white">
-                            <i class="fas fa-fish fa-4x mb-2"></i>
-                            <p class="mb-0 small">鱼类图片</p>
-                        </div>
-                    {% else %}
-                        <div class="text-center text-white-50">
-                            <i class="fas fa-question-circle fa-4x mb-2"></i>
-                            <p class="mb-0 small">未解锁</p>
-                        </div>
-                    {% endif %}
-                </div>
-                
+        <div class="col-md-6 col-lg-4 fish-card" data-fish-name="{{ fish.name }}" data-rarity="{{ rarity }}" data-owned="{{ '1' if fish.is_caught else '0' }}">
+            <div class="card h-100 pokedex-card {% if fish.is_caught %}border-primary{% else %}border-secondary{% endif %}">
                 <div class="card-body d-flex flex-column">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="flex-grow-1">
-                            <h5 class="card-title mb-1">
-                                {% if fish.is_caught %}
-                                    <i class="fas fa-check-circle text-success"></i> {{ fish.name }}
-                                {% else %}
-                                    <i class="fas fa-question-circle text-muted"></i> ???
-                                {% endif %}
-                            </h5>
-                            <div>
-                                <span class="badge bg-info">
-                                    {% for i in range(rarity) %}★{% endfor %}
-                                </span>
-                                <small class="text-muted ms-2">ID: {{ fish.id }}</small>
-                            </div>
-                        </div>
+                    <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+                        <h5 class="card-title mb-0">
+                            {% if fish.is_caught %}
+                                <i class="fas fa-check-circle text-success"></i> {{ fish.name }} <span class="star-inline">{{ star_label(rarity) }}</span>
+                            {% else %}
+                                <i class="fas fa-question-circle text-muted"></i> ??? <span class="star-inline">{{ star_label(rarity) }}</span>
+                            {% endif %}
+                        </h5>
+                        <span class="badge">ID: {{ fish.id }}</span>
                     </div>
-                    
-                    <hr class="my-2">
-                    
                     {% if fish.is_caught %}
-                        <p class="card-text mb-2" style="min-height: 40px;">{{ fish.description or '暂无描述' }}</p>
-                        
-                        <!-- 统计数据 -->
-                        <div class="small text-muted mb-2">
-                            <div class="d-flex justify-content-between mb-1">
-                                <span><i class="fas fa-fish"></i> 捕获次数:</span>
-                                <strong>{{ fish.total_caught }}</strong>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-auto">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted">
-                                    <i class="fas fa-coins text-warning"></i> {{ fish.base_value }}
-                                </small>
-                                <span class="badge bg-success">已解锁</span>
-                            </div>
+                        <p class="card-text mb-2">{{ fish.description or '暂无描述' }}</p>
+                        <div class="small text-muted mt-auto">
+                            <div><i class="fas fa-fish"></i> 捕获 {{ fish.total_caught }}</div>
+                            <div><i class="fas fa-coins text-warning"></i> {{ fish.base_value }}</div>
                         </div>
                     {% else %}
-                        <p class="card-text flex-grow-1 mb-2 text-muted" style="min-height: 60px;">暂未解锁，需要钓到此鱼类</p>
-                        <div class="mt-auto">
-                            <span class="badge bg-secondary">未解锁</span>
-                        </div>
+                        <p class="card-text text-muted mt-auto mb-0">暂未解锁，需要钓到此鱼类</p>
                     {% endif %}
                 </div>
             </div>
@@ -253,7 +186,7 @@
             <ul class="mb-0">
                 <li>不同钓鱼区域可以钓到不同稀有度的鱼类</li>
                 <li>使用更高级的鱼竿和饰品可以提升稀有鱼出现概率</li>
-                <li>收集图鉴可以解锁成就和奖励</li>
+                <li>可使用筛选快速查看已拥有鱼类</li>
             </ul>
         </div>
     </div>
@@ -262,55 +195,37 @@
 
 {% block extra_js %}
 <script>
-// 稀有度筛选功能
-function filterByRarity(rarity) {
-    const sections = document.querySelectorAll('.rarity-section');
-    const buttons = document.querySelectorAll('.btn-group button');
-    
-    // 更新按钮状态
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    
-    if (rarity === 'all') {
-        sections.forEach(section => section.style.display = '');
-    } else {
-        sections.forEach(section => {
-            if (section.dataset.rarity == rarity) {
-                section.style.display = '';
-            } else {
-                section.style.display = 'none';
-            }
-        });
-    }
-    
-    // 名字搜索后重新应用
-    filterByName();
+let currentFishRarity = 'all';
+
+function setFishRarity(rarity, button) {
+    currentFishRarity = rarity;
+    document.querySelectorAll('.filter-strip .btn-group .btn').forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+    applyFishFilters();
 }
 
-// 名字搜索功能
-function filterByName() {
+function applyFishFilters() {
     const searchText = document.getElementById('fishNameSearch').value.toLowerCase();
-    const fishCards = document.querySelectorAll('.fish-card');
-    
-    fishCards.forEach(card => {
-        const fishName = card.dataset.fishName.toLowerCase();
-        const parentSection = card.closest('.rarity-section[data-rarity]');
-        
-        // 只有在父分组显示时才检查名字筛选
-        if (parentSection && parentSection.style.display !== 'none') {
-            if (searchText === '' || fishName.includes(searchText)) {
-                card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
-        }
+    const ownedOnly = document.getElementById('fishOwnedOnly').checked;
+    document.querySelectorAll('.fish-card').forEach(card => {
+        const nameMatch = searchText === '' || card.dataset.fishName.toLowerCase().includes(searchText);
+        const rarityMatch = currentFishRarity === 'all' || card.dataset.rarity === currentFishRarity;
+        const ownedMatch = !ownedOnly || card.dataset.owned === '1';
+        card.style.display = (nameMatch && rarityMatch && ownedMatch) ? '' : 'none';
+    });
+    document.querySelectorAll('.rarity-heading').forEach(heading => {
+        const rarity = heading.dataset.rarity;
+        const visible = Array.from(document.querySelectorAll(`.fish-card[data-rarity="${rarity}"]`)).some(card => card.style.display !== 'none');
+        heading.style.display = visible ? '' : 'none';
+        document.querySelectorAll(`.row.rarity-section[data-rarity="${rarity}"]`).forEach(row => {
+            row.style.display = visible ? '' : 'none';
+        });
     });
 }
 
-// 清除搜索
 function clearSearch() {
     document.getElementById('fishNameSearch').value = '';
-    filterByName();
+    applyFishFilters();
 }
 </script>
 {% endblock %}

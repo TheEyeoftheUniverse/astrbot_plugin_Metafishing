@@ -324,13 +324,40 @@ CREATE TABLE user_fish_stats (
             FOREIGN KEY (fish_id) REFERENCES fish(fish_id) ON DELETE RESTRICT
         );
 
+-- table: user_equipment_stats
+CREATE TABLE user_equipment_stats (
+            user_id TEXT NOT NULL,
+            equipment_type TEXT NOT NULL CHECK (equipment_type IN ('rod', 'accessory', 'bait')),
+            equipment_id INTEGER NOT NULL,
+            first_obtained_at DATETIME,
+            last_obtained_at DATETIME,
+            total_obtained INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, equipment_type, equipment_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
 -- table: user_pokedex_reward_claims
 CREATE TABLE user_pokedex_reward_claims (
             user_id TEXT NOT NULL,
             milestone_percent INTEGER NOT NULL,
             reward_premium INTEGER NOT NULL,
+            reward_type TEXT NOT NULL DEFAULT 'premium' CHECK (reward_type IN ('coins', 'premium')),
+            reward_amount INTEGER NOT NULL DEFAULT 0,
             claimed_unlocked_fish_count INTEGER NOT NULL,
             claimed_total_fish_count INTEGER NOT NULL,
+            claimed_at DATETIME NOT NULL,
+            PRIMARY KEY (user_id, milestone_percent),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
+-- table: user_equipment_pokedex_reward_claims
+CREATE TABLE user_equipment_pokedex_reward_claims (
+            user_id TEXT NOT NULL,
+            milestone_percent INTEGER NOT NULL,
+            reward_type TEXT NOT NULL CHECK (reward_type IN ('coins', 'premium')),
+            reward_amount INTEGER NOT NULL,
+            claimed_unlocked_equipment_count INTEGER NOT NULL,
+            claimed_total_equipment_count INTEGER NOT NULL,
             claimed_at DATETIME NOT NULL,
             PRIMARY KEY (user_id, milestone_percent),
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -508,6 +535,12 @@ CREATE INDEX idx_user_fish_stats_fish ON user_fish_stats(fish_id);
 
 -- index: idx_user_fish_stats_user
 CREATE INDEX idx_user_fish_stats_user ON user_fish_stats(user_id);
+
+-- index: idx_user_equipment_stats_equipment
+CREATE INDEX idx_user_equipment_stats_equipment ON user_equipment_stats(equipment_type, equipment_id);
+
+-- index: idx_user_equipment_stats_user
+CREATE INDEX idx_user_equipment_stats_user ON user_equipment_stats(user_id);
 
 -- index: idx_user_rods_display_code
 CREATE UNIQUE INDEX idx_user_rods_display_code ON user_rods(display_code);

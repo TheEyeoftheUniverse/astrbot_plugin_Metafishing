@@ -1,0 +1,189 @@
+{% extends "layout.html" %}
+
+{% block title %}装备图鉴 - 钓鱼游戏{% endblock %}
+
+{% block content %}
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
+{% set data = pokedex_data if pokedex_data and pokedex_data.success else None %}
+{% set next_reward = reward_status.next_milestone if reward_status and reward_status.success else None %}
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-0">
+            <i class="fas fa-toolbox"></i> 装备图鉴
+        </h2>
+        <p class="text-muted mt-2">查看已经获得过的鱼竿、饰品和鱼饵</p>
+        <div class="btn-group mt-2" role="group" aria-label="图鉴类型切换">
+            <a class="btn btn-outline-primary" href="{{ url_for('player_bp.pokedex') }}">
+                <i class="fas fa-fish"></i> 鱼类
+            </a>
+            <a class="btn btn-primary active" aria-current="page" href="{{ url_for('player_bp.equipment_pokedex') }}">
+                <i class="fas fa-toolbox"></i> 装备
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if data %}
+<div class="row mb-4">
+    <div class="col-md-6 col-xl-3 mb-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-chart-pie"></i> 总进度</h5>
+                <h2 class="mb-0">{{ data.unlocked_equipment_count }} / {{ data.total_equipment_count }}</h2>
+                <div class="progress mt-2" style="height: 8px;">
+                    <div class="progress-bar bg-white" role="progressbar" style="width: {{ data.unlocked_percentage * 100 }}%"></div>
+                </div>
+                <small>{{ data.unlocked_percentage_text }} 完成</small>
+            </div>
+        </div>
+    </div>
+    {% for key in ["rod", "accessory", "bait"] %}
+        {% set category = data.categories[key] %}
+        <div class="col-md-6 col-xl-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        {% if key == "rod" %}
+                            <i class="fas fa-fish"></i>
+                        {% elif key == "accessory" %}
+                            <i class="fas fa-ring"></i>
+                        {% else %}
+                            <i class="fas fa-cookie-bite"></i>
+                        {% endif %}
+                        {{ category.label }}
+                    </h5>
+                    <h3 class="mb-0">{{ category.unlocked_count }} / {{ category.total_count }}</h3>
+                    <div class="progress mt-2" style="height: 8px;">
+                        <div class="progress-bar" role="progressbar" style="width: {{ category.unlocked_percentage * 100 }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ category.unlocked_percentage_text }} 完成</small>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+{% if reward_status and reward_status.success %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-lg-8">
+                        <h5 class="card-title mb-2"><i class="fas fa-gift text-warning"></i> 装备图鉴奖励</h5>
+                        <div class="row g-2 small">
+                            <div class="col-md-4">
+                                <div class="text-muted">当前可领取</div>
+                                <div class="fw-bold text-warning">{{ reward_status.claimable_coins_total }} 金币 / {{ reward_status.claimable_premium_total }} 钻石</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-muted">累计已领取</div>
+                                <div class="fw-bold">{{ reward_status.total_claimed_coins }} 金币 / {{ reward_status.total_claimed_premium }} 钻石</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-muted">已领取节点</div>
+                                <div class="fw-bold">{{ reward_status.claimed_count }} / {{ reward_status.total_milestones }}</div>
+                            </div>
+                        </div>
+                        {% if next_reward %}
+                        <p class="mb-0 mt-2 text-muted small">
+                            下一奖励：{{ next_reward.milestone_percent }}% 节点 · 还需 {{ next_reward.remaining_equipment_count }} 件装备
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="col-lg-4">
+                        <form method="post" action="{{ url_for('player_bp.claim_equipment_pokedex_reward') }}" class="d-grid">
+                            <button type="submit" class="btn btn-warning" {% if reward_status.claimable_coins_total <= 0 and reward_status.claimable_premium_total <= 0 %}disabled{% endif %}>
+                                <i class="fas fa-gift"></i>
+                                {% if reward_status.claimable_coins_total > 0 or reward_status.claimable_premium_total > 0 %}
+                                    领取奖励
+                                {% else %}
+                                    暂无可领取奖励
+                                {% endif %}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<form class="filter-strip mb-3" method="get" action="{{ url_for('player_bp.equipment_pokedex') }}">
+    <input type="hidden" name="page" value="1">
+    <div class="btn-group" role="group">
+        {% for value, label in [("all", "全部"), ("rod", "鱼竿"), ("accessory", "饰品"), ("bait", "鱼饵")] %}
+        <input type="radio" class="btn-check" name="equipment_type" id="type-{{ value }}" value="{{ value }}" {% if data.filters.equipment_type == value %}checked{% endif %} onchange="this.form.submit()">
+        <label class="btn btn-outline-primary btn-sm" for="type-{{ value }}">{{ label }}</label>
+        {% endfor %}
+    </div>
+    <div class="btn-group" role="group">
+        <input type="radio" class="btn-check" name="rarity" id="rarity-all" value="all" {% if data.filters.rarity == 'all' %}checked{% endif %} onchange="this.form.submit()">
+        <label class="btn btn-outline-primary btn-sm" for="rarity-all">全部星级</label>
+        {% for value in range(1, 11) %}
+        <input type="radio" class="btn-check" name="rarity" id="rarity-{{ value }}" value="{{ value }}" {% if data.filters.rarity == value %}checked{% endif %} onchange="this.form.submit()">
+        <label class="btn btn-outline-primary btn-sm" for="rarity-{{ value }}">{{ star_label(value) }}</label>
+        {% endfor %}
+    </div>
+    <div class="form-check form-switch">
+        <input type="hidden" name="owned" value="0">
+        <input class="form-check-input" type="checkbox" role="switch" id="equipmentOwnedOnly" name="owned" value="1" {% if data.filters.owned == '1' %}checked{% endif %} onchange="this.form.submit()">
+        <label class="form-check-label" for="equipmentOwnedOnly">显示已拥有</label>
+    </div>
+</form>
+
+<div class="small text-muted mb-3">当前筛选：{{ data.filtered_count }} 件</div>
+
+<div class="row g-3 mb-4">
+    {% for item in data.page_items %}
+    <div class="col-md-6 col-lg-4 equipment-card">
+        <div class="card h-100 pokedex-card {% if item.is_collected %}border-primary{% else %}border-secondary{% endif %}">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+                    <h5 class="card-title mb-0">
+                        {% if item.is_collected %}
+                            <i class="fas fa-check-circle text-success"></i> {{ item.name }} <span class="star-inline">{{ star_label(item.rarity) }}</span>
+                        {% else %}
+                            <i class="fas fa-question-circle text-muted"></i> ??? <span class="star-inline">{{ star_label(item.rarity) }}</span>
+                        {% endif %}
+                    </h5>
+                    <span class="badge">{{ item.equipment_type_label }}</span>
+                </div>
+                <div class="small text-muted mb-2">ID: {{ item.id }}</div>
+                {% if item.is_collected %}
+                    <p class="card-text mb-2">{{ item.description or "暂无描述" }}</p>
+                    {% if item.effect_description %}
+                        <p class="small text-muted mb-2">{{ item.effect_description }}</p>
+                    {% endif %}
+                    <div class="small text-muted mt-auto">
+                        <span>累计获得</span>
+                        <strong>{{ item.total_obtained }}</strong>
+                    </div>
+                {% else %}
+                    <p class="card-text text-muted mt-auto mb-0">尚未收集</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<nav aria-label="装备图鉴分页">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if data.page <= 1 %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('player_bp.equipment_pokedex', page=data.page - 1, equipment_type=data.filters.equipment_type, rarity=data.filters.rarity, owned=data.filters.owned) }}">上一页</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">{{ data.page }} / {{ data.total_pages }}</span>
+        </li>
+        <li class="page-item {% if data.page >= data.total_pages %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('player_bp.equipment_pokedex', page=data.page + 1, equipment_type=data.filters.equipment_type, rarity=data.filters.rarity, owned=data.filters.owned) }}">下一页</a>
+        </li>
+    </ul>
+</nav>
+{% else %}
+<div class="alert alert-danger">装备图鉴数据加载失败。</div>
+{% endif %}
+{% endblock %}

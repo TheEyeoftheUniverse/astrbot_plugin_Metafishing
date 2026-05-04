@@ -9,9 +9,9 @@
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="player-ui">
 {% if session.get('user_id') %}
-<nav class="navbar navbar-expand-lg navbar-dark bg-info fixed-top">
+<nav class="navbar navbar-expand-lg navbar-light player-topbar fixed-top">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('player_bp.index') }}">
             <i class="fas fa-gamepad"></i> 钓鱼游戏
@@ -40,6 +40,7 @@
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.fishpond') }}"><i class="fas fa-fish"></i> 鱼塘</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.aquarium') }}"><i class="fas fa-water"></i> 水族箱</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.pokedex') }}"><i class="fas fa-book"></i> 鱼类图鉴</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('player_bp.equipment_pokedex') }}"><i class="fas fa-toolbox"></i> 装备图鉴</a></li>
                     </ul>
                 </li>
                 <li class="nav-item dropdown">
@@ -63,18 +64,30 @@
                     </a>
                 </li>
             </ul>
-            <span class="navbar-text me-3">
-                <i class="fas fa-user-circle"></i> {{ session.get('nickname', session.get('user_id')) }}
-            </span>
-            <a href="{{ url_for('player_bp.logout') }}" class="btn btn-outline-light btn-sm">
-                <i class="fas fa-sign-out-alt"></i> 登出
-            </a>
+            <div class="nav-item dropdown player-account-menu">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="playerAccountDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-user-circle"></i> {{ session.get('nickname', session.get('user_id')) }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="playerAccountDropdown">
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('player_bp.profile') }}">
+                            <i class="fas fa-id-card"></i> 个人信息
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-danger" href="{{ url_for('player_bp.logout') }}">
+                            <i class="fas fa-sign-out-alt"></i> 登出
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
 </nav>
 {% endif %}
 
-<main class="container mt-5 pt-4">
+<main class="container player-main">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -85,11 +98,11 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-    
+
     {% block content %}{% endblock %}
 </main>
 
-<footer class="mt-5 py-3 bg-light text-center">
+<footer class="editorial-footer py-3 text-center">
     <div class="container">
         <p class="text-muted mb-0">
             <i class="fas fa-fish"></i> 钓鱼游戏 WebUI &copy; 2025
@@ -98,9 +111,9 @@
 </footer>
 
 <!-- 通知面板 -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999; width: 350px;">
-    <div class="card shadow-lg" id="notificationPanel">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2" style="cursor: pointer;" onclick="toggleNotificationPanel()">
+<div class="position-fixed bottom-0 end-0 p-3 notification-dock">
+    <div class="card" id="notificationPanel">
+        <div class="card-header d-flex justify-content-between align-items-center py-2" onclick="toggleNotificationPanel()">
             <h6 class="mb-0"><i class="fas fa-bell"></i> 消息通知 <span id="unreadBadge" class="badge bg-danger" style="display: none;">0</span></h6>
             <button class="btn btn-sm btn-light" type="button" title="折叠/展开">
                 <i class="fas fa-chevron-down" id="panelToggleIcon"></i>
@@ -118,6 +131,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+function formatRarityStars(value) {
+    const rarity = Number(value) || 0;
+    if (rarity <= 0) return '-';
+    return `${rarity}${rarity <= 5 ? '☆' : '★'}`;
+}
+
 // 从 localStorage 恢复通知面板状态
 let notificationPanelCollapsed = localStorage.getItem('notificationPanelCollapsed') === 'true';
 
@@ -129,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
         body.style.display = 'none';
         icon.className = 'fas fa-chevron-up';
     }
-    
+
     // 从 sessionStorage 恢复通知列表
     restoreNotifications();
 });
@@ -139,9 +158,9 @@ function toggleNotificationPanel() {
     const body = document.getElementById('notificationBody');
     const icon = document.getElementById('panelToggleIcon');
     const badge = document.getElementById('unreadBadge');
-    
+
     notificationPanelCollapsed = !notificationPanelCollapsed;
-    
+
     if (notificationPanelCollapsed) {
         body.style.display = 'none';
         icon.className = 'fas fa-chevron-up';
@@ -151,7 +170,7 @@ function toggleNotificationPanel() {
         // 展开时清除未读标记
         badge.style.display = 'none';
     }
-    
+
     // 保存状态到 localStorage
     localStorage.setItem('notificationPanelCollapsed', notificationPanelCollapsed);
 }
@@ -160,7 +179,7 @@ function toggleNotificationPanel() {
 function saveNotifications() {
     const list = document.getElementById('notificationList');
     const notifications = [];
-    
+
     for (let i = 0; i < Math.min(list.children.length, 20); i++) {
         const item = list.children[i];
         if (!item.classList.contains('text-muted')) {
@@ -170,7 +189,7 @@ function saveNotifications() {
             });
         }
     }
-    
+
     sessionStorage.setItem('notifications', JSON.stringify(notifications));
 }
 
@@ -181,7 +200,7 @@ function restoreNotifications() {
         try {
             const notifications = JSON.parse(saved);
             const list = document.getElementById('notificationList');
-            
+
             // 清空默认消息
             if (notifications.length > 0) {
                 list.innerHTML = '';
@@ -203,23 +222,23 @@ function showToast(message, type = 'success') {
     const list = document.getElementById('notificationList');
     const body = document.getElementById('notificationBody');
     const badge = document.getElementById('unreadBadge');
-    
+
     // 清空默认消息
     if (list.children.length === 1 && list.children[0].classList.contains('text-muted')) {
         list.innerHTML = '';
     }
-    
+
     // 如果面板折叠，显示未读标记
     if (notificationPanelCollapsed) {
         const currentCount = parseInt(badge.textContent) || 0;
         badge.textContent = currentCount + 1;
         badge.style.display = 'inline-block';
     }
-    
+
     // 创建通知项
     const item = document.createElement('div');
     item.className = 'list-group-item list-group-item-action';
-    
+
     // 设置颜色
     if (type === 'success') {
         item.classList.add('list-group-item-success');
@@ -230,17 +249,17 @@ function showToast(message, type = 'success') {
     } else {
         item.classList.add('list-group-item-info');
     }
-    
+
     // 设置图标
     let icon = 'fa-check-circle';
     if (type === 'error') icon = 'fa-exclamation-circle';
     else if (type === 'warning') icon = 'fa-exclamation-triangle';
     else if (type === 'info') icon = 'fa-info-circle';
-    
+
     // 获取当前时间
     const now = new Date();
     const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    
+
     item.innerHTML = `
         <div class="d-flex w-100 justify-content-between align-items-start">
             <div class="flex-grow-1">
@@ -249,18 +268,18 @@ function showToast(message, type = 'success') {
             <small class="text-muted ms-2">${timeStr}</small>
         </div>
     `;
-    
+
     // 添加到列表顶部
     list.insertBefore(item, list.firstChild);
-    
+
     // 限制通知数量（最多保留20条）
     while (list.children.length > 20) {
         list.removeChild(list.lastChild);
     }
-    
+
     // 滚动到顶部
     body.scrollTop = 0;
-    
+
     // 保存通知
     saveNotifications();
 }

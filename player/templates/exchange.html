@@ -114,55 +114,57 @@
 <div class="row">
     {% for commodity_id, commodity in market_status.commodities.items() %}
     <div class="col-lg-4 mb-4">
-        <div class="card h-100">
+        <div class="card h-100 exchange-commodity-card">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
                     <i class="fas fa-box"></i> {{ commodity.name }}
                 </h5>
             </div>
             <div class="card-body">
-                <!-- 当前价格 -->
-                <div class="text-center mb-3">
-                    <h6 class="text-muted mb-2">当前价格</h6>
-                    <h2 class="text-warning mb-0">
-                        <i class="fas fa-coins"></i> {{ market_status.prices[commodity_id] }}
-                    </h2>
+                <div class="exchange-commodity-summary">
+                    <!-- 当前价格 -->
+                    <div class="text-center mb-3">
+                        <h6 class="text-muted mb-2">当前价格</h6>
+                        <h2 class="text-warning mb-0">
+                            <i class="fas fa-coins"></i> {{ market_status.prices[commodity_id] }}
+                        </h2>
+                    </div>
+
+                    <!-- 商品描述 -->
+                    <p class="text-muted small mb-3">{{ commodity.description }}</p>
+
+                    <!-- 持有量 -->
+                    <div class="mb-3">
+                        <h6 class="mb-2">我的持仓</h6>
+                        {% set user_qty = user_inventory.get(commodity_id, 0) %}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>持有数量:</span>
+                            <strong class="text-primary">{{ user_qty }}</strong>
+                        </div>
+                        {% if user_qty > 0 %}
+                        {% set cost = user_costs.get(commodity_id, 0) %}
+                        {% set current_value = user_qty * market_status.prices[commodity_id] %}
+                        {% set profit = current_value - cost %}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>成本:</span>
+                            <span class="text-muted">{{ cost }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>市值:</span>
+                            <span class="text-info">{{ current_value }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>盈亏:</span>
+                            <strong class="{% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "+" if profit >= 0 else "" }}{{ profit }}
+                                ({{ "%.2f"|format((profit / cost * 100) if cost > 0 else 0) }}%)
+                            </strong>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
 
-                <!-- 商品描述 -->
-                <p class="text-muted small mb-3">{{ commodity.description }}</p>
-
-                <!-- 持有量 -->
-                <div class="mb-3">
-                    <h6 class="mb-2">我的持仓</h6>
-                    {% set user_qty = user_inventory.get(commodity_id, 0) %}
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span>持有数量:</span>
-                        <strong class="text-primary">{{ user_qty }}</strong>
-                    </div>
-                    {% if user_qty > 0 %}
-                    {% set cost = user_costs.get(commodity_id, 0) %}
-                    {% set current_value = user_qty * market_status.prices[commodity_id] %}
-                    {% set profit = current_value - cost %}
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span>成本:</span>
-                        <span class="text-muted">{{ cost }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span>市值:</span>
-                        <span class="text-info">{{ current_value }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span>盈亏:</span>
-                        <strong class="{% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            {{ "+" if profit >= 0 else "" }}{{ profit }}
-                            ({{ "%.2f"|format((profit / cost * 100) if cost > 0 else 0) }}%)
-                        </strong>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <hr>
+                <hr class="card-section-divider">
 
                 <!-- 交易操作 -->
                 <div>
@@ -270,18 +272,18 @@
 // 绘制价格走势图
 function drawPriceChart() {
     const ctx = document.getElementById('priceChart').getContext('2d');
-    
+
     const labels = {{ labels | tojson }};
     const commodities = {{ market_status.commodities | tojson }};
     const historyData = {{ history_data | tojson }};
-    
+
     const datasets = [];
     const colors = {
         'dried_fish': { border: 'rgb(255, 159, 64)', bg: 'rgba(255, 159, 64, 0.2)' },
         'fish_roe': { border: 'rgb(255, 99, 132)', bg: 'rgba(255, 99, 132, 0.2)' },
         'fish_oil': { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' }
     };
-    
+
     for (const [commodityId, commodity] of Object.entries(commodities)) {
         if (historyData[commodityId]) {
             datasets.push({
@@ -294,7 +296,7 @@ function drawPriceChart() {
             });
         }
     }
-    
+
     new Chart(ctx, {
         type: 'line',
         data: {
@@ -350,13 +352,13 @@ async function openAccount() {
     if (!confirm('确认免费开通期货账户吗？')) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_open_exchange_account") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'}
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -396,18 +398,18 @@ async function upgradeCapacity() {
 async function buyCommodity(commodityId, commodityName, currentPrice) {
     const qty = prompt(`买入【${commodityName}】\n当前价格: ${currentPrice} 金币/个\n请输入买入数量:`, '1');
     if (!qty || qty <= 0) return;
-    
+
     const quantity = parseInt(qty);
     if (isNaN(quantity) || quantity <= 0) {
         showToast('数量无效', 'error');
         return;
     }
-    
+
     const totalCost = quantity * currentPrice;
     if (!confirm(`确认购买 ${quantity} 个【${commodityName}】吗？\n总价: ${totalCost} 金币`)) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_buy_commodity") }}', {
             method: 'POST',
@@ -418,7 +420,7 @@ async function buyCommodity(commodityId, commodityName, currentPrice) {
                 current_price: currentPrice
             })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
@@ -437,21 +439,21 @@ async function sellCommodity(commodityId, commodityName, currentPrice, maxQty) {
         showToast('您没有该商品', 'error');
         return;
     }
-    
+
     const qty = prompt(`卖出【${commodityName}】\n当前价格: ${currentPrice} 金币/个\n持有数量: ${maxQty}\n请输入卖出数量:`, '1');
     if (!qty || qty <= 0) return;
-    
+
     const quantity = parseInt(qty);
     if (isNaN(quantity) || quantity <= 0 || quantity > maxQty) {
         showToast('数量无效', 'error');
         return;
     }
-    
+
     const totalValue = quantity * currentPrice;
     if (!confirm(`确认卖出 ${quantity} 个【${commodityName}】吗？\n总价: ${totalValue} 金币`)) {
         return;
     }
-    
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_sell_commodity") }}', {
             method: 'POST',
@@ -462,7 +464,7 @@ async function sellCommodity(commodityId, commodityName, currentPrice, maxQty) {
                 current_price: currentPrice
             })
         });
-        
+
         const data = await response.json();
         if (data.success) {
             showToast(data.message, 'success');
