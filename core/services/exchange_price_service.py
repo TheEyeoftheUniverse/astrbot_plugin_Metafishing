@@ -115,7 +115,7 @@ class ExchangePriceService:
 
         return dict(initial_prices), dict(initial_prices)
 
-    def _calculate_market_descriptors(
+    def _calculate_price_descriptors(
         self,
         current_prices: Dict[str, int],
         previous_prices: Dict[str, int],
@@ -140,7 +140,6 @@ class ExchangePriceService:
             return {
                 "market_sentiment": "中性观望",
                 "price_trend": "稳定",
-                "supply_demand": "基本平衡",
             }
 
         average_change = sum(changes) / len(changes)
@@ -170,6 +169,12 @@ class ExchangePriceService:
         else:
             market_sentiment = "中性观望"
 
+        return {
+            "market_sentiment": market_sentiment,
+            "price_trend": price_trend,
+        }
+
+    def _calculate_current_supply_demand(self) -> str:
         try:
             all_commodities = self.exchange_repo.get_all_user_commodities()
         except Exception as e:
@@ -181,21 +186,43 @@ class ExchangePriceService:
         average_holding = (total_quantity / holder_count) if holder_count > 0 else 0
 
         if holder_count == 0 or total_quantity == 0:
-            supply_demand = "需求低迷"
-        elif average_holding >= 120:
-            supply_demand = "供过于求"
-        elif average_holding >= 45:
-            supply_demand = "供给充足"
-        elif average_holding <= 8 and holder_count >= 3:
-            supply_demand = "需求旺盛"
-        else:
-            supply_demand = "基本平衡"
+            return "需求低迷"
+        if average_holding >= 120:
+            return "供过于求"
+        if average_holding >= 45:
+            return "供给充足"
+        if average_holding <= 8 and holder_count >= 3:
+            return "需求旺盛"
+        return "基本平衡"
 
-        return {
-            "market_sentiment": market_sentiment,
-            "price_trend": price_trend,
-            "supply_demand": supply_demand,
-        }
+    def _get_or_create_daily_supply_demand(self, date: str) -> str:
+        try:
+            snapshot = self.exchange_repo.get_exchange_market_snapshot(date)
+            if snapshot and snapshot.get("supply_demand"):
+                return str(snapshot["supply_demand"])
+        except Exception as e:
+            logger.warning(f"读取期货供需日快照失败，将重新生成: {e}")
+
+        supply_demand = self._calculate_current_supply_demand()
+        try:
+            self.exchange_repo.upsert_exchange_market_snapshot(
+                date,
+                supply_demand,
+                datetime.now().isoformat(),
+            )
+        except Exception as e:
+            logger.warning(f"写入期货供需日快照失败，本次使用实时计算值: {e}")
+        return supply_demand
+
+    def _calculate_market_descriptors(
+        self,
+        current_prices: Dict[str, int],
+        previous_prices: Dict[str, int],
+        date: str,
+    ) -> Dict[str, str]:
+        descriptors = self._calculate_price_descriptors(current_prices, previous_prices)
+        descriptors["supply_demand"] = self._get_or_create_daily_supply_demand(date)
+        return descriptors
 
     def get_market_status(self) -> Dict[str, Any]:
         """获取市场状态"""
@@ -207,7 +234,7 @@ class ExchangePriceService:
             reference_prices = y_prices or self.exchange_repo.get_latest_prices()
 
             current_prices, previous_prices = self._get_current_and_previous_snapshots(prices, reference_prices)
-            market_descriptors = self._calculate_market_descriptors(current_prices, previous_prices)
+            market_descriptors = self._calculate_market_descriptors(current_prices, previous_prices, today_str)
 
             return {
                 "success": True,

@@ -33,7 +33,7 @@
                         <td>
                             {{ item.item_name }} (ID: {{ item.item_id }})
                             {% if item.rarity %}
-                                <span class="text-warning">{{ '★' * item.rarity }}</span>
+                                <span class="text-warning">{{ rarity_label(item.rarity) }}</span>
                             {% endif %}
                         </td>
                         <td><span class="badge bg-secondary">{{ item.item_type }}</span></td>
@@ -100,19 +100,19 @@
                                 <option value="coins-0">金币</option>
                             </optgroup>
                             <optgroup label="鱼竿">
-                                {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}">{{ rod.name }} {{ '★' * rod.rarity }}</option>{% endfor %}
+                                {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}">{{ rod.name }} {{ rarity_label(rod.rarity) }}</option>{% endfor %}
                             </optgroup>
                              <optgroup label="鱼饵">
-                                {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}">{{ bait.name }} {{ '★' * bait.rarity }}</option>{% endfor %}
+                                {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}">{{ bait.name }} {{ rarity_label(bait.rarity) }}</option>{% endfor %}
                             </optgroup>
                             <optgroup label="饰品">
                                 {% for accessory in all_accessories %}
-                                    <option value="accessory-{{ accessory.accessory_id }}">{{ accessory.name }} (稀有度: {{ accessory.rarity }})</option>
+                                    <option value="accessory-{{ accessory.accessory_id }}">{{ accessory.name }} {{ rarity_label(accessory.rarity) }}</option>
                                 {% endfor %}
                             </optgroup>
                             <optgroup label="道具">
                                 {% for item in all_items %}
-                                    <option value="item-{{ item.item_id }}">{{ item.name }} (稀有度: {{ item.rarity }})</option>
+                                    <option value="item-{{ item.item_id }}">{{ item.name }} {{ rarity_label(item.rarity) }}</option>
                                 {% endfor %}
                             </optgroup>
                         </select>

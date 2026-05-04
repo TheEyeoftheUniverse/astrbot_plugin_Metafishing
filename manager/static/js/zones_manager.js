@@ -49,10 +49,10 @@ document.addEventListener('DOMContentLoaded', function() {
         let totalFishListHtml = '';
         for (let rarity = 1; rarity <= 10; rarity++) {
             if (fishByRarity[rarity]?.length > 0) {
-                const rarityStars = '★'.repeat(rarity);
+                const rarityStars = window.formatAdminRarityLabel(rarity);
                 totalFishListHtml += `
                     <div class="list-group-item bg-light fw-bold d-flex justify-content-between align-items-center">
-                        <span>${rarityStars} ${rarity}星鱼类 (${fishByRarity[rarity].length}种)</span>
+                        <span>${rarityStars} 鱼类 (${fishByRarity[rarity].length}种)</span>
                         <div class="form-check">
                             <input class="form-check-input rarity-select-all" type="checkbox" id="rarity-${rarity}" title="选中/取消选中此星级所有鱼类">
                             <label class="form-check-label" for="rarity-${rarity}">全选</label>
@@ -141,12 +141,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="row">
                         ${[...Array(5).keys()].map(i => `
                             <div class="col-md-2 col-4 mb-2">
-                                <label>${i+1} 星</label>
+                                <label>${window.formatAdminRarityLabel(i+1)}</label>
                                 <input type="number" step="0.001" min="0" max="1" class="form-control rarity-input" name="rarity_${i+1}" value="${rarityDistribution[i]}" placeholder="0.000">
                             </div>
                         `).join('')}
                         <div class="col-md-2 col-4 mb-2">
-                            <label>6+ 星</label>
+                            <label>6★+</label>
                             <input type="number" step="0.001" min="0" max="1" class="form-control rarity-input" name="rarity_6plus" value="${rarityDistribution[5]}" placeholder="0.000">
                         </div>
                     </div>
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-md-3">
                             <select class="form-control form-control-sm" id="rarityFilter">
                                 <option value="">所有稀有度</option>
-                                ${[...Array(10).keys()].map(i => `<option value="${i+1}">${'★'.repeat(i+1)} ${i+1}星</option>`).join('')}
+                                ${[...Array(10).keys()].map(i => `<option value="${i+1}">${window.formatAdminRarityLabel(i+1)}</option>`).join('')}
                             </select>
                         </div>
                         <div class="col-md-3">
@@ -375,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const fishData = totalItem.dataset;
         const rarity = parseInt(fishData.rarity);
-        const rarityStars = '★'.repeat(rarity);
+        const rarityStars = window.formatAdminRarityLabel(rarity);
         const valueText = Number(fishData.value).toLocaleString();
 
         const selectedList = container.querySelector('#selectedFishList');

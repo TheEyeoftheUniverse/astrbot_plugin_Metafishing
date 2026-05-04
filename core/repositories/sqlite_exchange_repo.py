@@ -97,6 +97,59 @@ class SqliteExchangeRepository(AbstractExchangeRepository):
             for row in rows
         }
 
+    def get_exchange_market_snapshot(self, date: str) -> Optional[Dict[str, Any]]:
+        conn = self._get_connection()
+        c = conn.cursor()
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS exchange_market_snapshots (
+                date TEXT PRIMARY KEY,
+                supply_demand TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        c.execute(
+            """
+            SELECT date, supply_demand, created_at
+            FROM exchange_market_snapshots
+            WHERE date = ?
+            """,
+            (date,),
+        )
+        row = c.fetchone()
+        if not row:
+            return None
+        return {
+            "date": row[0],
+            "supply_demand": row[1],
+            "created_at": row[2],
+        }
+
+    def upsert_exchange_market_snapshot(self, date: str, supply_demand: str, created_at: str) -> None:
+        conn = self._get_connection()
+        c = conn.cursor()
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS exchange_market_snapshots (
+                date TEXT PRIMARY KEY,
+                supply_demand TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        c.execute(
+            """
+            INSERT INTO exchange_market_snapshots (date, supply_demand, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(date) DO UPDATE SET
+                supply_demand = excluded.supply_demand,
+                created_at = excluded.created_at
+            """,
+            (date, supply_demand, created_at),
+        )
+        conn.commit()
+
     def add_exchange_price(self, price: Exchange) -> None:
         conn = self._get_connection()
         c = conn.cursor()

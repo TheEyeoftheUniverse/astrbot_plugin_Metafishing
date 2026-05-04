@@ -68,7 +68,7 @@ function updateItemOptions(itemType) {
     templates.forEach(template => {
         const option = document.createElement('option');
         option.value = template[`${itemType}_id`];
-        option.textContent = `${template.name} (${'★'.repeat(template.rarity)})`;
+        option.textContent = `${template.name} (${window.formatAdminRarityLabel(template.rarity)})`;
         itemIdSelect.appendChild(option);
     });
     

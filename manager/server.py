@@ -20,6 +20,41 @@ admin_bp = Blueprint(
     static_folder="static",
 )
 
+
+def format_rarity_label(value: Any) -> str:
+    try:
+        rarity = int(value or 0)
+    except (TypeError, ValueError):
+        return ""
+    if rarity <= 0:
+        return ""
+    return f"{rarity}{'☆' if rarity <= 5 else '★'}"
+
+
+def format_modifier_delta(value: Any) -> str:
+    try:
+        percent = (float(value or 1.0) - 1.0) * 100
+    except (TypeError, ValueError):
+        percent = 0.0
+    return f"{percent:+.1f}%"
+
+
+def format_chance_delta(value: Any) -> str:
+    try:
+        percent = float(value or 0.0) * 100
+    except (TypeError, ValueError):
+        percent = 0.0
+    return f"{percent:+.1f}%"
+
+
+def format_percent_value(value: Any) -> str:
+    try:
+        percent = float(value or 0.0) * 100
+    except (TypeError, ValueError):
+        percent = 0.0
+    return f"{percent:.1f}%"
+
+
 # 工厂函数现在接收服务实例
 def create_app(secret_key: str, services: Dict[str, Any]):
     """
@@ -32,6 +67,12 @@ def create_app(secret_key: str, services: Dict[str, Any]):
     app = Quart(__name__)
     app.secret_key = os.urandom(24)
     app.config["SECRET_LOGIN_KEY"] = secret_key
+    app.jinja_env.globals.update(
+        rarity_label=format_rarity_label,
+        modifier_delta=format_modifier_delta,
+        chance_delta=format_chance_delta,
+        percent_value=format_percent_value,
+    )
 
     # 将所有注入的服务实例存入app的配置中，供路由函数使用
     # 键名将转换为大写，例如 'user_service' -> 'USER_SERVICE'
@@ -1450,6 +1491,9 @@ async def manage_shop_details(shop_id):
             elif cost["cost_type"] == "accessory":
                 accessory_template = item_template_service.get_accessory_by_id(cost.get("cost_item_id"))
                 cost["accessory_name"] = accessory_template.name if accessory_template else None
+            elif cost["cost_type"] == "bait":
+                bait_template = item_template_service.get_bait_by_id(cost.get("cost_item_id"))
+                cost["bait_name"] = bait_template.name if bait_template else None
         
         # 为奖励添加物品名称
         for reward in rewards:
@@ -1636,7 +1680,7 @@ async def add_shop_item(shop_id):
             "quality_level": int(cost_quality_levels[idx]) if idx < len(cost_quality_levels) and cost_quality_levels[idx] else 0,
         }
         
-        if t in ("fish", "item", "rod", "accessory"):
+        if t in ("fish", "item", "rod", "accessory", "bait"):
             try:
                 cost_data["cost_item_id"] = int(id_text)
             except Exception:
@@ -1732,7 +1776,7 @@ async def edit_shop_item(shop_id, item_id):
             "quality_level": int(cost_quality_levels[idx]) if idx < len(cost_quality_levels) and cost_quality_levels[idx] else 0,
         }
         
-        if t in ("fish", "item", "rod", "accessory"):
+        if t in ("fish", "item", "rod", "accessory", "bait"):
             try:
                 cost_data["cost_item_id"] = int(id_text)
             except Exception:

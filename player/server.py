@@ -2976,6 +2976,7 @@ async def exchange():
                                       market_status={"commodities": []},
                                       user_inventory={},
                                       user_costs={},
+                                      user_inventory_lots={},
                                       capacity_info={},
                                       price_history={},
                                       history_data={},
@@ -2993,9 +2994,45 @@ async def exchange():
     # 构建用户库存字典和成本字典
     user_inventory = {}
     user_costs = {}
+    user_inventory_lots = {}
+    now = datetime.now()
     for commodity_id, data in inventory_data.items():
         user_inventory[commodity_id] = data.get("total_quantity", 0)
         user_costs[commodity_id] = data.get("total_cost", 0)
+        lots = []
+        for item in data.get("items", []):
+            expires_at = item.get("expires_at")
+            expires_at_text = "未知"
+            time_left_text = "未知"
+            is_expired = False
+            is_expiring_soon = False
+            if isinstance(expires_at, datetime):
+                expires_at_text = expires_at.strftime("%Y-%m-%d %H:%M")
+                seconds_left = int((expires_at - now).total_seconds())
+                if seconds_left <= 0:
+                    is_expired = True
+                    time_left_text = "已到期"
+                elif seconds_left < 86400:
+                    hours = max(1, seconds_left // 3600)
+                    is_expiring_soon = True
+                    time_left_text = f"剩 {hours} 小时"
+                else:
+                    days = seconds_left // 86400
+                    hours = (seconds_left % 86400) // 3600
+                    if hours > 0:
+                        time_left_text = f"剩 {days} 天 {hours} 小时"
+                    else:
+                        time_left_text = f"剩 {days} 天"
+            lots.append({
+                "instance_id": item.get("instance_id"),
+                "quantity": item.get("quantity", 0),
+                "purchase_price": item.get("purchase_price", 0),
+                "expires_at_text": expires_at_text,
+                "time_left_text": time_left_text,
+                "is_expired": is_expired,
+                "is_expiring_soon": is_expiring_soon,
+            })
+        user_inventory_lots[commodity_id] = lots
     
     # 获取价格历史
     price_history_result = exchange_service.get_price_history(days=7)
@@ -3017,6 +3054,7 @@ async def exchange():
                                   market_status=market_status,
                                   user_inventory=user_inventory,
                                   user_costs=user_costs,
+                                  user_inventory_lots=user_inventory_lots,
                                   capacity_info=capacity_info,
                                   price_history=price_history,
                                   history_data=history_data,

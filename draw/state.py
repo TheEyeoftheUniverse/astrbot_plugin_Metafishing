@@ -64,8 +64,8 @@ async def draw_state_image(user_data: Dict[str, Any], data_dir: str) -> Image.Im
     # 导入优化的渐变生成函数
     from .gradient_utils import create_vertical_gradient
 
-    bg_top = (174, 214, 241)  # 柔和天蓝色
-    bg_bot = (245, 251, 255)  # 温和淡蓝色
+    bg_top = (255, 248, 236)
+    bg_bot = (246, 237, 220)
     image = create_vertical_gradient(width, height, bg_top, bg_bot)
     draw = ImageDraw.Draw(image)
 
@@ -85,16 +85,14 @@ async def draw_state_image(user_data: Dict[str, Any], data_dir: str) -> Image.Im
     small_font = load_font_with_cjk_fallback(font_path, 16)
     tiny_font = load_font("DouyinSansBold.otf", 14)
 
-    # 3. 颜色定义 - 温和协调的海洋主题配色
-    # 主色调：柔和蓝系
-    primary_dark = (52, 73, 94)      # 温和深蓝 - 主标题
-    primary_medium = (74, 105, 134)  # 柔和中蓝 - 副标题
-    primary_light = (108, 142, 191)  # 淡雅蓝 - 强调色
-    
-    # 文本色：和谐灰蓝色系
-    text_primary = (55, 71, 79)      # 温和深灰 - 主要文本
-    text_secondary = (120, 144, 156) # 柔和灰蓝 - 次要文本
-    text_muted = (176, 190, 197)     # 温和浅灰 - 弱化文本
+    # 3. 颜色定义 - 对齐玩家 WebUI 的纸张编辑风格
+    primary_dark = (38, 33, 27)
+    primary_medium = (18, 127, 130)
+    primary_light = (255, 90, 61)
+
+    text_primary = (38, 33, 27)
+    text_secondary = (113, 104, 92)
+    text_muted = (151, 139, 122)
     
     # 状态色：柔和自然色系
     success_color = COLOR_SUCCESS
@@ -102,11 +100,12 @@ async def draw_state_image(user_data: Dict[str, Any], data_dir: str) -> Image.Im
     error_color = COLOR_ERROR
     
     # 背景色：更柔和的对比
-    card_bg = (255, 255, 255, 240)   # 高透明度白色
+    card_bg = (255, 252, 245, 245)
+    hairline_color = (218, 204, 184)
     
     # 特殊色：温和特色
-    gold_color = COLOR_GOLD
-    rare_color = COLOR_RARE
+    gold_color = (217, 151, 36)
+    rare_color = (121, 103, 217)
 
     # 4. 获取文本尺寸的辅助函数
     def get_text_size(text, font):
@@ -117,6 +116,8 @@ async def draw_state_image(user_data: Dict[str, Any], data_dir: str) -> Image.Im
 
     # 5. 绘制圆角矩形
     def draw_rounded_rectangle(draw, bbox, radius, fill=None, outline=None, width=1):
+        if outline is None and fill is not None:
+            outline = hairline_color
         x1, y1, x2, y2 = bbox
         # 绘制主体矩形
         draw.rectangle([x1 + radius, y1, x2 - radius, y2], fill=fill, outline=outline, width=width)

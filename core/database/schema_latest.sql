@@ -64,6 +64,13 @@ CREATE TABLE exchange_prices (
             FOREIGN KEY (commodity_id) REFERENCES commodities(commodity_id)
         );
 
+-- table: exchange_market_snapshots
+CREATE TABLE exchange_market_snapshots (
+            date TEXT PRIMARY KEY,
+            supply_demand TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
 -- table: fish
 CREATE TABLE "fish" (
             fish_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,7 +154,7 @@ CREATE TABLE rods (
 CREATE TABLE "shop_item_costs" (
             cost_id INTEGER PRIMARY KEY AUTOINCREMENT,
             item_id INTEGER NOT NULL,
-            cost_type TEXT NOT NULL CHECK (cost_type IN ('coins','premium','item','fish','rod','accessory')),
+            cost_type TEXT NOT NULL CHECK (cost_type IN ('coins','premium','item','fish','rod','accessory','bait')),
             cost_amount INTEGER NOT NULL CHECK (cost_amount > 0),
             cost_item_id INTEGER,  -- cost_type 为具体物品时使用
             cost_relation TEXT DEFAULT 'and' CHECK (cost_relation IN ('and', 'or')),

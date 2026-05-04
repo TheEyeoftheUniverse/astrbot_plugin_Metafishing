@@ -39,7 +39,7 @@
                     <tr>
                         <td>{{ item.fish_id }}</td>
                         <td>{{ item.name }}</td>
-                        <td>{{ '★' * item.rarity }}</td>
+                        <td>{{ rarity_label(item.rarity) }}</td>
                         <td>{{ item.base_value }}</td>
                         <td>{{ item.description or '无' }}</td>
                         <td class="text-end">

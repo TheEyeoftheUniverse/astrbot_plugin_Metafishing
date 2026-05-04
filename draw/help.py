@@ -11,8 +11,8 @@ def draw_help_image():
     # 导入优化的渐变生成函数
     from .gradient_utils import create_vertical_gradient
 
-    bg_top = (240, 248, 255)  # 浅蓝
-    bg_bot = (255, 255, 255)  # 白
+    bg_top = (255, 248, 236)
+    bg_bot = (246, 237, 220)
 
     # 2. 加载字体
     title_font = load_font(32)
@@ -22,11 +22,11 @@ def draw_help_image():
     desc_font = load_font(16)
 
     # 3. 颜色定义
-    title_color = COLOR_TITLE
-    cmd_color = COLOR_CMD
-    card_bg = (255, 255, 255)
-    line_color = COLOR_LINE
-    shadow_color = COLOR_SHADOW
+    title_color = (38, 33, 27)
+    cmd_color = (18, 127, 130)
+    card_bg = (255, 252, 245)
+    line_color = (218, 204, 184)
+    muted_color = (113, 104, 92)
 
     # 4. 获取文本尺寸的辅助函数（测量版）
     _measure_img = Image.new('RGB', (10, 10), bg_bot)
@@ -62,13 +62,7 @@ def draw_help_image():
     title_y = logo_y + logo_size // 2
 
     # 7. 圆角矩形＋阴影 helper
-    def draw_card(x0, y0, x1, y1, radius=12):
-        # 简化阴影效果
-        shadow_offset = 3
-        # 绘制阴影
-        draw.rounded_rectangle([x0 + shadow_offset, y0 + shadow_offset, x1 + shadow_offset, y1 + shadow_offset],
-                               radius, fill=(220, 220, 220))
-        # 白色卡片
+    def draw_card(x0, y0, x1, y1, radius=8):
         draw.rounded_rectangle([x0, y0, x1, y1], radius, fill=card_bg, outline=line_color, width=1)
 
     # 8. 绘制章节和命令
@@ -106,7 +100,7 @@ def draw_help_image():
             # 描述文本 - 支持多行
             desc_lines = desc.split('\n') if '\n' in desc else [desc]
             for i, line in enumerate(desc_lines):
-                draw.text((cx, y0 + 45 + i * 18), line, fill=(100, 100, 100), font=desc_font, anchor="mt")
+                draw.text((cx, y0 + 45 + i * 18), line, fill=muted_color, font=desc_font, anchor="mt")
 
         rows = math.ceil(len(cmds) / cols)
         return y + rows * (card_h + pad) + 35
@@ -284,7 +278,7 @@ def draw_help_image():
     # 添加底部信息
     footer_y = y0 + 20
     draw.text((width // 2, footer_y), "💡 提示：命令中的 [ID] 表示必填参数，<> 表示可选参数",
-              fill=(120, 120, 120), font=desc_font, anchor="mm")
+              fill=muted_color, font=desc_font, anchor="mm")
 
     # 11. 保存（高度已自适应，无需再次裁剪）
     final_height = footer_y + 30

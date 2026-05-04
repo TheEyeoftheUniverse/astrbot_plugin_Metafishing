@@ -160,6 +160,23 @@
                                 ({{ "%.2f"|format((profit / cost * 100) if cost > 0 else 0) }}%)
                             </strong>
                         </div>
+                        {% set lots = user_inventory_lots.get(commodity_id, []) %}
+                        {% if lots %}
+                        <div class="exchange-lot-list mt-3">
+                            <div class="small text-muted mb-2">持仓批次与到期</div>
+                            {% for lot in lots %}
+                            <div class="exchange-lot-row">
+                                <span>
+                                    x{{ lot.quantity }}
+                                    <span class="text-muted">@{{ lot.purchase_price }}</span>
+                                </span>
+                                <span class="{% if lot.is_expired %}text-danger{% elif lot.is_expiring_soon %}text-warning{% else %}text-muted{% endif %}">
+                                    {{ lot.expires_at_text }} · {{ lot.time_left_text }}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                         {% endif %}
                     </div>
                 </div>

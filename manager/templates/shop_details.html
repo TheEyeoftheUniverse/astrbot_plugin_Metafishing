@@ -1,5 +1,10 @@
 {% extends "layout.html" %}
 
+{% macro rarity_label(rarity) -%}
+    {%- set r = rarity|int -%}
+    {%- if r > 0 -%}{{ r }}{{ '☆' if r <= 5 else '★' }}{%- endif -%}
+{%- endmacro %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
@@ -37,7 +42,7 @@
                         <td>
                             {{ item.item.name }}
                             {% if item.rewards and item.rewards[0].rarity %}
-                                <span class="text-warning">{{ '★' * item.rewards[0].rarity }}</span>
+                                <span class="text-warning">{{ rarity_label(item.rewards[0].rarity) }}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -55,6 +60,8 @@
                                         🎣 {{ cost.rod_name or ('鱼竿#' + cost.cost_item_id|string) }} x{{ cost.cost_amount }}
                                     {% elif cost.cost_type == 'accessory' %}
                                         💍 {{ cost.accessory_name or ('饰品#' + cost.cost_item_id|string) }} x{{ cost.cost_amount }}
+                                    {% elif cost.cost_type == 'bait' %}
+                                        🪱 {{ cost.bait_name or ('鱼饵#' + cost.cost_item_id|string) }} x{{ cost.cost_amount }}
                                     {% else %}
                                         {{ cost.cost_type }} x{{ cost.cost_amount }}
                                     {% endif %}
@@ -159,20 +166,23 @@
                                 <div class="col-12 col-lg-6">
                                     <select name="reward_item_full_id" class="form-select">
                                         <option value="">-- 请选择奖励 --</option>
+                                        <optgroup label="货币">
+                                            <option value="coins-0" data-cost="0" data-name="金币" data-desc="">金币</option>
+                                        </optgroup>
                                         <optgroup label="鱼竿">
-                                            {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}" data-cost="{{ rod.purchase_cost or 0 }}" data-name="{{ rod.name }}" data-desc="{{ rod.description or '' }}">{{ rod.name }} {{ '★' * rod.rarity }}</option>{% endfor %}
+                                            {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}" data-cost="{{ rod.purchase_cost or 0 }}" data-name="{{ rod.name }}" data-desc="{{ rod.description or '' }}">{{ rod.name }} {{ rarity_label(rod.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                         <optgroup label="鱼饵">
-                                            {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}" data-cost="{{ bait.cost or 0 }}" data-name="{{ bait.name }}" data-desc="{{ bait.description or '' }}">{{ bait.name }} {{ '★' * bait.rarity }}</option>{% endfor %}
+                                            {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}" data-cost="{{ bait.cost or 0 }}" data-name="{{ bait.name }}" data-desc="{{ bait.description or '' }}">{{ bait.name }} {{ rarity_label(bait.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                         <optgroup label="饰品">
-                                            {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}" data-cost="{{ accessory.cost or 0 }}" data-name="{{ accessory.name }}" data-desc="{{ accessory.description or '' }}">{{ accessory.name }} {{ '★' * accessory.rarity }}</option>{% endfor %}
+                                            {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}" data-cost="{{ accessory.cost or 0 }}" data-name="{{ accessory.name }}" data-desc="{{ accessory.description or '' }}">{{ accessory.name }} {{ rarity_label(accessory.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                         <optgroup label="道具">
-                                            {% for item in all_items %}<option value="item-{{ item.item_id }}" data-cost="{{ item.cost or 0 }}" data-name="{{ item.name }}" data-desc="{{ item.description or '' }}">{{ item.name }} {{ '★' * item.rarity }}</option>{% endfor %}
+                                            {% for item in all_items %}<option value="item-{{ item.item_id }}" data-cost="{{ item.cost or 0 }}" data-name="{{ item.name }}" data-desc="{{ item.description or '' }}">{{ item.name }} {{ rarity_label(item.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                         <optgroup label="鱼类">
-                                            {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}" data-cost="{{ fish.base_value or 0 }}" data-name="{{ fish.name }}" data-desc="{{ fish.description or '' }}">{{ fish.name }} {{ '★' * fish.rarity }}</option>{% endfor %}
+                                            {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}" data-cost="{{ fish.base_value or 0 }}" data-name="{{ fish.name }}" data-desc="{{ fish.description or '' }}">{{ fish.name }} {{ rarity_label(fish.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                     </select>
                                 </div>
@@ -208,16 +218,19 @@
                                             <option value="premium-0">高级货币</option>
                                         </optgroup>
                                         <optgroup label="鱼类">
-                                            {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}">{{ fish.name }} {{ '★' * fish.rarity }}</option>{% endfor %}
+                                            {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}">{{ fish.name }} {{ rarity_label(fish.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                         <optgroup label="鱼竿">
-                                            {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}">{{ rod.name }} {{ '★' * rod.rarity }}</option>{% endfor %}
+                                            {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}">{{ rod.name }} {{ rarity_label(rod.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                         <optgroup label="饰品">
-                                            {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}">{{ accessory.name }} {{ '★' * accessory.rarity }}</option>{% endfor %}
+                                            {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}">{{ accessory.name }} {{ rarity_label(accessory.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                         <optgroup label="道具">
-                                            {% for item in all_items %}<option value="item-{{ item.item_id }}">{{ item.name }} {{ '★' * item.rarity }}</option>{% endfor %}
+                                            {% for item in all_items %}<option value="item-{{ item.item_id }}">{{ item.name }} {{ rarity_label(item.rarity) }}</option>{% endfor %}
+                                        </optgroup>
+                                        <optgroup label="鱼饵">
+                                            {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}">{{ bait.name }} {{ rarity_label(bait.rarity) }}</option>{% endfor %}
                                         </optgroup>
                                     </select>
                                 </div>
@@ -348,6 +361,8 @@ document.addEventListener('DOMContentLoaded', function () {
             addItemModalTitle.textContent = '添加商品到商店';
             addItemForm.action = "{{ url_for('admin_bp.add_shop_item', shop_id=shop.shop_id) }}";
             addItemForm.reset();
+            resetCostRows();
+            resetRewardRows();
             if (addItemForm.elements['is_active']) addItemForm.elements['is_active'].checked = true;
         });
     }
@@ -359,6 +374,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const data = JSON.parse(this.dataset.itemJson);
                 addItemModalTitle.textContent = `编辑商品: ${data.item.name}`;
                 addItemForm.action = `/admin/shops/{{ shop.shop_id }}/items/edit/${data.item.item_id}`;
+                resetCostRows(false);
+                resetRewardRows(false);
 
                 // 填充表单
                 if (addItemForm.elements['name']) {
@@ -395,22 +412,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 // 填充消耗数据
                 const costsList = document.getElementById('costs-list');
                 if (costsList && data.costs) {
-                    // 保留第一行用于自动填充，清空其他行
                     const existingRows = costsList.querySelectorAll('.row.g-2.mb-2');
-                    existingRows.forEach((row, index) => {
-                        if (index > 0) { // 保留第一行
-                            row.remove();
-                        }
-                    });
-                    
-                    // 清空第一行的值
-                    const firstRow = costsList.querySelector('.row.g-2.mb-2');
-                    if (firstRow) {
-                        const firstSelect = firstRow.querySelector('select[name="cost_item_full_id"]');
-                        const firstAmount = firstRow.querySelector('input[name="cost_amount"]');
-                        if (firstSelect) firstSelect.value = '';
-                        if (firstAmount) firstAmount.value = '';
-                    }
+                    existingRows.forEach(row => row.remove());
                     
                     // 添加消耗行
                     data.costs.forEach(cost => {
@@ -429,6 +432,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             select.value = `fish-${cost.cost_item_id}`;
                         } else if (cost.cost_type === 'item') {
                             select.value = `item-${cost.cost_item_id}`;
+                        } else if (cost.cost_type === 'rod') {
+                            select.value = `rod-${cost.cost_item_id}`;
+                        } else if (cost.cost_type === 'accessory') {
+                            select.value = `accessory-${cost.cost_item_id}`;
+                        } else if (cost.cost_type === 'bait') {
+                            select.value = `bait-${cost.cost_item_id}`;
                         }
                         
                         if (amountInput) {
@@ -437,7 +446,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (relationSelect) {
                             relationSelect.value = cost.cost_relation || 'and';
                         }
-                        if (groupInput && cost.group_id) {
+                        if (groupInput && cost.group_id !== null && cost.group_id !== undefined) {
                             groupInput.value = cost.group_id;
                         }
                         
@@ -451,29 +460,16 @@ document.addEventListener('DOMContentLoaded', function () {
                             qualityDiv.style.display = cost.cost_type === 'fish' ? 'block' : 'none';
                         }
                     });
+                    if (data.costs.length === 0) {
+                        addCostRow();
+                    }
                 }
                 
                 // 填充奖励数据
                 const rewardsList = document.getElementById('rewards-list');
                 if (rewardsList && data.rewards) {
-                    // 保留第一行用于自动填充，清空其他行
                     const existingRows = rewardsList.querySelectorAll('.row.g-2.mb-2');
-                    existingRows.forEach((row, index) => {
-                        if (index > 0) { // 保留第一行
-                            row.remove();
-                        }
-                    });
-                    
-                    // 清空第一行的值
-                    const firstRow = rewardsList.querySelector('.row.g-2.mb-2');
-                    if (firstRow) {
-                        const firstSelect = firstRow.querySelector('select[name="reward_item_full_id"]');
-                        const firstQuantity = firstRow.querySelector('input[name="reward_quantity"]');
-                        const firstRefine = firstRow.querySelector('input[name="reward_refine_level"]');
-                        if (firstSelect) firstSelect.value = '';
-                        if (firstQuantity) firstQuantity.value = '1';
-                        if (firstRefine) firstRefine.value = '';
-                    }
+                    existingRows.forEach(row => row.remove());
                     
                     // 添加奖励行
                     data.rewards.forEach(reward => {
@@ -514,6 +510,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             qualityDiv.style.display = reward.reward_type === 'fish' ? 'block' : 'none';
                         }
                     });
+                    if (data.rewards.length === 0) {
+                        addRewardRow();
+                    }
                 }
                 
                 // 重新设置品质选择功能（因为新添加的行需要重新绑定事件）
@@ -545,34 +544,36 @@ document.addEventListener('DOMContentLoaded', function () {
     function setupAutoFill() {
         const nameInput = document.querySelector('input[name="name"]');
         const descriptionInput = document.querySelector('input[name="description"]');
-        
-        // 监听第一个奖励选择的变化
-        const firstRewardSelect = document.querySelector('select[name="reward_item_full_id"]');
-        if (firstRewardSelect) {
-            firstRewardSelect.addEventListener('change', function() {
-                if (!this.value) return;
-                const selectedOption = this.options[this.selectedIndex];
+        const form = document.getElementById('item-form');
+        if (!form || form.dataset.autoFillBound === 'true') return;
+        form.dataset.autoFillBound = 'true';
 
-                // 1) 自动填充名称与描述（仅当为空）
-                const itemName = selectedOption.dataset.name || selectedOption.textContent.trim();
-                const itemDesc = selectedOption.dataset.desc || '';
-                if (!nameInput.value && itemName) {
-                    nameInput.value = itemName;
-                }
-                if (!descriptionInput.value && itemDesc) {
-                    descriptionInput.value = itemDesc;
-                }
+        form.addEventListener('change', function(event) {
+            const target = event.target;
+            if (!target.matches('select[name="reward_item_full_id"]')) return;
+            const firstRewardSelect = document.querySelector('#rewards-list select[name="reward_item_full_id"]');
+            if (target !== firstRewardSelect || !target.value) return;
+            const selectedOption = target.options[target.selectedIndex];
 
-                // 2) 自动填充金币成本到第一个消耗行
-                const price = Number(selectedOption.dataset.cost || 0);
-                if (price > 0) {
-                    const firstCostSelect = document.querySelector('#costs-list select[name="cost_item_full_id"]');
-                    const firstCostAmount = document.querySelector('#costs-list input[name="cost_amount"]');
-                    if (firstCostSelect) firstCostSelect.value = 'coins-0';
-                    if (firstCostAmount) firstCostAmount.value = String(price);
-                }
-            });
-        }
+            // 1) 自动填充名称与描述（仅当为空）
+            const itemName = selectedOption.dataset.name || selectedOption.textContent.trim();
+            const itemDesc = selectedOption.dataset.desc || '';
+            if (!nameInput.value && itemName) {
+                nameInput.value = itemName;
+            }
+            if (!descriptionInput.value && itemDesc) {
+                descriptionInput.value = itemDesc;
+            }
+
+            // 2) 自动填充金币成本到第一个消耗行
+            const price = Number(selectedOption.dataset.cost || 0);
+            if (price > 0) {
+                const firstCostSelect = document.querySelector('#costs-list select[name="cost_item_full_id"]');
+                const firstCostAmount = document.querySelector('#costs-list input[name="cost_amount"]');
+                if (firstCostSelect) firstCostSelect.value = 'coins-0';
+                if (firstCostAmount) firstCostAmount.value = String(price);
+            }
+        });
     }
 
     // 初始化自动填充
@@ -612,6 +613,97 @@ document.addEventListener('DOMContentLoaded', function () {
     setupCostQualityToggle();
     setupRewardQualityToggle();
 
+    function resetCostRows(addBlank = true) {
+        const container = document.getElementById('costs-list');
+        if (!container) return;
+        container.querySelectorAll('.row.g-2.mb-2').forEach(row => row.remove());
+        if (addBlank) addCostRow();
+    }
+
+    function resetRewardRows(addBlank = true) {
+        const container = document.getElementById('rewards-list');
+        if (!container) return;
+        container.querySelectorAll('.row.g-2.mb-2').forEach(row => row.remove());
+        if (addBlank) addRewardRow();
+    }
+
+    const pickerTypeLabels = {
+        all: '全部类型',
+        coins: '金币',
+        premium: '高级货币',
+        fish: '鱼类',
+        rod: '鱼竿',
+        accessory: '饰品',
+        item: '道具',
+        bait: '鱼饵'
+    };
+
+    function getOptionType(option) {
+        const value = option.value || '';
+        return value.includes('-') ? value.split('-', 1)[0] : '';
+    }
+
+    function buildPickerTypes(select) {
+        const types = new Set();
+        select.querySelectorAll('option').forEach(option => {
+            const type = getOptionType(option);
+            if (type) types.add(type);
+        });
+        return Array.from(types).sort((a, b) => {
+            const order = ['coins', 'premium', 'fish', 'rod', 'accessory', 'item', 'bait'];
+            return order.indexOf(a) - order.indexOf(b);
+        });
+    }
+
+    function filterPickerOptions(select, typeValue, keywordValue) {
+        const keyword = (keywordValue || '').trim().toLowerCase();
+        select.querySelectorAll('option').forEach(option => {
+            if (!option.value) {
+                option.hidden = false;
+                return;
+            }
+            const optionType = getOptionType(option);
+            const typeMatched = !typeValue || typeValue === 'all' || optionType === typeValue;
+            const keywordMatched = !keyword || option.textContent.toLowerCase().includes(keyword);
+            option.hidden = !(typeMatched && keywordMatched);
+        });
+        select.querySelectorAll('optgroup').forEach(group => {
+            const hasVisible = Array.from(group.querySelectorAll('option')).some(option => !option.hidden);
+            group.hidden = !hasVisible;
+        });
+    }
+
+    function enhancePickerSelect(select) {
+        if (!select || select.dataset.pickerEnhanced === 'true') return;
+        select.dataset.pickerEnhanced = 'true';
+        const types = buildPickerTypes(select);
+        const filter = document.createElement('div');
+        filter.className = 'row g-1 mb-1 admin-picker-filter';
+        filter.innerHTML = `
+            <div class="col-5">
+                <select class="form-select form-select-sm picker-type-filter">
+                    <option value="all">全部类型</option>
+                    ${types.map(type => `<option value="${type}">${pickerTypeLabels[type] || type}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-7">
+                <input type="search" class="form-control form-control-sm picker-search-filter" placeholder="搜索名称">
+            </div>
+        `;
+        select.insertAdjacentElement('beforebegin', filter);
+        const typeSelect = filter.querySelector('.picker-type-filter');
+        const searchInput = filter.querySelector('.picker-search-filter');
+        const applyFilter = () => filterPickerOptions(select, typeSelect.value, searchInput.value);
+        typeSelect.addEventListener('change', applyFilter);
+        searchInput.addEventListener('input', applyFilter);
+    }
+
+    function setupPickerFilters() {
+        document.querySelectorAll('select[name="cost_item_full_id"], select[name="reward_item_full_id"]').forEach(enhancePickerSelect);
+    }
+
+    setupPickerFilters();
+
     function addCostRow() {
         const container = document.getElementById('costs-list');
         const row = document.createElement('div');
@@ -625,16 +717,19 @@ document.addEventListener('DOMContentLoaded', function () {
                         <option value="premium-0">高级货币</option>
                     </optgroup>
                     <optgroup label="鱼类">
-                        {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}">{{ fish.name }} {{ '★' * fish.rarity }}</option>{% endfor %}
+                        {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}">{{ fish.name }} {{ rarity_label(fish.rarity) }}</option>{% endfor %}
                     </optgroup>
                     <optgroup label="鱼竿">
-                        {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}">{{ rod.name }} {{ '★' * rod.rarity }}</option>{% endfor %}
+                        {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}">{{ rod.name }} {{ rarity_label(rod.rarity) }}</option>{% endfor %}
                     </optgroup>
                     <optgroup label="饰品">
-                        {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}">{{ accessory.name }} {{ '★' * accessory.rarity }}</option>{% endfor %}
+                        {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}">{{ accessory.name }} {{ rarity_label(accessory.rarity) }}</option>{% endfor %}
                     </optgroup>
                     <optgroup label="道具">
-                        {% for item in all_items %}<option value="item-{{ item.item_id }}">{{ item.name }} {{ '★' * item.rarity }}</option>{% endfor %}
+                        {% for item in all_items %}<option value="item-{{ item.item_id }}">{{ item.name }} {{ rarity_label(item.rarity) }}</option>{% endfor %}
+                    </optgroup>
+                    <optgroup label="鱼饵">
+                        {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}">{{ bait.name }} {{ rarity_label(bait.rarity) }}</option>{% endfor %}
                     </optgroup>
                 </select>
             </div>
@@ -690,6 +785,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // 添加品质选择显示/隐藏逻辑
         setupQualityToggle('', 'cost_item_full_id');
+        setupPickerFilters();
         
     }
 
@@ -701,20 +797,23 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="col-12 col-lg-6">
                 <select name="reward_item_full_id" class="form-select">
                     <option value="">-- 请选择奖励 --</option>
+                    <optgroup label="货币">
+                        <option value="coins-0" data-cost="0" data-name="金币" data-desc="">金币</option>
+                    </optgroup>
                     <optgroup label="鱼竿">
-                        {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}" data-cost="{{ rod.purchase_cost or 0 }}" data-name="{{ rod.name }}" data-desc="{{ rod.description or '' }}">{{ rod.name }} {{ '★' * rod.rarity }}</option>{% endfor %}
+                        {% for rod in all_rods %}<option value="rod-{{ rod.rod_id }}" data-cost="{{ rod.purchase_cost or 0 }}" data-name="{{ rod.name }}" data-desc="{{ rod.description or '' }}">{{ rod.name }} {{ rarity_label(rod.rarity) }}</option>{% endfor %}
                     </optgroup>
                     <optgroup label="鱼饵">
-                        {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}" data-cost="{{ bait.cost or 0 }}" data-name="{{ bait.name }}" data-desc="{{ bait.description or '' }}">{{ bait.name }} {{ '★' * bait.rarity }}</option>{% endfor %}
+                        {% for bait in all_baits %}<option value="bait-{{ bait.bait_id }}" data-cost="{{ bait.cost or 0 }}" data-name="{{ bait.name }}" data-desc="{{ bait.description or '' }}">{{ bait.name }} {{ rarity_label(bait.rarity) }}</option>{% endfor %}
                     </optgroup>
                     <optgroup label="饰品">
-                        {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}" data-cost="{{ accessory.cost or 0 }}" data-name="{{ accessory.name }}" data-desc="{{ accessory.description or '' }}">{{ accessory.name }} {{ '★' * accessory.rarity }}</option>{% endfor %}
+                        {% for accessory in all_accessories %}<option value="accessory-{{ accessory.accessory_id }}" data-cost="{{ accessory.cost or 0 }}" data-name="{{ accessory.name }}" data-desc="{{ accessory.description or '' }}">{{ accessory.name }} {{ rarity_label(accessory.rarity) }}</option>{% endfor %}
                     </optgroup>
                     <optgroup label="道具">
-                        {% for item in all_items %}<option value="item-{{ item.item_id }}" data-cost="{{ item.cost or 0 }}" data-name="{{ item.name }}" data-desc="{{ item.description or '' }}">{{ item.name }} {{ '★' * item.rarity }}</option>{% endfor %}
+                        {% for item in all_items %}<option value="item-{{ item.item_id }}" data-cost="{{ item.cost or 0 }}" data-name="{{ item.name }}" data-desc="{{ item.description or '' }}">{{ item.name }} {{ rarity_label(item.rarity) }}</option>{% endfor %}
                     </optgroup>
                     <optgroup label="鱼类">
-                        {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}" data-cost="{{ fish.base_value or 0 }}" data-name="{{ fish.name }}" data-desc="{{ fish.description or '' }}">{{ fish.name }} {{ '★' * fish.rarity }}</option>{% endfor %}
+                        {% for fish in all_fish %}<option value="fish-{{ fish.fish_id }}" data-cost="{{ fish.base_value or 0 }}" data-name="{{ fish.name }}" data-desc="{{ fish.description or '' }}">{{ fish.name }} {{ rarity_label(fish.rarity) }}</option>{% endfor %}
                     </optgroup>
                 </select>
             </div>
@@ -741,6 +840,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         // 添加品质选择显示/隐藏逻辑
         setupQualityToggle('', 'reward_item_full_id');
+        setupPickerFilters();
     }
 });
 </script>

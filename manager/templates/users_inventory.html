@@ -165,7 +165,7 @@
                             <tr>
                                 <td>{{ item.fish_id }}</td>
                                 <td>{{ item.name }}</td>
-                                <td>{{ '★' * item.rarity }}</td>
+                                <td>{{ rarity_label(item.rarity) }}</td>
                                 <td>
                                     {% if item.quality_level == 1 %}
                                         <span class="badge bg-warning text-dark">✨ 高品质</span>
@@ -233,7 +233,7 @@
                             <tr>
                                 <td>{{ item.display_code if item.display_code else item.instance_id }}</td>
                                 <td>{{ item.name }}</td>
-                                <td>{{ '★' * item.rarity }}</td>
+                                <td>{{ rarity_label(item.rarity) }}</td>
                                 <td>{{ item.refine_level }}</td>
                                 <td>{{ item.durability if item.durability is not none else '∞' }}</td>
                                 <td>
@@ -299,7 +299,7 @@
                             <tr>
                                 <td>{{ item.display_code if item.display_code else item.instance_id }}</td>
                                 <td>{{ item.name }}</td>
-                                <td>{{ '★' * item.rarity }}</td>
+                                <td>{{ rarity_label(item.rarity) }}</td>
                                 <td>{{ item.refine_level }}</td>
                                 <td>
                                     {% if item.is_equipped %}
@@ -361,7 +361,7 @@
                             <tr>
                                 <td>{{ item.bait_id }}</td>
                                 <td>{{ item.name }}</td>
-                                <td>{{ '★' * item.rarity }}</td>
+                                <td>{{ rarity_label(item.rarity) }}</td>
                                 <td>{{ item.cost }}</td>
                                 <td>{{ item.quantity }}</td>
                                 <td>{{ item.total_value }}</td>
@@ -409,7 +409,7 @@
                             <tr>
                                 <td>{{ item.item_id }}</td>
                                 <td>{{ item.name }}</td>
-                                <td>{{ '★' * item.rarity }}</td>
+                                <td>{{ rarity_label(item.rarity) }}</td>
                                 <td>
                                     {% if item.is_consumable %}
                                         <span class="badge bg-success">是</span>

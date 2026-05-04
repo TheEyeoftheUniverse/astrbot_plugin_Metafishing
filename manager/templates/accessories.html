@@ -38,12 +38,12 @@
                     <tr>
                         <td>{{ item.accessory_id }}</td>
                         <td>{{ item.name }}</td>
-                        <td>{{ '★' * item.rarity }}</td>
+                        <td>{{ rarity_label(item.rarity) }}</td>
                         <td>
-                            <span class="badge bg-secondary">品质: {{ item.bonus_fish_quality_modifier }}</span>
-                            <span class="badge bg-secondary">数量: {{ item.bonus_fish_quantity_modifier }}</span>
-                            <span class="badge bg-secondary">稀有: {{ item.bonus_rare_fish_chance }}</span>
-                            <span class="badge bg-warning text-dark">金币: {{ item.bonus_coin_modifier }}</span>
+                            <span class="badge bg-secondary">品质: {{ modifier_delta(item.bonus_fish_quality_modifier) }}</span>
+                            <span class="badge bg-secondary">数量: {{ modifier_delta(item.bonus_fish_quantity_modifier) }}</span>
+                            <span class="badge bg-secondary">稀有: {{ chance_delta(item.bonus_rare_fish_chance) }}</span>
+                            <span class="badge bg-warning text-dark">金币: {{ modifier_delta(item.bonus_coin_modifier) }}</span>
                         </td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-info edit-btn"

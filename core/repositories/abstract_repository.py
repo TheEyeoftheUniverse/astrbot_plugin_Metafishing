@@ -415,6 +415,16 @@ class AbstractExchangeRepository(ABC):
         pass
 
     @abstractmethod
+    def get_exchange_market_snapshot(self, date: str) -> Optional[Dict[str, Any]]:
+        """获取指定日期的期货市场描述快照"""
+        pass
+
+    @abstractmethod
+    def upsert_exchange_market_snapshot(self, date: str, supply_demand: str, created_at: str) -> None:
+        """写入或更新指定日期的期货市场描述快照"""
+        pass
+
+    @abstractmethod
     def add_exchange_price(self, price: Exchange) -> None:
         """新增一条交易所价格记录"""
         pass

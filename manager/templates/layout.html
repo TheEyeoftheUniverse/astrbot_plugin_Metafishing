@@ -6,7 +6,7 @@
     <title>钓鱼后台管理</title>
     <link href="{{ url_for('admin_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css', v='20260505') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('admin_bp.static', filename='vendor/fontawesome/css/all.min.css', v='20260505') }}">
-    <link rel="stylesheet" href="{{ url_for('admin_bp.static', filename='css/style.css', v='20260505') }}">
+    <link rel="stylesheet" href="{{ url_for('admin_bp.static', filename='css/style.css', v='20260505b') }}">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
@@ -49,7 +49,7 @@
     {% block content %}{% endblock %}
 </main>
 <script src="{{ url_for('admin_bp.static', filename='vendor/bootstrap/bootstrap.bundle.min.js', v='20260505') }}"></script>
-<script src="{{ url_for('admin_bp.static', filename='js/app.js', v='20260505') }}"></script>
+<script src="{{ url_for('admin_bp.static', filename='js/app.js', v='20260505b') }}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

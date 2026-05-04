@@ -1,4 +1,10 @@
 // web_admin/static/js/app.js
+window.formatAdminRarityLabel = function(value) {
+    const rarity = Number(value) || 0;
+    if (rarity <= 0) return '';
+    return `${rarity}${rarity <= 5 ? '☆' : '★'}`;
+};
+
 document.addEventListener('DOMContentLoaded', function () {
     // 查找所有class为'alert'的通知元素
     const autoDismissAlerts = document.querySelectorAll('.alert.alert-dismissible');
