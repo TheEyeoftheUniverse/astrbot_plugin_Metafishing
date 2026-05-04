@@ -184,7 +184,10 @@ async function showPoolDetails(poolId) {
 // 执行抽卡
 async function performDraw(poolId, numDraws, poolName) {
     const drawType = numDraws === 1 ? '单抽' : '十连';
-    if (!confirm(`确认在【${poolName}】进行${drawType}吗？`)) {
+    if (!await webuiConfirm(`确认在【${poolName}】进行${drawType}吗？`, {
+        title: '确认抽卡',
+        confirmText: '开始抽卡'
+    })) {
         return;
     }
 
@@ -212,7 +215,15 @@ async function performDraw(poolId, numDraws, poolName) {
 
 // 多次十连
 async function performMultiDraw(poolId, poolName) {
-    const times = prompt(`【${poolName}】多次十连\n请输入十连次数（1-100）:`, '5');
+    const times = await webuiPrompt(`【${poolName}】多次十连\n请输入十连次数（1-100）。`, {
+        title: '多次十连',
+        defaultValue: '5',
+        inputType: 'number',
+        min: '1',
+        max: '100',
+        step: '1',
+        confirmText: '继续'
+    });
     if (!times) return;
 
     const numTimes = parseInt(times);
@@ -221,7 +232,10 @@ async function performMultiDraw(poolId, poolName) {
         return;
     }
 
-    if (!confirm(`确认进行${numTimes}次十连（共${numTimes * 10}抽）吗？`)) {
+    if (!await webuiConfirm(`确认进行${numTimes}次十连（共${numTimes * 10}抽）吗？`, {
+        title: '确认抽卡',
+        confirmText: '开始抽卡'
+    })) {
         return;
     }
 

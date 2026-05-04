@@ -134,6 +134,7 @@ class ShopService:
             # 获取成本和奖励
             costs = self.shop_repo.get_item_costs(item["item_id"])
             rewards = self.shop_repo.get_item_rewards(item["item_id"])
+            self._apply_reward_quantity_defaults(rewards, costs)
             
             # 为costs补充物品名称
             for cost in costs:
@@ -250,6 +251,31 @@ class ShopService:
             "items": items_with_details
         }
 
+    @staticmethod
+    def _coerce_positive_quantity(value: Any, default: int = 1) -> int:
+        try:
+            quantity = int(value or default)
+        except (TypeError, ValueError):
+            quantity = default
+        return quantity if quantity > 0 else default
+
+    def _apply_reward_quantity_defaults(self, rewards: List[Dict[str, Any]], costs: List[Dict[str, Any]]) -> None:
+        """补齐旧商店数据缺失的奖励数量，保证展示和发放一致。"""
+        has_premium_cost = any(
+            cost.get("cost_type") == "premium"
+            and self._coerce_positive_quantity(cost.get("cost_amount"), 0) > 0
+            for cost in costs
+        )
+
+        for reward in rewards:
+            quantity = self._coerce_positive_quantity(
+                reward.get("reward_quantity") or reward.get("reward_amount"),
+                1,
+            )
+            if reward.get("reward_type") == "bait" and has_premium_cost and quantity <= 1:
+                quantity = 500
+            reward["reward_quantity"] = quantity
+
     # ---- 商品购买 ----
     def purchase_item(self, user_id: str, item_id: int, quantity: int = 1) -> Dict[str, Any]:
         """购买商店商品（已使用递归回溯算法优化OR逻辑）"""
@@ -350,6 +376,7 @@ class ShopService:
         # 6. 执行真实的交易
         self._deduct_costs(user, final_total_costs)
         rewards = self.shop_repo.get_item_rewards(item_id)
+        self._apply_reward_quantity_defaults(rewards, costs_db)
         obtained_items = self._give_rewards(user_id, rewards, quantity)
         
         self.shop_repo.increase_item_sold(item_id, quantity)
@@ -367,7 +394,7 @@ class ShopService:
         base_costs["coins"] = base_costs.get("coins", 0) + new_costs.get("coins", 0)
         base_costs["premium"] = base_costs.get("premium", 0) + new_costs.get("premium", 0)
 
-        for category in ["items", "fish", "rods", "accessories"]:
+        for category in ["items", "fish", "rods", "accessories", "baits"]:
             if category not in new_costs:
                 continue
 
@@ -405,7 +432,7 @@ class ShopService:
                 groups[group_id] = []
             groups[group_id].append(cost)
 
-        and_costs = {"coins": 0, "premium": 0, "items": {}, "fish": {}, "rods": {}, "accessories": {}}
+        and_costs = {"coins": 0, "premium": 0, "items": {}, "fish": {}, "rods": {}, "accessories": {}, "baits": {}}
         or_choices = []
 
         def _get_cost_dict(cost_item: Dict, qty: int) -> Dict:
@@ -413,7 +440,7 @@ class ShopService:
             amount = cost_item["cost_amount"] * qty
             item_id = cost_item.get("cost_item_id")
             quality_level = cost_item.get("quality_level", 0)  # 获取品质等级
-            plural_map = {"item": "items", "fish": "fish", "rod": "rods", "accessory": "accessories"}
+            plural_map = {"item": "items", "fish": "fish", "rod": "rods", "accessory": "accessories", "bait": "baits"}
             if cost_type in ["coins", "premium"]:
                 return {cost_type: amount}
             elif cost_type in plural_map and item_id:
@@ -449,7 +476,8 @@ class ShopService:
             "items": self.inventory_repo.get_user_item_inventory(user.user_id),
             "fish": {}, # 结构: {fish_id: {quality_level: count}}
             "rods": {},
-            "accessories": {}
+            "accessories": {},
+            "baits": self.inventory_repo.get_user_bait_inventory(user.user_id),
         }
         
         # 合并鱼塘和水族箱的鱼，并按品质区分
@@ -483,7 +511,7 @@ class ShopService:
         if res_copy.get("premium", 0) < cost.get("premium", 0): return (False, None)
         res_copy["premium"] -= cost.get("premium", 0)
 
-        for category in ["items", "rods", "accessories"]:
+        for category in ["items", "rods", "accessories", "baits"]:
             if category in cost:
                 for item_id_str, need_qty in cost[category].items():
                     item_id = int(item_id_str)
@@ -548,6 +576,14 @@ class ShopService:
                     tpl = self.item_template_repo.get_item_by_id(item_id)
                     name = tpl.name if tpl else str(item_id)
                     return {"success": False, "message": f"道具不足：{name} x{need_qty}"}
+
+        if costs.get("baits"):
+            inv_baits = self.inventory_repo.get_user_bait_inventory(user.user_id)
+            for bait_id, need_qty in costs["baits"].items():
+                if inv_baits.get(bait_id, 0) < need_qty:
+                    tpl = self.item_template_repo.get_bait_by_id(bait_id)
+                    name = tpl.name if tpl else str(bait_id)
+                    return {"success": False, "message": f"鱼饵不足：{name} x{need_qty}"}
         
         # 检查鱼类（包括鱼塘和水族箱）
         if costs.get("fish"):
@@ -624,6 +660,10 @@ class ShopService:
         if costs.get("items"):
             for item_id, need_qty in costs["items"].items():
                 self.inventory_repo.decrease_item_quantity(user.user_id, item_id, need_qty)
+
+        if costs.get("baits"):
+            for bait_id, need_qty in costs["baits"].items():
+                self.inventory_repo.update_bait_quantity(user.user_id, bait_id, -need_qty)
         
         # 扣除鱼类（智能扣除：优先鱼塘，后水族箱）
         if costs.get("fish"):
@@ -686,7 +726,10 @@ class ShopService:
             for reward in rewards:
                 reward_type = reward["reward_type"]
                 reward_item_id = reward.get("reward_item_id")
-                reward_quantity = reward.get("reward_quantity", 1)
+                reward_quantity = self._coerce_positive_quantity(
+                    reward.get("reward_quantity") or reward.get("reward_amount"),
+                    1,
+                )
                 reward_refine_level = reward.get("reward_refine_level")
                 
                 if reward_type == "rod" and reward_item_id:

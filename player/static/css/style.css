@@ -664,6 +664,10 @@ a:hover {
     min-height: 7.2rem;
 }
 
+.inventory-usage-description {
+    overflow: hidden;
+}
+
 .inventory-code {
     align-self: flex-end;
     color: var(--ink-soft);

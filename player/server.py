@@ -141,6 +141,16 @@ def _get_next_pond_upgrade(inventory_service, current_capacity: int) -> Dict[str
     return None
 
 
+async def _read_request_payload() -> Dict[str, Any]:
+    """兼容 JSON 与表单提交，避免空请求体触发 500。"""
+    payload = await request.get_json(silent=True)
+    if isinstance(payload, dict):
+        return payload
+
+    form = await request.form
+    return dict(form)
+
+
 def _get_linuxdo_links_file():
     """获取 Linux.do OAuth 绑定文件路径"""
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
@@ -875,6 +885,9 @@ async def login():
         if not user_id:
             await flash("请输入用户ID", "danger")
             return await _render_login_page()
+        if len(password) < 5 or len(password) > 20:
+            await flash("登录密钥长度需要为 5~20 字", "danger")
+            return await _render_login_page()
 
         # 检查用户是否存在
         user_repo = current_app.config.get("USER_REPO")
@@ -1122,7 +1135,7 @@ async def api_sell_fish():
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
     
     try:
-        data = await request.get_json()
+        data = await request.get_json() or {}
         fish_id = data.get("fish_id")
         quality_level = data.get("quality_level", 0)
         quantity = data.get("quantity", 1)
@@ -1196,19 +1209,24 @@ async def api_buy_shop_item():
     """购买商店商品API"""
     user_id = session.get("user_id")
     shop_service = current_app.config.get("SHOP_SERVICE")
+    if shop_service is None:
+        return jsonify({"success": False, "message": "商店系统未初始化"}), 500
     
     try:
-        data = await request.get_json()
-        item_id = data.get("item_id")
-        quantity = data.get("quantity", 1)
+        data = await _read_request_payload()
+        item_id = int(data.get("item_id") or 0)
+        quantity = int(data.get("quantity", 1) or 1)
         
-        if not item_id or quantity <= 0:
+        if item_id <= 0 or quantity <= 0:
             return jsonify({"success": False, "message": "参数无效"}), 400
         
         result = shop_service.purchase_item(user_id, item_id, quantity)
-        return jsonify(result)
+        status_code = 200 if result.get("success", False) else 400
+        return jsonify(result), status_code
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
-        logger.error(f"购买商店商品失败: {e}")
+        logger.error(f"购买商店商品失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/list_item", methods=["POST"])
@@ -1748,7 +1766,7 @@ async def api_delete_item():
         quantity = int(data.get("quantity", 1) or 1)
         if item_id <= 0 or quantity <= 0:
             return jsonify({"success": False, "message": "参数无效"}), 400
-        owned = inventory_service.inventory_repo.get_user_items(user_id).get(item_id, 0)
+        owned = inventory_service.inventory_repo.get_user_item_inventory(user_id).get(item_id, 0)
         if owned <= 0:
             return jsonify({"success": False, "message": "道具不存在或数量不足"}), 400
         delete_quantity = min(quantity, owned)
@@ -2421,11 +2439,12 @@ async def update_profile_password():
     if not verify_user_password(user_id, old_password):
         await flash("旧密码不正确", "danger")
         return redirect(url_for("player_bp.profile"))
-    if len(new_password.strip()) < 5:
-        await flash("新密码至少 5 位", "danger")
+    new_password = new_password.strip()
+    if len(new_password) < 5 or len(new_password) > 20:
+        await flash("新密码长度需要为 5~20 字", "danger")
         return redirect(url_for("player_bp.profile"))
 
-    set_user_password(user_id, new_password.strip())
+    set_user_password(user_id, new_password)
     await flash("登录密钥已修改", "success")
     return redirect(url_for("player_bp.profile"))
 
