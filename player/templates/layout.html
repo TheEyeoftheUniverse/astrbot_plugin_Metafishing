@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}MetaFishing！{% endblock %}</title>
-    <link href="{{ url_for('player_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css') }}" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='vendor/fontawesome/css/all.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css') }}">
+    <link href="{{ url_for('player_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css', v='20260505') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='vendor/fontawesome/css/all.min.css', v='20260505') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260505') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body class="player-ui">
@@ -148,7 +148,7 @@
     </div>
 </div>
 
-<script src="{{ url_for('player_bp.static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('player_bp.static', filename='vendor/bootstrap/bootstrap.bundle.min.js', v='20260505') }}"></script>
 <script>
 function formatRarityStars(value) {
     const rarity = Number(value) || 0;

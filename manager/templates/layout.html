@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>钓鱼后台管理</title>
-    <link href="{{ url_for('admin_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css') }}" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('admin_bp.static', filename='vendor/fontawesome/css/all.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('admin_bp.static', filename='css/style.css') }}">
+    <link href="{{ url_for('admin_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css', v='20260505') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('admin_bp.static', filename='vendor/fontawesome/css/all.min.css', v='20260505') }}">
+    <link rel="stylesheet" href="{{ url_for('admin_bp.static', filename='css/style.css', v='20260505') }}">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
@@ -48,8 +48,8 @@
     {% endwith %}
     {% block content %}{% endblock %}
 </main>
-<script src="{{ url_for('admin_bp.static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('admin_bp.static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('admin_bp.static', filename='vendor/bootstrap/bootstrap.bundle.min.js', v='20260505') }}"></script>
+<script src="{{ url_for('admin_bp.static', filename='js/app.js', v='20260505') }}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>
