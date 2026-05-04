@@ -639,15 +639,15 @@ class FishingPlugin(Star):
         async for r in common_handlers.update_nickname(self, event):
             yield r
 
-    @filter.command("初始密码获取")
+    @filter.command("初始密码获取", alias={"初始密码", "获取初始密码", "登录密钥", "获取密钥"})
     async def get_initial_password(self, event: AstrMessageEvent):
         """私聊获取 WebUI/App 初始登录密码"""
         if self._is_group_message_event(event):
-            yield event.plain_result("❌ 为保护账号安全，请在私聊中使用 /初始密码获取。")
+            yield event.plain_result("❌ 为保护账号安全，请在私聊中使用“初始密码获取”。")
             return
         user_id = self._get_effective_user_id(event)
         if not self.user_repo.check_exists(user_id):
-            yield event.plain_result("❌ 你还没有注册，请先使用 /注册。")
+            yield event.plain_result("❌ 你还没有注册，请先使用“注册”。")
             return
         from .player.server import ensure_initial_password
         initial_password = ensure_initial_password(user_id)
