@@ -74,8 +74,8 @@ class FishingPlugin(Star):
         self.area2num = config.get("area2num", 2000)
         self.area3num = config.get("area3num", 500)
         
-        # 插件ID
-        self.plugin_id = "astrbot_plugin_fishing"
+        # 插件ID，与 metadata.yaml 的 name 保持一致
+        self.plugin_id = "astrbot_plugin_metafishing"
 
         # --- 1.1. 数据与临时文件路径管理 ---
         try:
