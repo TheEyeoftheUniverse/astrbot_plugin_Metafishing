@@ -375,8 +375,10 @@ class FishingPlugin(Star):
         self.web_player_task = None
         self._web_player_shutdown_event = asyncio.Event()
         self.player_port = webui_config.get("player_port", 8888)
+        public_base_url_config_value = str(webui_config.get("public_base_url", "") or "").strip().rstrip("/")
+        self.public_base_url_configured = bool(public_base_url_config_value)
         self.public_base_url = str(
-            webui_config.get("public_base_url", "https://fish.eyeoftheuniverse.top")
+            public_base_url_config_value
             or "https://fish.eyeoftheuniverse.top"
         ).rstrip("/")
         oauth_config = webui_config.get("oauth", {})
@@ -652,6 +654,14 @@ class FishingPlugin(Star):
         from .player.server import ensure_initial_password
         initial_password = ensure_initial_password(user_id)
         yield event.plain_result(f"你的 WebUI/App 初始密码是：{initial_password}")
+
+    @filter.command("获取网页端地址", alias={"网页端地址", "获取WebUI地址", "WebUI地址", "获取网页地址"})
+    async def get_player_webui_url(self, event: AstrMessageEvent):
+        """获取玩家 WebUI 公网访问地址"""
+        if not self.public_base_url_configured:
+            yield event.plain_result("未配置网页端地址")
+            return
+        yield event.plain_result(f"玩家 WebUI 网页端地址：{self.public_base_url}")
 
     @filter.command("高级货币", alias={"钻石", "星石"})
     async def premium(self, event: AstrMessageEvent):

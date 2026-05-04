@@ -25,7 +25,7 @@
         "description": "玩家WebUI公网访问地址",
         "type": "string",
         "hint": "Unity 和 OAuth 使用的公网根地址，不要以 / 结尾",
-        "default": "https://fish.eyeoftheuniverse.top"
+        "default": ""
       },
       "oauth": {
         "description": "玩家WebUI第三方登录配置",
