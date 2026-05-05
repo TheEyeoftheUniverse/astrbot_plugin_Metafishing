@@ -27,6 +27,24 @@
         "hint": "Unity 和 OAuth 使用的公网根地址，不要以 / 结尾",
         "default": ""
       },
+      "github_url": {
+        "description": "玩家WebUI首页 GitHub 开源地址",
+        "type": "string",
+        "hint": "主页底部“GitHub 开源地址”按钮跳转目标，留空时使用当前仓库地址",
+        "default": "https://github.com/TheEyeoftheUniverse/astrbot_plugin_fishing"
+      },
+      "apk_download_url": {
+        "description": "玩家WebUI首页 APK 下载页地址",
+        "type": "string",
+        "hint": "主页底部“APK 下载页面”按钮跳转目标，可先填下载页或云服务器落地页",
+        "default": "https://github.com/TheEyeoftheUniverse/astrbot_plugin_fishing/releases"
+      },
+      "tavern_admin_user_id": {
+        "description": "酒馆公告管理员用户ID",
+        "type": "string",
+        "hint": "该用户可编辑酒馆公告，并拥有酒馆留言管理员权限",
+        "default": "2645956495"
+      },
       "oauth": {
         "description": "玩家WebUI第三方登录配置",
         "type": "object",

@@ -174,6 +174,22 @@ a:hover {
     background: var(--hairline);
 }
 
+.editorial-link-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+    margin-top: 0.9rem;
+}
+
+.editorial-link-button {
+    min-height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    border-width: 1px;
+}
+
 .metric-strip {
     border-top: 1px solid var(--hairline);
     border-bottom: 1px solid var(--hairline);

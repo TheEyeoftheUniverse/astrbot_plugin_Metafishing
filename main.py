@@ -1325,6 +1325,9 @@ class FishingPlugin(Star):
                 services,
                 {
                     "public_base_url": self.public_base_url,
+                    "github_url": str(webui_config.get("github_url", "") or "").strip(),
+                    "apk_download_url": str(webui_config.get("apk_download_url", "") or "").strip(),
+                    "tavern_admin_user_id": str(webui_config.get("tavern_admin_user_id", "") or "").strip(),
                     "unity_allowed_origins": [
                         self.public_base_url,
                         "https://fish.eyeoftheuniverse.top",

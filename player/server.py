@@ -36,6 +36,9 @@ LINUXDO_USER_API_URL = "https://connect.linux.do/api/user"
 UNITY_OAUTH_PENDING_TTL = timedelta(minutes=10)
 UNITY_OAUTH_TICKET_TTL = timedelta(minutes=3)
 UNITY_LINUXDO_OAUTH_PENDING = {}
+DEFAULT_GITHUB_URL = "https://github.com/TheEyeoftheUniverse/astrbot_plugin_fishing"
+DEFAULT_APK_DOWNLOAD_URL = f"{DEFAULT_GITHUB_URL}/releases"
+DEFAULT_TAVERN_ADMIN_USER_ID = "2645956495"
 
 # 用户凭证持久化辅助函数
 def _get_credentials_file():
@@ -108,6 +111,23 @@ def ensure_initial_password(user_id: str) -> str:
     if not str(user_id or "").strip():
         return ""
     return _get_credential_entry(user_id).get("initial_password", "")
+
+
+def _normalize_external_url(value: Any, default: str = "") -> str:
+    url = str(value or "").strip()
+    return url or default
+
+
+def _get_player_link_config() -> Dict[str, str]:
+    return {
+        "github_url": _normalize_external_url(current_app.config.get("PLAYER_GITHUB_URL"), DEFAULT_GITHUB_URL),
+        "apk_download_url": _normalize_external_url(current_app.config.get("PLAYER_APK_DOWNLOAD_URL"), DEFAULT_APK_DOWNLOAD_URL),
+    }
+
+
+def _get_tavern_admin_user_id() -> str:
+    configured = str(current_app.config.get("TAVERN_ADMIN_USER_ID", DEFAULT_TAVERN_ADMIN_USER_ID) or "").strip()
+    return configured or DEFAULT_TAVERN_ADMIN_USER_ID
 
 
 def verify_user_password(user_id: str, password: str) -> bool:
@@ -819,6 +839,11 @@ def create_player_app(services: Dict[str, Any], webui_options: Dict[str, Any] | 
 
     public_base_url = normalize_public_base_url(webui_options.get("public_base_url"))
     app.config["PUBLIC_BASE_URL"] = public_base_url
+    app.config["PLAYER_GITHUB_URL"] = _normalize_external_url(webui_options.get("github_url"), DEFAULT_GITHUB_URL)
+    app.config["PLAYER_APK_DOWNLOAD_URL"] = _normalize_external_url(webui_options.get("apk_download_url"), DEFAULT_APK_DOWNLOAD_URL)
+    app.config["TAVERN_ADMIN_USER_ID"] = str(
+        webui_options.get("tavern_admin_user_id", "") or DEFAULT_TAVERN_ADMIN_USER_ID
+    ).strip()
     app.config["UNITY_ALLOWED_ORIGINS"] = webui_options.get("unity_allowed_origins", [])
     app.config["LINUXDO_OAUTH_CONFIG"] = webui_options.get("linuxdo_oauth", {})
     if public_base_url.startswith("https://"):
@@ -2054,7 +2079,7 @@ async def api_post_message():
 async def api_delete_message():
     """删除留言API"""
     user_id = session.get("user_id")
-    ADMIN_ID = "2645956495"
+    admin_user_id = _get_tavern_admin_user_id()
     
     try:
         data = await request.get_json()
@@ -2086,7 +2111,7 @@ async def api_delete_message():
             return jsonify({"success": False, "message": "留言不存在"}), 404
         
         # 检查权限（只能删除自己的留言或管理员可以删除所有）
-        if message_to_delete.get("user_id") != user_id and user_id != ADMIN_ID:
+        if message_to_delete.get("user_id") != user_id and user_id != admin_user_id:
             return jsonify({"success": False, "message": "无权删除此留言"}), 403
         
         # 删除留言
@@ -2106,9 +2131,9 @@ async def api_delete_message():
 async def api_update_announcement():
     """更新公告API（仅管理员）"""
     user_id = session.get("user_id")
-    ADMIN_ID = "2645956495"
-    
-    if user_id != ADMIN_ID:
+    admin_user_id = _get_tavern_admin_user_id()
+
+    if user_id != admin_user_id:
         return jsonify({"success": False, "message": "无权限操作"}), 403
     
     try:
@@ -2355,7 +2380,13 @@ async def index():
         "has_checked_in_today": has_checked_in_today,
     }
     
-    return await render_template("index.html", user=user, stats=stats, user_state=user_state)
+    return await render_template(
+        "index.html",
+        user=user,
+        stats=stats,
+        user_state=user_state,
+        **_get_player_link_config(),
+    )
 
 # ==================== 功能页面（占位符） ====================
 
@@ -3117,9 +3148,8 @@ async def tavern():
         await flash("用户数据异常", "danger")
         return redirect(url_for("player_bp.logout"))
     
-    # 管理员ID
-    ADMIN_ID = "2645956495"
-    is_admin = (user_id == ADMIN_ID)
+    tavern_admin_user_id = _get_tavern_admin_user_id()
+    is_admin = user_id == tavern_admin_user_id
     
     # 获取留言数据文件路径
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
@@ -3172,6 +3202,7 @@ async def tavern():
                                   announcement=tavern_data.get("announcement", ""),
                                   messages=page_messages,
                                   is_admin=is_admin,
+                                  tavern_admin_user_id=tavern_admin_user_id,
                                   current_user_id=user_id,
                                   page=page,
                                   total_pages=total_pages,
