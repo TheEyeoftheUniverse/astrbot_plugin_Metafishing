@@ -512,6 +512,7 @@ def _get_login_template_context(**kwargs):
         "allow_password_login": oauth_config.get("allow_password_fallback", True) or not oauth_config.get("login_entry_enabled", False),
         "oauth_login_url": url_for("player_bp.login_with_linuxdo", flow="webui") if oauth_config.get("login_entry_enabled", False) else None,
     }
+    context.update(_get_player_link_config())
     context.update(kwargs)
     return context
 
@@ -2396,7 +2397,6 @@ async def index():
         user=user,
         stats=stats,
         user_state=user_state,
-        **_get_player_link_config(),
     )
 
 # ==================== 功能页面（占位符） ====================
