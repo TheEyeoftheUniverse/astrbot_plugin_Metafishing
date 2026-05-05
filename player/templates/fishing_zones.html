@@ -60,11 +60,16 @@
             <div class="card-header {% if zone.is_current %}bg-primary text-white{% else %}bg-secondary text-white{% endif %}">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">{{ zone.name }}</h5>
-                    {% if zone.is_current %}
-                        <span class="badge bg-light text-primary">
-                            <i class="fas fa-check-circle"></i> 当前
+                    <div class="d-flex flex-column align-items-end gap-1">
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-coins"></i> {{ "{:,}".format(zone.fishing_cost) }} 金币/次
                         </span>
-                    {% endif %}
+                        {% if zone.is_current %}
+                            <span class="badge bg-light text-primary">
+                                <i class="fas fa-check-circle"></i> 当前
+                            </span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             <div class="card-body d-flex flex-column">
