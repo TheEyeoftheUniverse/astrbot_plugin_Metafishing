@@ -381,6 +381,9 @@ class FishingPlugin(Star):
             public_base_url_config_value
             or "https://fish.eyeoftheuniverse.top"
         ).rstrip("/")
+        self.player_github_url = str(webui_config.get("github_url", "") or "").strip()
+        self.player_apk_download_url = str(webui_config.get("apk_download_url", "") or "").strip()
+        self.tavern_admin_user_id = str(webui_config.get("tavern_admin_user_id", "") or "").strip()
         oauth_config = webui_config.get("oauth", {})
         linuxdo_oauth_config = oauth_config.get("linuxdo", {})
         configured_redirect_uri = str(linuxdo_oauth_config.get("redirect_uri", "") or "").strip()
@@ -1325,9 +1328,9 @@ class FishingPlugin(Star):
                 services,
                 {
                     "public_base_url": self.public_base_url,
-                    "github_url": str(webui_config.get("github_url", "") or "").strip(),
-                    "apk_download_url": str(webui_config.get("apk_download_url", "") or "").strip(),
-                    "tavern_admin_user_id": str(webui_config.get("tavern_admin_user_id", "") or "").strip(),
+                    "github_url": self.player_github_url,
+                    "apk_download_url": self.player_apk_download_url,
+                    "tavern_admin_user_id": self.tavern_admin_user_id,
                     "unity_allowed_origins": [
                         self.public_base_url,
                         "https://fish.eyeoftheuniverse.top",

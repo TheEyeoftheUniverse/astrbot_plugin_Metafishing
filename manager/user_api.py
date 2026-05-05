@@ -924,21 +924,14 @@ async def api_login():
             logger.warning(f"[WebUI] 未注册用户 {user_id} 尝试通过 API 登录")
             return jsonify({"success": False, "message": "该用户不存在"}), 404
 
-        credentials, save_credentials = _get_player_credentials_state()
-        first_login = user_id not in credentials
+        from ..player import server as player_server
 
-        if first_login:
-            credentials[user_id] = password
-            save_credentials(credentials)
-            login_message = f"欢迎，{user.nickname or user_id}！密钥已设置"
-        else:
-            if credentials.get(user_id) != password:
-                return jsonify({"success": False, "message": "密钥错误"}), 401
-            login_message = f"欢迎回来，{user.nickname or user_id}！"
+        player_server.ensure_initial_password(user_id)
+        if not player_server.verify_user_password(user_id, password):
+            return jsonify({"success": False, "message": "密钥错误"}), 401
 
-        session.clear()
-        session["user_id"] = user_id
-        session["nickname"] = user.nickname or user_id
+        player_server._login_player_session(user)
+        login_message = f"欢迎回来，{user.nickname or user_id}！"
 
         logger.info(f"[WebUI] 用户 {user_id} 通过 API 登录成功")
         return jsonify({
@@ -947,7 +940,7 @@ async def api_login():
             "data": {
                 "user_id": user_id,
                 "nickname": user.nickname or user_id,
-                "first_login": first_login
+                "first_login": False
             }
         })
     except KeyError as e:
