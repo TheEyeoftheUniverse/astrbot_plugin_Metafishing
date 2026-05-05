@@ -88,6 +88,14 @@
                         <i class="fas fa-check"></i> 确认修改
                     </button>
                 </form>
+                <hr>
+                <h6 class="mb-2"><i class="fas fa-rotate-right"></i> 重置为新的初始密码</h6>
+                <p class="text-muted small mb-3">如果忘记了自己设置过的密码，可以直接重置。重置后旧密码会失效，新的初始密码会显示在本页上方。</p>
+                <form method="post" action="{{ url_for('player_bp.reset_profile_password') }}" onsubmit="return confirm('确认将登录密钥重置为新的初始密码吗？');">
+                    <button class="btn btn-outline-danger" type="submit">
+                        <i class="fas fa-key"></i> 重置密码
+                    </button>
+                </form>
             </div>
         </div>
     </div>

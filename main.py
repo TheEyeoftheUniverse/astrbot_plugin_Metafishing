@@ -658,6 +658,20 @@ class FishingPlugin(Star):
         initial_password = ensure_initial_password(user_id)
         yield event.plain_result(f"你的 WebUI/App 初始密码是：{initial_password}")
 
+    @filter.command("重置密码", alias={"重置初始密码", "重置登录密码"})
+    async def reset_player_password(self, event: AstrMessageEvent):
+        """私聊将 WebUI/App 登录密钥重置为新的初始密码"""
+        if self._is_group_message_event(event):
+            yield event.plain_result("❌ 为保护账号安全，请在私聊中使用“重置密码”。")
+            return
+        user_id = self._get_effective_user_id(event)
+        if not self.user_repo.check_exists(user_id):
+            yield event.plain_result("❌ 你还没有注册，请先使用“注册”。")
+            return
+        from .player.server import reset_user_password_to_new_initial
+        new_initial_password = reset_user_password_to_new_initial(user_id)
+        yield event.plain_result(f"你的 WebUI/App 登录密钥已重置。新的初始密码是：{new_initial_password}")
+
     @filter.command("获取网页端地址", alias={"网页端地址", "获取WebUI地址", "WebUI地址", "获取网页地址"})
     async def get_player_webui_url(self, event: AstrMessageEvent):
         """获取玩家 WebUI 公网访问地址"""

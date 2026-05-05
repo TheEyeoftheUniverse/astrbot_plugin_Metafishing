@@ -148,6 +148,17 @@ def set_user_password(user_id: str, new_password: str) -> None:
     _save_credentials(USER_CREDENTIALS)
 
 
+def reset_user_password_to_new_initial(user_id: str) -> str:
+    """重置玩家登录密钥为新的初始密码，并废弃旧自定义密码。"""
+    entry = _get_credential_entry(user_id)
+    new_initial_password = _generate_initial_password()
+    entry["password"] = ""
+    entry["initial_password"] = new_initial_password
+    USER_CREDENTIALS[str(user_id)] = entry
+    _save_credentials(USER_CREDENTIALS)
+    return new_initial_password
+
+
 def _get_next_pond_upgrade(inventory_service, current_capacity: int) -> Dict[str, Any] | None:
     """根据当前鱼塘容量查找下一档升级信息。"""
     pond_upgrades = getattr(inventory_service, "config", {}).get("pond_upgrades", [])
@@ -2477,6 +2488,16 @@ async def update_profile_password():
 
     set_user_password(user_id, new_password)
     await flash("登录密钥已修改", "success")
+    return redirect(url_for("player_bp.profile"))
+
+
+@player_bp.route("/profile/password/reset", methods=["POST"])
+@login_required
+async def reset_profile_password():
+    """重置 WebUI/App 登录密钥为新的初始密码"""
+    user_id = session.get("user_id")
+    new_initial_password = reset_user_password_to_new_initial(user_id)
+    await flash(f"登录密钥已重置为新的初始密码：{new_initial_password}", "success")
     return redirect(url_for("player_bp.profile"))
 
 @player_bp.route("/pokedex")
