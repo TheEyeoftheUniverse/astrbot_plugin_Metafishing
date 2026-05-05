@@ -18,3 +18,12 @@ data/*.json
 data/*.bak
 outputs/
 .codex_write_test
+
+# 非运行说明文档
+docs/
+CHANGELOG.md
+CONTRIBUTING.md
+DELIVERY_CHECKLIST.txt
+ENHANCEMENT_SUMMARY.txt
+INTEGRATION_SUMMARY.md
+QUICK_REFERENCE.md
