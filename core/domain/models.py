@@ -48,6 +48,7 @@ class Rod:
     purchase_cost: Optional[int] = None
     bonus_fish_quality_modifier: float = 1.0
     bonus_fish_quantity_modifier: float = 1.0
+    success_rate_modifier: float = 0.0
     bonus_rare_fish_chance: float = 0.0
     durability: Optional[int] = None
     icon_url: Optional[str] = None

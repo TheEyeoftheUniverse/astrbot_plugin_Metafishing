@@ -64,6 +64,25 @@ def _normalize_notice(entry: Any) -> Dict[str, Any]:
     }
 
 
+def _get_user_display_name(user: Any) -> str:
+    nickname = getattr(user, "nickname", "") or ""
+    if nickname:
+        return nickname
+    user_id = str(getattr(user, "user_id", "0000") or "0000")
+    return f"渔夫{user_id[-4:]}"
+
+
+def _build_notice_entry(user: Any, title_name: str, multiplier: float, profit: int) -> Dict[str, Any]:
+    return {
+        "has_record": True,
+        "user_id": str(getattr(user, "user_id", "") or ""),
+        "title_name": title_name or "",
+        "nickname": _get_user_display_name(user),
+        "multiplier": float(multiplier or 0.0),
+        "profit": int(profit or 0),
+    }
+
+
 def normalize_wipe_bomb_daily_state(data: Any, reset_marker: str) -> Dict[str, Any]:
     normalized = create_default_wipe_bomb_daily_state(reset_marker)
     if isinstance(data, dict):
@@ -115,6 +134,29 @@ def save_wipe_bomb_daily_state(reset_hour: int, data: Dict[str, Any]) -> Dict[st
         normalized["reset_marker"] = reset_marker
         _write_state_unlocked(normalized)
         return deepcopy(normalized)
+
+
+def record_wipe_bomb_daily_notice(
+    reset_hour: int,
+    user: Any,
+    title_name: str,
+    multiplier: float,
+    profit: int,
+) -> Dict[str, Any]:
+    """Record the daily highest and lowest wipe-bomb multipliers."""
+    with _STATE_LOCK:
+        state = _read_state_unlocked(reset_hour)
+        king = _normalize_notice(state.get("king"))
+        ghost = _normalize_notice(state.get("ghost"))
+
+        if (not king["has_record"]) or float(multiplier or 0.0) > king["multiplier"]:
+            state["king"] = _build_notice_entry(user, title_name, multiplier, profit)
+
+        if (not ghost["has_record"]) or float(multiplier or 0.0) < ghost["multiplier"]:
+            state["ghost"] = _build_notice_entry(user, title_name, multiplier, profit)
+
+        _write_state_unlocked(state)
+        return deepcopy(state)
 
 
 def add_wipe_bomb_jackpot(amount: int, reset_hour: int) -> int:

@@ -44,6 +44,7 @@
                         <td>{{ item.source }}</td>
                         <td>{{ item.purchase_cost or 'N/A' }}</td>
                         <td>
+                            <span class="badge bg-success">成功: {{ chance_delta(item.success_rate_modifier) }}</span>
                             <span class="badge bg-secondary">品质: {{ modifier_delta(item.bonus_fish_quality_modifier) }}</span>
                             <span class="badge bg-secondary">数量: {{ modifier_delta(item.bonus_fish_quantity_modifier) }}</span>
                             <span class="badge bg-secondary">稀有: {{ chance_delta(item.bonus_rare_fish_chance) }}</span>
@@ -92,6 +93,7 @@
                         <div class="col-md-6"><label>购买成本(可选)</label><input type="number" name="purchase_cost" class="form-control"></div>
                         <div class="col-md-4"><label>品质加成</label><input type="number" step="0.01" name="bonus_fish_quality_modifier" class="form-control" value="1.0"></div>
                         <div class="col-md-4"><label>数量加成</label><input type="number" step="0.01" name="bonus_fish_quantity_modifier" class="form-control" value="1.0"></div>
+                        <div class="col-md-4"><label>成功率加成</label><input type="number" step="0.01" name="success_rate_modifier" class="form-control" value="0.0"></div>
                         <div class="col-md-4"><label>稀有加成</label><input type="number" step="0.01" name="bonus_rare_fish_chance" class="form-control" value="0.0"></div>
                         <div class="col-md-6"><label>耐久度(可选)</label><input type="number" name="durability" class="form-control"></div>
                         <div class="col-md-6"><label>图标URL(可选)</label><input type="text" name="icon_url" class="form-control"></div>

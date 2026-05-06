@@ -218,6 +218,8 @@ class ShopService:
                                 reward["attributes"] = ", ".join(attrs)
                         elif reward_type == "rod":
                             attrs = []
+                            if hasattr(item_template, 'success_rate_modifier') and item_template.success_rate_modifier > 0:
+                                attrs.append(f"成功率 +{item_template.success_rate_modifier * 100:.1f}%")
                             if hasattr(item_template, 'bonus_fish_quality_modifier') and item_template.bonus_fish_quality_modifier != 1.0:
                                 attrs.append(f"品质 +{(item_template.bonus_fish_quality_modifier - 1) * 100:.1f}%")
                             if hasattr(item_template, 'bonus_fish_quantity_modifier') and item_template.bonus_fish_quantity_modifier != 1.0:

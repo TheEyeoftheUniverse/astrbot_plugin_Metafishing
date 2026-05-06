@@ -1735,7 +1735,7 @@ async def api_refine_accessory():
 @player_bp.route("/api/delete_rod", methods=["POST"])
 @login_required
 async def api_delete_rod():
-    """删除鱼竿API"""
+    """兼容旧前端：鱼竿删除请求默认改为出售。"""
     user_id = session.get("user_id")
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
 
@@ -1755,16 +1755,35 @@ async def api_delete_rod():
             return jsonify({"success": False, "message": "装备中的鱼竿不能删除"}), 400
         if rod.is_locked:
             return jsonify({"success": False, "message": "锁定的鱼竿不能删除"}), 400
-        inventory_service.inventory_repo.delete_rod_instance(instance_id)
-        return jsonify({"success": True, "message": "已删除鱼竿"})
+        return jsonify(inventory_service.sell_rod(user_id, instance_id))
     except Exception as e:
         logger.error(f"删除鱼竿失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@player_bp.route("/api/sell_rod", methods=["POST"])
+@login_required
+async def api_sell_rod():
+    """出售鱼竿API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        rod_code = data.get("rod_code")
+        if not rod_code:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        instance_id = inventory_service.resolve_rod_instance_id(user_id, rod_code)
+        if not instance_id:
+            return jsonify({"success": False, "message": "无效的鱼竿编号"}), 400
+        return jsonify(inventory_service.sell_rod(user_id, instance_id))
+    except Exception as e:
+        logger.error(f"出售鱼竿失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/delete_accessory", methods=["POST"])
 @login_required
 async def api_delete_accessory():
-    """删除饰品API"""
+    """兼容旧前端：饰品删除请求默认改为出售。"""
     user_id = session.get("user_id")
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
 
@@ -1784,16 +1803,35 @@ async def api_delete_accessory():
             return jsonify({"success": False, "message": "装备中的饰品不能删除"}), 400
         if accessory.is_locked:
             return jsonify({"success": False, "message": "锁定的饰品不能删除"}), 400
-        inventory_service.inventory_repo.delete_accessory_instance(instance_id)
-        return jsonify({"success": True, "message": "已删除饰品"})
+        return jsonify(inventory_service.sell_accessory(user_id, instance_id))
     except Exception as e:
         logger.error(f"删除饰品失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@player_bp.route("/api/sell_accessory", methods=["POST"])
+@login_required
+async def api_sell_accessory():
+    """出售饰品API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        accessory_code = data.get("accessory_code")
+        if not accessory_code:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        instance_id = inventory_service.resolve_accessory_instance_id(user_id, accessory_code)
+        if not instance_id:
+            return jsonify({"success": False, "message": "无效的饰品编号"}), 400
+        return jsonify(inventory_service.sell_accessory(user_id, instance_id))
+    except Exception as e:
+        logger.error(f"出售饰品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/delete_item", methods=["POST"])
 @login_required
 async def api_delete_item():
-    """删除道具API"""
+    """兼容旧前端：道具删除请求默认改为出售。"""
     user_id = session.get("user_id")
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
 
@@ -1803,20 +1841,33 @@ async def api_delete_item():
         quantity = int(data.get("quantity", 1) or 1)
         if item_id <= 0 or quantity <= 0:
             return jsonify({"success": False, "message": "参数无效"}), 400
-        owned = inventory_service.inventory_repo.get_user_item_inventory(user_id).get(item_id, 0)
-        if owned <= 0:
-            return jsonify({"success": False, "message": "道具不存在或数量不足"}), 400
-        delete_quantity = min(quantity, owned)
-        inventory_service.inventory_repo.decrease_item_quantity(user_id, item_id, delete_quantity)
-        return jsonify({"success": True, "message": f"已删除道具 x{delete_quantity}"})
+        return jsonify(inventory_service.sell_item(user_id, item_id, quantity))
     except Exception as e:
         logger.error(f"删除道具失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@player_bp.route("/api/sell_item", methods=["POST"])
+@login_required
+async def api_sell_item():
+    """出售道具API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        item_id = int(data.get("item_id") or 0)
+        quantity = int(data.get("quantity", 1) or 1)
+        if item_id <= 0 or quantity <= 0:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        return jsonify(inventory_service.sell_item(user_id, item_id, quantity))
+    except Exception as e:
+        logger.error(f"出售道具失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/delete_bait", methods=["POST"])
 @login_required
 async def api_delete_bait():
-    """删除鱼饵API"""
+    """兼容旧前端：鱼饵删除请求默认改为出售。"""
     user_id = session.get("user_id")
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
 
@@ -1826,14 +1877,27 @@ async def api_delete_bait():
         quantity = int(data.get("quantity", 1) or 1)
         if bait_id <= 0 or quantity <= 0:
             return jsonify({"success": False, "message": "参数无效"}), 400
-        owned = inventory_service.inventory_repo.get_user_bait_inventory(user_id).get(bait_id, 0)
-        if owned <= 0:
-            return jsonify({"success": False, "message": "鱼饵不存在或数量不足"}), 400
-        delete_quantity = min(quantity, owned)
-        inventory_service.inventory_repo.update_bait_quantity(user_id, bait_id, -delete_quantity)
-        return jsonify({"success": True, "message": f"已删除鱼饵 x{delete_quantity}"})
+        return jsonify(inventory_service.sell_bait(user_id, bait_id, quantity))
     except Exception as e:
         logger.error(f"删除鱼饵失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@player_bp.route("/api/sell_bait", methods=["POST"])
+@login_required
+async def api_sell_bait():
+    """出售鱼饵API"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+
+    try:
+        data = await request.get_json()
+        bait_id = int(data.get("bait_id") or 0)
+        quantity = int(data.get("quantity", 1) or 1)
+        if bait_id <= 0 or quantity <= 0:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        return jsonify(inventory_service.sell_bait(user_id, bait_id, quantity))
+    except Exception as e:
+        logger.error(f"出售鱼饵失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/use_item", methods=["POST"])
@@ -3033,6 +3097,7 @@ async def exchange():
                                       price_history={},
                                       history_data={},
                                       labels=[],
+                                      price_changes={},
                                       auto_sell_message="")
     
     # 获取市场状态
@@ -3088,8 +3153,45 @@ async def exchange():
     
     # 获取价格历史
     price_history_result = exchange_service.get_price_history(days=7)
-    history_data = price_history_result.get("history", {})
-    labels = price_history_result.get("labels", [])
+    raw_history_data = price_history_result.get("history", {}) if price_history_result.get("success", False) else {}
+    labels = price_history_result.get("labels", []) if price_history_result.get("success", False) else []
+    current_prices = market_status.get("prices", {})
+
+    if not labels:
+        labels = [market_status.get("date") or datetime.now().strftime("%Y-%m-%d")]
+
+    history_data = {}
+    for commodity_id in market_status.get("commodities", {}).keys():
+        raw_series = list(raw_history_data.get(commodity_id, []) or [])
+        if not raw_series:
+            raw_series = [current_prices.get(commodity_id, 0)]
+
+        while len(raw_series) < len(labels):
+            raw_series.append(raw_series[-1] if raw_series else current_prices.get(commodity_id, 0))
+
+        normalized_series = []
+        last_known = None
+        for value in raw_series[:len(labels)]:
+            if value is None:
+                value = last_known if last_known is not None else current_prices.get(commodity_id, 0)
+            if value is not None:
+                last_known = value
+            normalized_series.append(value)
+        history_data[commodity_id] = normalized_series
+
+    price_changes = {}
+    for commodity_id, current_price in current_prices.items():
+        series = [price for price in history_data.get(commodity_id, []) if price is not None]
+        previous_price = series[-2] if len(series) >= 2 else (series[-1] if series else current_price)
+        change_amount = int(current_price or 0) - int(previous_price or 0)
+        change_percent = (change_amount / previous_price * 100) if previous_price else 0
+        price_changes[commodity_id] = {
+            "previous_price": int(previous_price or 0),
+            "amount": change_amount,
+            "percent": change_percent,
+            "direction": "up" if change_amount > 0 else ("down" if change_amount < 0 else "flat"),
+            "has_previous": bool(previous_price),
+        }
     capacity_info = exchange_service.get_exchange_capacity_info(user_id)
     
     # 转换数据结构：从 {commodity_id: [prices]} 转换为 {date: {commodity_id: price}}
@@ -3111,6 +3213,7 @@ async def exchange():
                                   price_history=price_history,
                                   history_data=history_data,
                                   labels=labels,
+                                  price_changes=price_changes,
                                   auto_sell_message=auto_sell_message)
 
 @player_bp.route("/gacha")

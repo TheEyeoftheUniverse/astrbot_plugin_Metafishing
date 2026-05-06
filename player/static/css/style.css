@@ -825,6 +825,18 @@ a:hover {
     -webkit-line-clamp: 2;
 }
 
+.shop-item-intro.is-expanded {
+    max-height: none;
+    overflow: visible;
+    display: block;
+    -webkit-line-clamp: unset;
+}
+
+.shop-description-toggle {
+    align-self: flex-start;
+    text-decoration: none;
+}
+
 .shop-item-divider {
     margin-top: 0.65rem;
 }
@@ -832,6 +844,22 @@ a:hover {
 .exchange-commodity-card .card-body {
     display: flex;
     flex-direction: column;
+}
+
+.exchange-commodity-card-active {
+    border-color: var(--aqua);
+    box-shadow: 0 0 0 0.16rem rgba(32, 136, 160, 0.18);
+}
+
+.exchange-commodity-name {
+    font: inherit;
+    text-decoration: none;
+    vertical-align: baseline;
+}
+
+.exchange-commodity-name:hover,
+.exchange-commodity-name:focus {
+    text-decoration: underline;
 }
 
 .exchange-commodity-summary {

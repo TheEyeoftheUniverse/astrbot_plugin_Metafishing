@@ -290,6 +290,11 @@ class FishingService:
                         rarity=rod_template.rarity,
                     )
                 )
+                base_success_rate += calculate_after_refine(
+                    getattr(rod_template, "success_rate_modifier", 0.0),
+                    refine_level=equipped_rod_instance.refine_level,
+                    rarity=rod_template.rarity,
+                )
                 rare_chance += calculate_after_refine(rod_template.bonus_rare_fish_chance, refine_level= equipped_rod_instance.refine_level, rarity=rod_template.rarity)
         # 获取装备饰品并应用加成
         equipped_accessory_instance = self.inventory_repo.get_user_equipped_accessory(user.user_id)

@@ -259,10 +259,6 @@ async def rod(plugin: "FishingPlugin", event: AstrMessageEvent):
         
         for rod in rods:
             message += format_accessory_or_rod(rod)
-            if (
-                rod.get("bonus_rare_fish_chance", 1) != 1
-            ):
-                message += f"   - 钓上鱼鱼类几率加成: {to_percentage(rod['bonus_rare_fish_chance'])}\n"
             message += f"   -精炼等级: {rod.get('refine_level', 1)}\n"
 
         # 检查消息长度，如果太长则截断

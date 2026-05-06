@@ -507,6 +507,8 @@ async def shop(plugin: "FishingPlugin", event: AstrMessageEvent):
                     reward.get("reward_item_id")
                 )
                 if rod_template:
+                    if getattr(rod_template, "success_rate_modifier", 0.0) != 0.0:
+                        bonus_info.append(f"成功率加成: +{rod_template.success_rate_modifier:.1%}")
                     if rod_template.bonus_fish_quality_modifier != 1.0:
                         # 转换为增益百分比：1.5 -> +50%
                         bonus_pct = (rod_template.bonus_fish_quality_modifier - 1.0) * 100

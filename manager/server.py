@@ -320,6 +320,7 @@ async def rods_csv_template():
         "purchase_cost",
         "bonus_fish_quality_modifier",
         "bonus_fish_quantity_modifier",
+        "success_rate_modifier",
         "bonus_rare_fish_chance",
         "durability",
         "icon_url",
@@ -332,6 +333,7 @@ async def rods_csv_template():
         "1000",
         "1.1",
         "1.0",
+        "0.04",
         "0.05",
         "",
         "",
@@ -371,10 +373,11 @@ async def import_rods_csv():
             "source",
             "bonus_fish_quality_modifier",
             "bonus_fish_quantity_modifier",
+            "success_rate_modifier",
             "bonus_rare_fish_chance",
         }
         if not required_cols.issubset(set([c.strip() for c in reader.fieldnames or []])):
-            await flash("CSV列缺失，至少需要: name, rarity, source, 三个加成字段", "danger")
+            await flash("CSV列缺失，至少需要: name, rarity, source, 品质/数量/成功率/稀有加成字段", "danger")
             return redirect(url_for("admin_bp.manage_rods"))
 
         item_template_service = current_app.config["ITEM_TEMPLATE_SERVICE"]
@@ -390,6 +393,7 @@ async def import_rods_csv():
                     "purchase_cost": int(row["purchase_cost"]) if (row.get("purchase_cost") or "").strip() != "" else None,
                     "bonus_fish_quality_modifier": float(row.get("bonus_fish_quality_modifier") or 1.0),
                     "bonus_fish_quantity_modifier": float(row.get("bonus_fish_quantity_modifier") or 1.0),
+                    "success_rate_modifier": float(row.get("success_rate_modifier") or 0.0),
                     "bonus_rare_fish_chance": float(row.get("bonus_rare_fish_chance") or 0.0),
                     "durability": int(row["durability"]) if (row.get("durability") or "").strip() != "" else None,
                     "icon_url": (row.get("icon_url") or "").strip() or None,

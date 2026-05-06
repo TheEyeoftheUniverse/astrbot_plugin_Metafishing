@@ -205,14 +205,21 @@ async def kill_processes_on_port(port: int):
     return len(killed) > 0, killed  # 即使端口未释放，如果杀死了进程也算部分成功
 
 # 将1.2等数字转换成百分数
+def _format_percent_number(percent: float) -> str:
+    rounded = round(percent, 2)
+    if rounded == 0:
+        return "0%"
+    text = f"{rounded:.2f}".rstrip("0").rstrip(".")
+    return f"{text}%"
+
+
 def to_percentage(value: float) -> str:
     """将小数转换为百分比字符串"""
     if value is None:
         return "0%"
     if value < 1:
-        return f"{value * 100:.2f}%"
-    else:
-        return f"{(value - 1) * 100:.2f}%"
+        return _format_percent_number(value * 100)
+    return _format_percent_number((value - 1) * 100)
 
 def format_rarity_display(rarity: int) -> str:
     """格式化稀有度显示，支持显示到10星，10星以上显示为⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐+"""
@@ -234,12 +241,14 @@ def format_accessory_or_rod(accessory_or_rod: dict) -> str:
         message += f"   - {'🔒 已锁定'}\n"
     else:
         message += f"   - {'🔓 未锁定'}\n"
+    if accessory_or_rod.get("success_rate_modifier", 0.0) not in (0.0, 0, None):
+        message += f"   - 🎯钓鱼成功率加成: {to_percentage(accessory_or_rod['success_rate_modifier'])}\n"
     if accessory_or_rod.get("bonus_fish_quality_modifier", 1.0) != 1.0 and accessory_or_rod.get("bonus_fish_quality_modifier", 1) != 1 and accessory_or_rod.get("bonus_fish_quality_modifier", 1) > 0:
         message += f"   - ✨鱼类品质加成: {to_percentage(accessory_or_rod['bonus_fish_quality_modifier'])}\n"
     if accessory_or_rod.get("bonus_fish_quantity_modifier", 1.0) != 1.0 and accessory_or_rod.get("bonus_fish_quantity_modifier", 1) != 1 and accessory_or_rod.get("bonus_fish_quantity_modifier", 1) > 0:
         message += f"   - 📊鱼类数量加成: {to_percentage(accessory_or_rod['bonus_fish_quantity_modifier'])}\n"
     if accessory_or_rod.get("bonus_rare_fish_chance", 1.0) != 1.0 and accessory_or_rod.get("bonus_rare_fish_chance", 1) != 1 and accessory_or_rod.get("bonus_rare_fish_chance", 1) > 0:
-        message += f"   - 🎣钓鱼几率加成: {to_percentage(accessory_or_rod['bonus_rare_fish_chance'])}\n"
+        message += f"   - 🎣稀有鱼概率加成: {to_percentage(accessory_or_rod['bonus_rare_fish_chance'])}\n"
     if accessory_or_rod.get("description"):
         message += f"   - 📋描述: {accessory_or_rod['description']}\n"
     message += "\n"

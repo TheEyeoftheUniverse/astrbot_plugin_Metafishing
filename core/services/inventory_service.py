@@ -282,6 +282,7 @@ class InventoryService:
                     "is_locked": rod_instance.is_locked,
                     "bonus_fish_quality_modifier": calculate_after_refine(rod_template.bonus_fish_quality_modifier, refine_level= rod_instance.refine_level, rarity=rod_template.rarity),
                     "bonus_fish_quantity_modifier": calculate_after_refine(rod_template.bonus_fish_quantity_modifier, refine_level= rod_instance.refine_level, rarity=rod_template.rarity),
+                    "success_rate_modifier": calculate_after_refine(getattr(rod_template, "success_rate_modifier", 0.0), refine_level=rod_instance.refine_level, rarity=rod_template.rarity),
                     "bonus_rare_fish_chance": calculate_after_refine(rod_template.bonus_rare_fish_chance, refine_level= rod_instance.refine_level, rarity=rod_template.rarity),
                     "refine_level": rod_instance.refine_level,
                     "current_durability": rod_instance.current_durability,
@@ -2120,6 +2121,43 @@ class InventoryService:
         return {
             "success": True,
             "message": f"💰 成功卖出【{tpl.name}】x{quantity}，获得 {total} 金币",
+            "gained": total,
+            "remaining": owned_qty - quantity
+        }
+
+    def sell_bait(self, user_id: str, bait_id: int, quantity: int = 1) -> Dict[str, Any]:
+        """出售指定数量的鱼饵，按照模板 cost 的一半计价（至少 1）。"""
+        if quantity <= 0:
+            return {"success": False, "message": "数量必须大于0"}
+
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {"success": False, "message": "用户不存在"}
+
+        inv = self.inventory_repo.get_user_bait_inventory(user_id)
+        owned_qty = inv.get(bait_id, 0)
+        if owned_qty <= 0:
+            return {"success": False, "message": "❌ 你没有这个鱼饵"}
+        if quantity > owned_qty:
+            return {"success": False, "message": f"❌ 数量不足，当前仅有 {owned_qty} 个"}
+
+        tpl = self.item_template_repo.get_bait_by_id(bait_id)
+        if not tpl:
+            return {"success": False, "message": "鱼饵信息不存在"}
+
+        single_price = max(1, int((tpl.cost or 0) * 0.5))
+        total = single_price * quantity
+
+        self.inventory_repo.update_bait_quantity(user_id, bait_id, -quantity)
+        user.coins += total
+        if getattr(user, "current_bait_id", None) == bait_id and owned_qty - quantity <= 0:
+            user.current_bait_id = None
+            user.bait_start_time = None
+        self.user_repo.update(user)
+
+        return {
+            "success": True,
+            "message": f"💰 成功卖出鱼饵【{tpl.name}】x{quantity}，获得 {total} 金币",
             "gained": total,
             "remaining": owned_qty - quantity
         }

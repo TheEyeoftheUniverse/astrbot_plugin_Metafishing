@@ -24,6 +24,9 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
         return conn
 
     # --- 私有映射辅助方法 ---
+    def _default_rod_success_rate(self, rarity: int) -> float:
+        return round((rarity or 0) * 0.04, 4)
+
     def _row_to_fish(self, row: sqlite3.Row) -> Optional[Fish]:
         if not row:
             return None
@@ -40,7 +43,10 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
     def _row_to_rod(self, row: sqlite3.Row) -> Optional[Rod]:
         if not row:
             return None
-        return Rod(**row)
+        data = dict(row)
+        if not data.get("success_rate_modifier"):
+            data["success_rate_modifier"] = self._default_rod_success_rate(data.get("rarity", 0))
+        return Rod(**data)
 
     def _row_to_bait(self, row: sqlite3.Row) -> Optional[Bait]:
         if not row:
@@ -311,11 +317,13 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
             cursor.execute("""
                 INSERT INTO rods (name, description, rarity, source, purchase_cost,
                                   bonus_fish_quality_modifier, bonus_fish_quantity_modifier,
-                                  bonus_rare_fish_chance, durability, icon_url)
+                                  success_rate_modifier, bonus_rare_fish_chance,
+                                  durability, icon_url)
                 VALUES (:name, :description, :rarity, :source, :purchase_cost,
                         :bonus_fish_quality_modifier, :bonus_fish_quantity_modifier,
-                        :bonus_rare_fish_chance, :durability, :icon_url)
-            """, {**data, "purchase_cost": data.get("purchase_cost") or None, "durability": durability_value, "icon_url": data.get("icon_url")})
+                        :success_rate_modifier, :bonus_rare_fish_chance,
+                        :durability, :icon_url)
+            """, {**data, "purchase_cost": data.get("purchase_cost") or None, "success_rate_modifier": data.get("success_rate_modifier", 0.0), "durability": durability_value, "icon_url": data.get("icon_url")})
             conn.commit()
 
     def update_rod_template(self, rod_id: int, data: Dict[str, Any]) -> None:
@@ -331,10 +339,11 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
                     name = :name, description = :description, rarity = :rarity, source = :source,
                     purchase_cost = :purchase_cost, bonus_fish_quality_modifier = :bonus_fish_quality_modifier,
                     bonus_fish_quantity_modifier = :bonus_fish_quantity_modifier,
+                    success_rate_modifier = :success_rate_modifier,
                     bonus_rare_fish_chance = :bonus_rare_fish_chance, durability = :durability,
                     icon_url = :icon_url
                 WHERE rod_id = :rod_id
-            """, {**data, "purchase_cost": data.get("purchase_cost") or None, "durability": durability_value, "icon_url": data.get("icon_url")})
+            """, {**data, "purchase_cost": data.get("purchase_cost") or None, "success_rate_modifier": data.get("success_rate_modifier", 0.0), "durability": durability_value, "icon_url": data.get("icon_url")})
             conn.commit()
 
     def delete_rod_template(self, rod_id: int) -> None:

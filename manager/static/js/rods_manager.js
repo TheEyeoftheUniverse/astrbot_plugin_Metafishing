@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // 重置为默认值
         form.querySelector('[name="bonus_fish_quality_modifier"]').value = '1.0';
         form.querySelector('[name="bonus_fish_quantity_modifier"]').value = '1.0';
+        form.querySelector('[name="success_rate_modifier"]').value = '0.0';
         form.querySelector('[name="bonus_rare_fish_chance"]').value = '0.0';
     });
 

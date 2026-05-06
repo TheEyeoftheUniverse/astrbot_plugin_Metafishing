@@ -23,10 +23,14 @@ def to_percentage(value: float) -> str:
     """将小数转换为百分比字符串"""
     if value is None:
         return "0%"
+    def format_number(percent: float) -> str:
+        rounded = round(percent, 2)
+        if rounded == 0:
+            return "0%"
+        return f"{rounded:.2f}".rstrip("0").rstrip(".") + "%"
     if value < 1:
-        return f"{value * 100:.2f}%"
-    else:
-        return f"{(value - 1) * 100:.2f}%"
+        return format_number(value * 100)
+    return format_number((value - 1) * 100)
 
 def calculate_dynamic_height(user_data: Dict[str, Any]) -> int:
     """
@@ -201,6 +205,8 @@ async def _draw_backpack_image_impl(user_data: Dict[str, Any], data_dir: str) ->
     def measure_rod_card_height(rod, card_width: int) -> int:
         line_h = get_text_size("测", tiny_font)[1] + 2
         attr_lines = 0
+        if rod.get('success_rate_modifier', 0.0) not in (0.0, 0, None):
+            attr_lines += 1
         if rod.get('bonus_fish_quality_modifier', 1.0) not in (1.0, 1) and rod.get('bonus_fish_quality_modifier', 0) > 0:
             attr_lines += 1
         if rod.get('bonus_fish_quantity_modifier', 1.0) not in (1.0, 1) and rod.get('bonus_fish_quantity_modifier', 0) > 0:
@@ -489,6 +495,10 @@ async def _draw_backpack_image_impl(user_data: Dict[str, Any], data_dir: str) ->
                 bonus_y = y + 85
             
             # 属性加成 - 参考format_accessory_or_rod函数
+            if rod.get('success_rate_modifier', 0.0) not in (0.0, 0, None):
+                bonus_text = f"钓鱼成功率加成: {to_percentage(rod['success_rate_modifier'])}"
+                draw.text((x + 15, bonus_y), bonus_text, font=tiny_font, fill=primary_light)
+                bonus_y += 18
             if rod.get('bonus_fish_quality_modifier', 1.0) != 1.0 and rod.get('bonus_fish_quality_modifier', 1) != 1 and rod.get('bonus_fish_quality_modifier', 1) > 0:
                 bonus_text = f"鱼类品质加成: {to_percentage(rod['bonus_fish_quality_modifier'])}"
                 draw.text((x + 15, bonus_y), bonus_text, font=tiny_font, fill=primary_light)
@@ -498,7 +508,7 @@ async def _draw_backpack_image_impl(user_data: Dict[str, Any], data_dir: str) ->
                 draw.text((x + 15, bonus_y), bonus_text, font=tiny_font, fill=primary_light)
                 bonus_y += 18
             if rod.get('bonus_rare_fish_chance', 1.0) != 1.0 and rod.get('bonus_rare_fish_chance', 1) != 1 and rod.get('bonus_rare_fish_chance', 1) > 0:
-                bonus_text = f"钓鱼几率加成: {to_percentage(rod['bonus_rare_fish_chance'])}"
+                bonus_text = f"稀有鱼概率加成: {to_percentage(rod['bonus_rare_fish_chance'])}"
                 draw.text((x + 15, bonus_y), bonus_text, font=tiny_font, fill=primary_light)
                 bonus_y += 18
             
@@ -613,7 +623,7 @@ async def _draw_backpack_image_impl(user_data: Dict[str, Any], data_dir: str) ->
                 draw.text((x + 15, bonus_y), bonus_text, font=tiny_font, fill=primary_light)
                 bonus_y += 18
             if accessory.get('bonus_rare_fish_chance', 1.0) != 1.0 and accessory.get('bonus_rare_fish_chance', 1) != 1 and accessory.get('bonus_rare_fish_chance', 1) > 0:
-                bonus_text = f"钓鱼几率加成: {to_percentage(accessory['bonus_rare_fish_chance'])}"
+                bonus_text = f"稀有鱼概率加成: {to_percentage(accessory['bonus_rare_fish_chance'])}"
                 draw.text((x + 15, bonus_y), bonus_text, font=tiny_font, fill=primary_light)
                 bonus_y += 18
             if accessory.get('bonus_coin_modifier', 1.0) != 1.0 and accessory.get('bonus_coin_modifier', 1) != 1 and accessory.get('bonus_coin_modifier', 1) > 0:

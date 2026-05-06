@@ -75,11 +75,14 @@
                             <div class="card-body d-flex flex-column">
                                 <div class="shop-item-intro">
                                 {% if item.description %}
-                                    <p class="card-text text-muted small mb-0">{{ item.description }}</p>
+                                    <p class="card-text text-muted small mb-0 shop-item-description">{{ item.description }}</p>
                                 {% else %}
-                                    <p class="card-text text-muted small mb-0">暂无描述</p>
+                                    <p class="card-text text-muted small mb-0 shop-item-description">暂无描述</p>
                                 {% endif %}
                                 </div>
+                                <button type="button" class="btn btn-link btn-sm p-0 mt-1 shop-description-toggle d-none" onclick="toggleShopDescription(this)">
+                                    展开
+                                </button>
 
                                 <hr class="card-section-divider shop-item-divider">
 
@@ -208,6 +211,11 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    initializeShopDescriptionToggles();
+    document.querySelectorAll('.shop-collapse').forEach(collapseEl => {
+        collapseEl.addEventListener('shown.bs.collapse', initializeShopDescriptionToggles);
+    });
+
     const openShopId = sessionStorage.getItem('openShopAfterPurchase');
     if (!openShopId) return;
     sessionStorage.removeItem('openShopAfterPurchase');
@@ -217,6 +225,24 @@ document.addEventListener('DOMContentLoaded', function() {
         collapseEl.scrollIntoView({block: 'start'});
     }
 });
+
+function initializeShopDescriptionToggles() {
+    document.querySelectorAll('.shop-item-intro').forEach(intro => {
+        const toggle = intro.parentElement ? intro.parentElement.querySelector('.shop-description-toggle') : null;
+        if (!toggle) return;
+        if (intro.scrollHeight > intro.clientHeight + 2) {
+            toggle.classList.remove('d-none');
+        }
+    });
+}
+
+function toggleShopDescription(button) {
+    const body = button.closest('.card-body');
+    const intro = body ? body.querySelector('.shop-item-intro') : null;
+    if (!intro) return;
+    const expanded = intro.classList.toggle('is-expanded');
+    button.textContent = expanded ? '收起' : '展开';
+}
 
 function buyShopItemFromButton(button) {
     const itemId = Number(button.dataset.itemId || 0);

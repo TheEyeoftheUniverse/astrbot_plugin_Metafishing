@@ -14,7 +14,12 @@ from ..repositories.abstract_repository import (
     AbstractUserBuffRepository,
 )
 from ..domain.models import User
-from .wipe_bomb_daily_service import add_wipe_bomb_jackpot, consume_wipe_bomb_jackpot, get_wipe_bomb_jackpot_amount
+from .wipe_bomb_daily_service import (
+    add_wipe_bomb_jackpot,
+    consume_wipe_bomb_jackpot,
+    get_wipe_bomb_jackpot_amount,
+    record_wipe_bomb_daily_notice,
+)
 from ...core.utils import get_now, get_today
 
 if TYPE_CHECKING:
@@ -417,6 +422,28 @@ class GameMechanicsService:
             "jackpot_paid": jackpot_paid,
             "jackpot_notice": jackpot_notice,
         }
+
+        title_name = ""
+        title_id = getattr(user, "current_title_id", None)
+        if title_id:
+            try:
+                title = self.item_template_repo.get_title_by_id(title_id)
+                title_name = getattr(title, "name", "") or ""
+            except Exception as exception:
+                logger.warning(f"读取用户 {user_id} 当前称号失败: {exception}")
+
+        try:
+            publicity_state = record_wipe_bomb_daily_notice(
+                daily_reset_hour,
+                user,
+                title_name,
+                reward_multiplier,
+                profit,
+            )
+            result["king_notice"] = publicity_state.get("king")
+            result["ghost_notice"] = publicity_state.get("ghost")
+        except Exception as exception:
+            logger.warning(f"更新每日擦弹公示失败: user_id={user_id}, error={exception}")
         
         if suppression_triggered:
             result["suppression_notice"] = "✨ 天界之力降临！你的惊人运气触发了时空沙漏的平衡法则！为了避免时空扭曲，命运女神暂时调整了概率之流，但宝藏之门依然为你敞开！"

@@ -114,10 +114,12 @@
 <div class="row">
     {% for commodity_id, commodity in market_status.commodities.items() %}
     <div class="col-lg-4 mb-4">
-        <div class="card h-100 exchange-commodity-card">
+        <div class="card h-100 exchange-commodity-card" data-commodity-id="{{ commodity_id }}">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-box"></i> {{ commodity.name }}
+                    <button type="button" class="btn btn-link p-0 text-white exchange-commodity-name" onclick="highlightCommodityLine('{{ commodity_id }}')">
+                        <i class="fas fa-box"></i> {{ commodity.name }}
+                    </button>
                 </h5>
             </div>
             <div class="card-body">
@@ -128,6 +130,19 @@
                         <h2 class="text-warning mb-0">
                             <i class="fas fa-coins"></i> {{ market_status.prices[commodity_id] }}
                         </h2>
+                        {% set change = price_changes.get(commodity_id, {}) %}
+                        {% if change.has_previous %}
+                        <div class="small mt-2">
+                            较上次
+                            <span class="{% if change.direction == 'up' %}text-success{% elif change.direction == 'down' %}text-danger{% else %}text-muted{% endif %}">
+                                {% if change.direction == 'up' %}<i class="fas fa-arrow-up"></i>
+                                {% elif change.direction == 'down' %}<i class="fas fa-arrow-down"></i>
+                                {% else %}<i class="fas fa-minus"></i>{% endif %}
+                                {{ "+" if change.amount > 0 else "" }}{{ change.amount }}
+                                ({{ "+" if change.percent > 0 else "" }}{{ "%.1f"|format(change.percent) }}%)
+                            </span>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- 商品描述 -->
@@ -286,35 +301,55 @@
 {% block extra_js %}
 <script src="{{ url_for('player_bp.static', filename='vendor/chartjs/chart.umd.min.js', v='20260505') }}"></script>
 <script>
+let priceChart = null;
+
 // 绘制价格走势图
 function drawPriceChart() {
-    const ctx = document.getElementById('priceChart').getContext('2d');
+    const canvas = document.getElementById('priceChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const ctx = canvas.getContext('2d');
 
     const labels = {{ labels | tojson }};
     const commodities = {{ market_status.commodities | tojson }};
     const historyData = {{ history_data | tojson }};
 
     const datasets = [];
+    const palette = [
+        { border: 'rgb(255, 159, 64)', bg: 'rgba(255, 159, 64, 0.18)' },
+        { border: 'rgb(255, 99, 132)', bg: 'rgba(255, 99, 132, 0.18)' },
+        { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.18)' },
+        { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.18)' },
+        { border: 'rgb(153, 102, 255)', bg: 'rgba(153, 102, 255, 0.18)' }
+    ];
     const colors = {
         'dried_fish': { border: 'rgb(255, 159, 64)', bg: 'rgba(255, 159, 64, 0.2)' },
         'fish_roe': { border: 'rgb(255, 99, 132)', bg: 'rgba(255, 99, 132, 0.2)' },
         'fish_oil': { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' }
     };
 
-    for (const [commodityId, commodity] of Object.entries(commodities)) {
-        if (historyData[commodityId]) {
+    Object.entries(commodities).forEach(([commodityId, commodity], index) => {
+        const color = colors[commodityId] || palette[index % palette.length];
+        if (Array.isArray(historyData[commodityId]) && historyData[commodityId].length > 0) {
             datasets.push({
                 label: commodity.name,
+                commodityId: commodityId,
                 data: historyData[commodityId],
-                borderColor: colors[commodityId].border,
-                backgroundColor: colors[commodityId].bg,
+                borderColor: color.border,
+                backgroundColor: color.bg,
+                pointBackgroundColor: color.border,
+                borderWidth: 2,
+                pointRadius: 2,
                 tension: 0.3,
-                fill: true
+                fill: false
             });
         }
+    });
+
+    if (priceChart) {
+        priceChart.destroy();
     }
 
-    new Chart(ctx, {
+    priceChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -357,6 +392,27 @@ function drawPriceChart() {
             }
         }
     });
+}
+
+function highlightCommodityLine(commodityId) {
+    if (!priceChart) return;
+    priceChart.data.datasets.forEach(dataset => {
+        const active = dataset.commodityId === commodityId;
+        dataset.borderWidth = active ? 4 : 1.5;
+        dataset.pointRadius = active ? 4 : 2;
+        dataset.borderDash = active ? [] : [4, 4];
+        dataset.hidden = false;
+    });
+    priceChart.update();
+
+    document.querySelectorAll('.exchange-commodity-card').forEach(card => {
+        card.classList.toggle('exchange-commodity-card-active', card.dataset.commodityId === commodityId);
+    });
+
+    const chartCanvas = document.getElementById('priceChart');
+    if (chartCanvas) {
+        chartCanvas.scrollIntoView({block: 'center', behavior: 'smooth'});
+    }
 }
 
 // 页面加载完成后绘制图表

@@ -72,8 +72,8 @@
                                 </button>
                                 {% endif %}
                                 {% if not rod.is_equipped and not rod.is_locked %}
-                                <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteRod('{{ rod.display_code }}', '{{ rod.name }}')">
-                                    <i class="fas fa-trash"></i>
+                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellRod('{{ rod.display_code }}', '{{ rod.name }}')">
+                                    <i class="fas fa-coins"></i>
                                 </button>
                                 {% endif %}
                             </div>
@@ -82,6 +82,7 @@
                         <p class="text-muted small mb-2 inventory-description">{{ rod.description }}</p>
                         <hr class="inventory-divider">
                         <div class="small flex-grow-1 inventory-stats">
+                            <p class="mb-1"><i class="fas fa-bullseye text-success"></i> 成功率: +{{ "%.1f" | format(rod.success_rate_modifier * 100) }}%</p>
                             <p class="mb-1"><i class="fas fa-arrow-up text-success"></i> 品质: +{{ "%.1f" | format((rod.bonus_fish_quality_modifier - 1) * 100) }}%</p>
                             <p class="mb-1"><i class="fas fa-layer-group text-primary"></i> 数量: +{{ "%.1f" | format((rod.bonus_fish_quantity_modifier - 1) * 100) }}%</p>
                             <p class="mb-1"><i class="fas fa-star text-warning"></i> 稀有: +{{ "%.1f" | format(rod.bonus_rare_fish_chance * 100) }}%</p>
@@ -140,8 +141,8 @@
                                 </button>
                                 {% endif %}
                                 {% if not acc.is_equipped and not acc.is_locked %}
-                                <button class="btn btn-sm btn-outline-danger" title="删除" onclick="deleteAccessory('{{ acc.display_code }}', '{{ acc.name }}')">
-                                    <i class="fas fa-trash"></i>
+                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellAccessory('{{ acc.display_code }}', '{{ acc.name }}')">
+                                    <i class="fas fa-coins"></i>
                                 </button>
                                 {% endif %}
                             </div>
@@ -198,6 +199,9 @@
                                         <i class="fas fa-hand-sparkles"></i>
                                     </button>
                                 {% endif %}
+                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})">
+                                    <i class="fas fa-coins"></i>
+                                </button>
                             </div>
                         </div>
                         <p class="text-muted small mb-2 inventory-description">
@@ -241,6 +245,9 @@
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 {% endif %}
+                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})">
+                                    <i class="fas fa-coins"></i>
+                                </button>
                             </div>
                         </div>
                         <p class="text-muted small mb-2 inventory-description">
@@ -250,7 +257,7 @@
                         <div class="small flex-grow-1 inventory-stats inventory-usage-description">
                             <p class="mb-1"><i class="fas fa-wand-magic-sparkles text-info"></i> {{ bait.effect_description or '暂无用途描述' }}</p>
                             {% if bait.fish_quality_bonus %}
-                            <p class="mb-1"><i class="fas fa-arrow-up text-success"></i> 品质加成: +{{ "%.1f" | format((bait.fish_quality_bonus - 1) * 100) }}%</p>
+                            <p class="mb-1"><i class="fas fa-bullseye text-success"></i> 成功率加成: +{{ "%.1f" | format((bait.fish_quality_bonus - 1) * 100) }}%</p>
                             {% endif %}
                             {% if bait.fish_quantity_bonus %}
                             <p class="mb-1"><i class="fas fa-layer-group text-primary"></i> 数量加成: +{{ "%.1f" | format((bait.fish_quantity_bonus - 1) * 100) }}%</p>
@@ -481,40 +488,74 @@ async function deactivateBait(baitId, baitName) {
     await postInventoryAction('{{ url_for("player_bp.api_use_bait") }}', {bait_id: baitId, deactivate: true});
 }
 
-async function deleteRod(code, name) {
-    if (!await webuiConfirm(`确认删除鱼竿【${name}】吗？`, {
-        title: '删除鱼竿',
-        confirmText: '删除',
+async function sellRod(code, name) {
+    if (!await webuiConfirm(`确认卖出鱼竿【${name}】吗？`, {
+        title: '卖出鱼竿',
+        confirmText: '卖出',
         confirmClass: 'btn-danger'
     })) return;
-    await postInventoryAction('{{ url_for("player_bp.api_delete_rod") }}', {rod_code: code});
+    await postInventoryAction('{{ url_for("player_bp.api_sell_rod") }}', {rod_code: code});
 }
 
-async function deleteAccessory(code, name) {
-    if (!await webuiConfirm(`确认删除饰品【${name}】吗？`, {
-        title: '删除饰品',
-        confirmText: '删除',
+async function sellAccessory(code, name) {
+    if (!await webuiConfirm(`确认卖出饰品【${name}】吗？`, {
+        title: '卖出饰品',
+        confirmText: '卖出',
         confirmClass: 'btn-danger'
     })) return;
-    await postInventoryAction('{{ url_for("player_bp.api_delete_accessory") }}', {accessory_code: code});
+    await postInventoryAction('{{ url_for("player_bp.api_sell_accessory") }}', {accessory_code: code});
 }
 
-async function deleteItem(itemId, name, quantity) {
-    if (!await webuiConfirm(`确认删除全部【${name}】x${quantity} 吗？`, {
-        title: '删除道具',
-        confirmText: '删除',
+async function sellItem(itemId, name, quantity) {
+    const qty = await webuiPrompt(`请输入要卖出的【${name}】数量。\n最多 ${quantity} 个。`, {
+        title: '卖出道具',
+        defaultValue: String(quantity),
+        inputType: 'number',
+        min: '1',
+        max: String(quantity),
+        step: '1',
+        confirmText: '继续'
+    });
+    if (!qty || qty <= 0) return;
+
+    const amount = parseInt(qty);
+    if (isNaN(amount) || amount <= 0 || amount > quantity) {
+        showToast('数量无效', 'error');
+        return;
+    }
+
+    if (!await webuiConfirm(`确认卖出【${name}】x${amount} 吗？`, {
+        title: '确认卖出',
+        confirmText: '卖出',
         confirmClass: 'btn-danger'
     })) return;
-    await postInventoryAction('{{ url_for("player_bp.api_delete_item") }}', {item_id: itemId, quantity: quantity});
+    await postInventoryAction('{{ url_for("player_bp.api_sell_item") }}', {item_id: itemId, quantity: amount});
 }
 
-async function deleteBait(baitId, name, quantity) {
-    if (!await webuiConfirm(`确认删除全部鱼饵【${name}】x${quantity} 吗？`, {
-        title: '删除鱼饵',
-        confirmText: '删除',
+async function sellBait(baitId, name, quantity) {
+    const qty = await webuiPrompt(`请输入要卖出的鱼饵【${name}】数量。\n最多 ${quantity} 个。`, {
+        title: '卖出鱼饵',
+        defaultValue: String(quantity),
+        inputType: 'number',
+        min: '1',
+        max: String(quantity),
+        step: '1',
+        confirmText: '继续'
+    });
+    if (!qty || qty <= 0) return;
+
+    const amount = parseInt(qty);
+    if (isNaN(amount) || amount <= 0 || amount > quantity) {
+        showToast('数量无效', 'error');
+        return;
+    }
+
+    if (!await webuiConfirm(`确认卖出鱼饵【${name}】x${amount} 吗？`, {
+        title: '确认卖出',
+        confirmText: '卖出',
         confirmClass: 'btn-danger'
     })) return;
-    await postInventoryAction('{{ url_for("player_bp.api_delete_bait") }}', {bait_id: baitId, quantity: quantity});
+    await postInventoryAction('{{ url_for("player_bp.api_sell_bait") }}', {bait_id: baitId, quantity: amount});
 }
 
 async function postInventoryAction(url, payload) {

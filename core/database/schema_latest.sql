@@ -146,7 +146,8 @@ CREATE TABLE rods (
             rod_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT,
             rarity INTEGER NOT NULL DEFAULT 1, source TEXT NOT NULL CHECK (source IN ('shop', 'gacha', 'event')),
             purchase_cost INTEGER, bonus_fish_quality_modifier REAL DEFAULT 1.0,
-            bonus_fish_quantity_modifier REAL DEFAULT 1.0, bonus_rare_fish_chance REAL DEFAULT 0.0,
+            bonus_fish_quantity_modifier REAL DEFAULT 1.0, success_rate_modifier REAL DEFAULT 0.0,
+            bonus_rare_fish_chance REAL DEFAULT 0.0,
             durability INTEGER, icon_url TEXT
         );
 
