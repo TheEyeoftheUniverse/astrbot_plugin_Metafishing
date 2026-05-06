@@ -74,15 +74,11 @@
                             </div>
                             <div class="card-body d-flex flex-column">
                                 <div class="shop-item-intro">
-                                {% if item.description %}
-                                    <p class="card-text text-muted small mb-0 shop-item-description">{{ item.description }}</p>
-                                {% else %}
-                                    <p class="card-text text-muted small mb-0 shop-item-description">暂无描述</p>
-                                {% endif %}
+                                    <p class="card-text text-muted small mb-0 shop-item-description" data-full-text="{{ (item.description or '暂无描述')|e }}">
+                                        <span class="shop-description-text"></span>
+                                        <button type="button" class="shop-description-toggle d-none" onclick="toggleShopDescription(this)">展开</button>
+                                    </p>
                                 </div>
-                                <button type="button" class="btn btn-link btn-sm p-0 mt-1 shop-description-toggle d-none" onclick="toggleShopDescription(this)">
-                                    展开
-                                </button>
 
                                 <hr class="card-section-divider shop-item-divider">
 
@@ -227,22 +223,104 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeShopDescriptionToggles() {
-    document.querySelectorAll('.shop-item-intro').forEach(intro => {
-        const toggle = intro.parentElement ? intro.parentElement.querySelector('.shop-description-toggle') : null;
-        if (!toggle) return;
-        if (intro.scrollHeight > intro.clientHeight + 2) {
-            toggle.classList.remove('d-none');
-        }
+    document.querySelectorAll('.shop-item-description').forEach(description => {
+        const textEl = description.querySelector('.shop-description-text');
+        const toggle = description.querySelector('.shop-description-toggle');
+        if (!textEl || !toggle) return;
+
+        description.dataset.fullText = description.dataset.fullText || '';
+        description.dataset.expanded = description.dataset.expanded || 'false';
+        renderShopDescription(description);
     });
 }
 
-function toggleShopDescription(button) {
-    const body = button.closest('.card-body');
-    const intro = body ? body.querySelector('.shop-item-intro') : null;
-    if (!intro) return;
-    const expanded = intro.classList.toggle('is-expanded');
-    button.textContent = expanded ? '收起' : '展开';
+function createShopDescriptionMeasurer(description) {
+    const measurer = description.cloneNode(false);
+    measurer.classList.add('shop-description-measurer');
+    measurer.removeAttribute('data-expanded');
+    measurer.style.width = `${description.clientWidth || 260}px`;
+
+    const textEl = document.createElement('span');
+    textEl.className = 'shop-description-text';
+    const toggle = description.querySelector('.shop-description-toggle').cloneNode(true);
+    toggle.classList.remove('d-none');
+
+    measurer.appendChild(textEl);
+    measurer.appendChild(toggle);
+    document.body.appendChild(measurer);
+
+    return {measurer, textEl, toggle};
 }
+
+function getCollapsedShopDescriptionText(description, fullText) {
+    const width = description.clientWidth || description.parentElement?.clientWidth || 260;
+    if (width <= 0) return fullText;
+
+    const {measurer, textEl} = createShopDescriptionMeasurer(description);
+    const computedStyle = window.getComputedStyle(description);
+    const lineHeight = parseFloat(computedStyle.lineHeight) || 20;
+    const maxHeight = lineHeight * 2 + 1;
+
+    let low = 0;
+    let high = fullText.length;
+    let best = fullText;
+
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const candidate = fullText.slice(0, mid).trimEnd();
+        textEl.textContent = `${candidate}... `;
+        if (measurer.offsetHeight <= maxHeight) {
+            best = candidate;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+
+    document.body.removeChild(measurer);
+    return best;
+}
+
+function renderShopDescription(description) {
+    const textEl = description.querySelector('.shop-description-text');
+    const toggle = description.querySelector('.shop-description-toggle');
+    if (!textEl || !toggle) return;
+
+    const fullText = description.dataset.fullText || '';
+    const expanded = description.dataset.expanded === 'true';
+    const collapsedText = getCollapsedShopDescriptionText(description, fullText);
+    const shouldCollapse = collapsedText.length < fullText.length;
+
+    if (!shouldCollapse) {
+        textEl.textContent = fullText;
+        toggle.classList.add('d-none');
+        description.dataset.expanded = 'false';
+        description.removeAttribute('data-expanded');
+        return;
+    }
+
+    toggle.classList.remove('d-none');
+    if (expanded) {
+        textEl.textContent = fullText + ' ';
+        toggle.textContent = '收起';
+        toggle.setAttribute('aria-expanded', 'true');
+        description.setAttribute('data-expanded', 'true');
+    } else {
+        textEl.textContent = collapsedText + '... ';
+        toggle.textContent = '展开';
+        toggle.setAttribute('aria-expanded', 'false');
+        description.setAttribute('data-expanded', 'false');
+    }
+}
+
+function toggleShopDescription(button) {
+    const description = button.closest('.shop-item-description');
+    if (!description) return;
+    description.dataset.expanded = description.dataset.expanded === 'true' ? 'false' : 'true';
+    renderShopDescription(description);
+}
+
+window.addEventListener('resize', initializeShopDescriptionToggles);
 
 function buyShopItemFromButton(button) {
     const itemId = Number(button.dataset.itemId || 0);

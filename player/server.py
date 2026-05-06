@@ -31,6 +31,29 @@ player_bp = Blueprint(
     static_folder="static",
 )
 
+
+@player_bp.context_processor
+def inject_player_wallet():
+    """为所有玩家页面提供导航栏钱包数据。"""
+    user_id = session.get("user_id")
+    if not user_id:
+        return {"nav_wallet": None}
+
+    try:
+        user_repo = current_app.config.get("USER_REPO")
+        user = user_repo.get_by_id(user_id) if user_repo else None
+        if not user:
+            return {"nav_wallet": None}
+        return {
+            "nav_wallet": {
+                "coins": int(getattr(user, "coins", 0) or 0),
+                "premium_currency": int(getattr(user, "premium_currency", 0) or 0),
+            }
+        }
+    except Exception as e:
+        logger.warning(f"获取导航栏钱包数据失败: {e}")
+        return {"nav_wallet": None}
+
 LINUXDO_AUTHORIZE_URL = "https://connect.linux.do/oauth2/authorize"
 LINUXDO_TOKEN_URL = "https://connect.linux.do/oauth2/token"
 LINUXDO_USER_API_URL = "https://connect.linux.do/api/user"

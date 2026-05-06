@@ -64,8 +64,20 @@
                     </a>
                 </li>
             </ul>
+            {% if nav_wallet %}
+            <div class="player-wallet-summary" aria-label="玩家货币">
+                <span class="btn btn-outline-secondary btn-sm player-wallet-pill" title="金币">
+                    <i class="fas fa-coins text-warning"></i>
+                    <span>{{ "{:,}".format(nav_wallet.coins) }}</span>
+                </span>
+                <span class="btn btn-outline-secondary btn-sm player-wallet-pill" title="钻石">
+                    <i class="fas fa-gem text-info"></i>
+                    <span>{{ "{:,}".format(nav_wallet.premium_currency) }}</span>
+                </span>
+            </div>
+            {% endif %}
             <div class="nav-item dropdown player-account-menu">
-                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="playerAccountDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle player-account-trigger" type="button" id="playerAccountDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fas fa-user-circle"></i> {{ session.get('nickname', session.get('user_id')) }}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="playerAccountDropdown">
