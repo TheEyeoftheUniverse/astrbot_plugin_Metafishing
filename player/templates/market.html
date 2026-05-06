@@ -464,8 +464,8 @@ async function listItem() {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -492,8 +492,8 @@ async function buyMarketItem(marketId, itemName, price) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -521,8 +521,8 @@ async function delistItem(marketId, itemName) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }

@@ -1,6 +1,7 @@
 import functools
 import asyncio
 import os
+import re
 from typing import Dict, Any
 from datetime import datetime, timedelta, timezone
 import json
@@ -1580,6 +1581,102 @@ async def api_batch_remove_from_aquarium():
         return jsonify({"success": True, "message": message})
     except Exception as e:
         logger.error(f"批量移回鱼塘失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@player_bp.route("/api/selected_fish_batch", methods=["POST"])
+@login_required
+async def api_selected_fish_batch():
+    """按 WebUI 卡片多选批量处理鱼类。"""
+    user_id = session.get("user_id")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
+    aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
+
+    try:
+        data = await request.get_json() or {}
+        source = str(data.get("source") or "").strip()
+        action = str(data.get("action") or "").strip()
+        fishes = data.get("fishes") or []
+
+        if source not in {"pond", "aquarium"} or action not in {"sell", "aquarium", "pond"}:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        if not isinstance(fishes, list) or not fishes:
+            return jsonify({"success": False, "message": "请先选择要操作的鱼"}), 400
+
+        total_quantity = 0
+        success_count = 0
+        failed_items = []
+        messages = []
+
+        for fish in fishes:
+            try:
+                fish_id = int(fish.get("fish_id") or 0)
+                quality_level = int(fish.get("quality_level") or 0)
+                quantity = int(fish.get("quantity") or 0)
+                fish_name = str(fish.get("name") or fish_id)
+            except (TypeError, ValueError):
+                failed_items.append("无效条目")
+                continue
+
+            if fish_id <= 0 or quantity <= 0:
+                failed_items.append(f"{fish_name}(数量无效)")
+                continue
+
+            if source == "pond" and action == "sell":
+                result = inventory_service.sell_fish(user_id, fish_id, quantity, quality_level)
+            elif source == "pond" and action == "aquarium":
+                result = aquarium_service.add_fish_to_aquarium(user_id, fish_id, quantity, quality_level)
+            elif source == "aquarium" and action == "pond":
+                result = aquarium_service.remove_fish_from_aquarium(user_id, fish_id, quantity, quality_level)
+            elif source == "aquarium" and action == "sell":
+                move_result = aquarium_service.remove_fish_from_aquarium(user_id, fish_id, quantity, quality_level)
+                if move_result.get("success"):
+                    result = inventory_service.sell_fish(user_id, fish_id, quantity, quality_level)
+                else:
+                    result = move_result
+            else:
+                result = {"success": False, "message": "该批量操作不支持"}
+
+            if result.get("success"):
+                success_count += 1
+                total_quantity += quantity
+                if result.get("message"):
+                    messages.append(result["message"])
+            else:
+                failed_items.append(f"{fish_name}({result.get('message', '失败')})")
+
+        action_labels = {
+            ("pond", "sell"): "卖出",
+            ("pond", "aquarium"): "放入水族箱",
+            ("aquarium", "pond"): "移回鱼塘",
+            ("aquarium", "sell"): "卖出",
+        }
+        action_label = action_labels.get((source, action), "处理")
+
+        if success_count == 0:
+            message = f"没有鱼被成功{action_label}"
+            if failed_items:
+                message += "：" + "、".join(failed_items[:5])
+            return jsonify({"success": False, "message": message})
+
+        message = f"成功{action_label} {success_count} 种鱼，共 {total_quantity} 条"
+        if action == "sell":
+            earned = 0
+            for item_message in messages:
+                match = re.search(r"获得\s+([\d,]+)\s+金币", item_message)
+                if match:
+                    earned += int(match.group(1).replace(",", ""))
+            if earned > 0:
+                message += f"，获得 {earned:,} 金币"
+
+        if failed_items:
+            message += "\n\n部分鱼类处理失败：" + "、".join(failed_items[:5])
+            if len(failed_items) > 5:
+                message += f" 等 {len(failed_items)} 项"
+
+        return jsonify({"success": True, "message": message})
+    except Exception as e:
+        logger.error(f"批量处理选中鱼类失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/equip_rod", methods=["POST"])

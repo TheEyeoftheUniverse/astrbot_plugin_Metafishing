@@ -277,9 +277,9 @@ async function buyShopItem(itemId, itemName, shopId) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
             sessionStorage.setItem('openShopAfterPurchase', String(shopId));
-            setTimeout(() => location.reload(), 800);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }

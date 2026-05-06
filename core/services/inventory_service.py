@@ -797,13 +797,12 @@ class InventoryService:
         # 清空所有鱼类
         self.inventory_repo.clear_fish_inventory(user_id)
 
-        # 2. 卖出所有未锁定且未装备的鱼竿
+        # 2. 卖出所有未锁定、未装备且低于6星的鱼竿
         rod_instances = self.inventory_repo.get_user_rod_instances(user_id)
         for rod_instance in rod_instances:
-            # 只卖出未锁定且未装备的鱼竿
             if not rod_instance.is_locked and not rod_instance.is_equipped:
                 rod_template = self.item_template_repo.get_rod_by_id(rod_instance.rod_id)
-                if rod_template:
+                if rod_template and rod_template.rarity < 6:
                     # 计算售价（基础价格 × 精炼倍数）
                     base_price = self.config["sell_prices"]["rod"].get(str(rod_template.rarity), 100)
                     refine_multiplier = self.config["sell_prices"]["refine_multiplier"].get(str(rod_instance.refine_level), 1.0)
@@ -816,13 +815,12 @@ class InventoryService:
                     # 删除鱼竿实例
                     self.inventory_repo.delete_rod_instance(rod_instance.rod_instance_id)
 
-        # 3. 卖出所有未锁定且未装备的饰品
+        # 3. 卖出所有未锁定、未装备且低于6星的饰品
         accessory_instances = self.inventory_repo.get_user_accessory_instances(user_id)
         for accessory_instance in accessory_instances:
-            # 只卖出未锁定且未装备的饰品
             if not accessory_instance.is_locked and not accessory_instance.is_equipped:
                 accessory_template = self.item_template_repo.get_accessory_by_id(accessory_instance.accessory_id)
-                if accessory_template:
+                if accessory_template and accessory_template.rarity < 6:
                     # 计算售价（基础价格 × 精炼倍数）
                     base_price = self.config["sell_prices"]["accessory"].get(str(accessory_template.rarity), 100)
                     refine_multiplier = self.config["sell_prices"]["refine_multiplier"].get(str(accessory_instance.refine_level), 1.0)
@@ -950,6 +948,8 @@ class InventoryService:
         rod_template = self.item_template_repo.get_rod_by_id(rod_to_sell.rod_id)
         if not rod_template:
              return {"success": False, "message": "找不到鱼竿的基础信息"}
+        if rod_template.rarity >= 6:
+            return {"success": False, "message": "6星及以上鱼竿可用于兑换精炼材料，不能直接卖出"}
 
         # 3. 计算售价
         sell_price = self.game_mechanics_service.calculate_sell_price(
@@ -985,12 +985,12 @@ class InventoryService:
         total_value = 0
         rods_to_sell = []
         
-        # 只计算可以卖出的鱼竿（未锁定、未装备且小于5星）
+        # 只计算可以卖出的鱼竿（未锁定、未装备且低于6星）
         for rod_instance in user_rods:
             if rod_instance.is_equipped or rod_instance.is_locked:
                 continue
             rod_template = self.item_template_repo.get_rod_by_id(rod_instance.rod_id)
-            if rod_template and rod_template.rarity < 5:  # 只计算小于5星的鱼竿
+            if rod_template and rod_template.rarity < 6:
                 sell_price = self.game_mechanics_service.calculate_sell_price(
                     item_type="rod",
                     rarity=rod_template.rarity,
@@ -998,9 +998,9 @@ class InventoryService:
                 )
                 total_value += sell_price
                 rods_to_sell.append(rod_instance)
-        
+
         if total_value == 0:
-            return {"success": False, "message": "❌ 没有可以卖出的鱼竿（已自动保留锁定、已装备或5星以上的鱼竿）"}
+            return {"success": False, "message": "❌ 没有可以卖出的鱼竿（已自动保留锁定、已装备或6星及以上的鱼竿）"}
         
         # 逐个删除可以卖出的鱼竿
         for rod_instance in rods_to_sell:
@@ -1034,6 +1034,8 @@ class InventoryService:
         accessory_template = self.item_template_repo.get_accessory_by_id(accessory_to_sell.accessory_id)
         if not accessory_template:
             return {"success": False, "message": "找不到饰品的基础信息"}
+        if accessory_template.rarity >= 6:
+            return {"success": False, "message": "6星及以上饰品可用于兑换精炼材料，不能直接卖出"}
 
         # 3. 计算售价
         sell_price = self.game_mechanics_service.calculate_sell_price(
@@ -1067,12 +1069,12 @@ class InventoryService:
         total_value = 0
         accessories_to_sell = []
         
-        # 只计算可以卖出的饰品（未锁定、未装备且小于5星）
+        # 只计算可以卖出的饰品（未锁定、未装备且低于6星）
         for accessory_instance in user_accessories:
             if accessory_instance.is_equipped or accessory_instance.is_locked:
                 continue
             accessory_template = self.item_template_repo.get_accessory_by_id(accessory_instance.accessory_id)
-            if accessory_template and accessory_template.rarity < 5:  # 只计算小于5星的饰品
+            if accessory_template and accessory_template.rarity < 6:
                 sell_price = self.game_mechanics_service.calculate_sell_price(
                     item_type="accessory",
                     rarity=accessory_template.rarity,
@@ -1082,7 +1084,7 @@ class InventoryService:
                 accessories_to_sell.append(accessory_instance)
 
         if total_value == 0:
-            return {"success": False, "message": "❌ 没有可以卖出的饰品（已自动保留锁定、已装备或5星以上的饰品）"}
+            return {"success": False, "message": "❌ 没有可以卖出的饰品（已自动保留锁定、已装备或6星及以上的饰品）"}
 
         # 逐个删除可以卖出的饰品
         for accessory_instance in accessories_to_sell:
@@ -2108,6 +2110,8 @@ class InventoryService:
         tpl = self.item_template_repo.get_item_by_id(item_id)
         if not tpl:
             return {"success": False, "message": "道具信息不存在"}
+        if getattr(tpl, "rarity", 1) >= 6:
+            return {"success": False, "message": "6星及以上道具可用于兑换精炼材料，不能直接卖出"}
 
         # 定价：模板 cost 的 50%，至少 1
         single_price = max(1, int((tpl.cost or 0) * 0.5))
@@ -2144,6 +2148,8 @@ class InventoryService:
         tpl = self.item_template_repo.get_bait_by_id(bait_id)
         if not tpl:
             return {"success": False, "message": "鱼饵信息不存在"}
+        if getattr(tpl, "rarity", 1) >= 6:
+            return {"success": False, "message": "6星及以上鱼饵可用于兑换精炼材料，不能直接卖出"}
 
         single_price = max(1, int((tpl.cost or 0) * 0.5))
         total = single_price * quantity

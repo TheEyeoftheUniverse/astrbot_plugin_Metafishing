@@ -129,12 +129,16 @@ class ExchangeInventoryService:
 
                 commodity_summary = summary.setdefault(
                     item.commodity_id,
-                    {"quantity": 0, "income": 0},
+                    {"quantity": 0, "cost": 0, "income": 0, "profit_loss": 0},
                 )
                 commodity_summary["quantity"] += item.quantity
+                commodity_summary["cost"] += item_cost
                 commodity_summary["income"] += item_income
+                commodity_summary["profit_loss"] += item_income - item_cost
 
-            taxable_profit = max(total_income - total_cost, 0)
+            total_profit_loss = total_income - total_cost
+            profit_rate = (total_profit_loss / total_cost * 100) if total_cost > 0 else 0
+            taxable_profit = max(total_profit_loss, 0)
             tax_rate = self.config.get("tax_rate", 0.05)
             tax_amount = int(taxable_profit * tax_rate)
             net_income = total_income - tax_amount
@@ -156,7 +160,8 @@ class ExchangeInventoryService:
                     original_amount=taxable_profit,
                     balance_after=user.coins,
                     tax_type=(
-                        f"到期期货自动卖出 | 毛收入 {total_income:,} 金币 | 税基 {taxable_profit:,} 金币"
+                        f"到期期货自动卖出 | 毛收入 {total_income:,} 金币 | "
+                        f"盈亏 {total_profit_loss:+,} 金币 | 税基 {taxable_profit:,} 金币"
                     ),
                     timestamp=datetime.now(),
                 )
@@ -166,11 +171,14 @@ class ExchangeInventoryService:
 
             details = "、".join(
                 f"{self.commodities.get(commodity_id, {}).get('name', commodity_id)} x{data['quantity']}"
+                f"（盈亏 {data['profit_loss']:+,}）"
                 for commodity_id, data in summary.items()
             )
+            profit_label = "盈利" if total_profit_loss > 0 else "亏损" if total_profit_loss < 0 else "持平"
             message = (
                 f"⏰ 已自动卖出到期的期货持仓：{details}，"
-                f"到账 {net_income:,} 金币"
+                f"{profit_label} {total_profit_loss:+,} 金币，"
+                f"收益率 {profit_rate:+.1f}%，到账 {net_income:,} 金币"
             )
             if tax_amount > 0:
                 message += f"（含税 {tax_amount:,} 金币）"
@@ -180,7 +188,10 @@ class ExchangeInventoryService:
                 "message": message,
                 "settled_count": len(expired_items),
                 "total_quantity": total_quantity,
+                "total_cost": total_cost,
                 "total_income": total_income,
+                "profit_loss": total_profit_loss,
+                "profit_rate": profit_rate,
                 "tax_amount": tax_amount,
                 "net_income": net_income,
                 "summary": summary,

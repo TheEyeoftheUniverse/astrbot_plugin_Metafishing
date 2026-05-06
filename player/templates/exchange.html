@@ -110,10 +110,23 @@
     </div>
 </div>
 
+<!-- 交易所筛选 -->
+<div class="compact-toolbar mb-3 exchange-filter-toolbar">
+    <div class="btn-group flex-wrap" role="group" aria-label="交易所筛选">
+        <button type="button" class="btn btn-outline-primary btn-sm active" data-exchange-filter="all" onclick="filterExchangeGroup('all', this)">全部</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-exchange-filter="fishlight" onclick="filterExchangeGroup('fishlight', this)">鱼光临交易所</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-exchange-filter="moon" onclick="filterExchangeGroup('moon', this)">月塔交易所</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-exchange-filter="rift" onclick="filterExchangeGroup('rift', this)">裂隙交易所</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-exchange-filter="dragon" onclick="filterExchangeGroup('dragon', this)">龙瀑交易所</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-exchange-filter="dream" onclick="filterExchangeGroup('dream', this)">梦境交易所</button>
+    </div>
+    <span class="text-muted small ms-2" id="exchangeFilterSummary">显示全部期货</span>
+</div>
+
 <!-- 商品交易 -->
 <div class="row">
     {% for commodity_id, commodity in market_status.commodities.items() %}
-    <div class="col-lg-4 mb-4">
+    <div class="col-lg-4 mb-4 exchange-commodity-col" data-commodity-id="{{ commodity_id }}">
         <div class="card h-100 exchange-commodity-card" data-commodity-id="{{ commodity_id }}">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
@@ -249,7 +262,7 @@
                             <tr>
                                 <th>日期</th>
                                 {% for commodity_id, commodity in market_status.commodities.items() %}
-                                <th>{{ commodity.name }}</th>
+                                <th data-commodity-id="{{ commodity_id }}">{{ commodity.name }}</th>
                                 {% endfor %}
                             </tr>
                         </thead>
@@ -258,7 +271,7 @@
                             <tr>
                                 <td>{{ date }}</td>
                                 {% for commodity_id in market_status.commodities.keys() %}
-                                <td>
+                                <td data-commodity-id="{{ commodity_id }}">
                                     {% if prices.get(commodity_id) %}
                                     <i class="fas fa-coins text-warning"></i> {{ prices[commodity_id] }}
                                     {% else %}
@@ -302,16 +315,70 @@
 <script src="{{ url_for('player_bp.static', filename='vendor/chartjs/chart.umd.min.js', v='20260505') }}"></script>
 <script>
 let priceChart = null;
+let currentExchangeGroup = 'all';
+let selectedChartCommodityId = null;
+const exchangeLabels = {{ labels | tojson }};
+const exchangeCommodities = {{ market_status.commodities | tojson }};
+const exchangeHistoryData = {{ history_data | tojson }};
+const exchangeGroups = {
+    all: {label: '全部期货', ids: null},
+    fishlight: {label: '鱼光临交易所', ids: [1, 2, 3]},
+    moon: {label: '月塔交易所', ids: [4, 5, 6]},
+    rift: {label: '裂隙交易所', ids: [7, 8, 9]},
+    dragon: {label: '龙瀑交易所', ids: [10, 11, 12]},
+    dream: {label: '梦境交易所', ids: [13, 14, 15]}
+};
+const exchangeCommodityOrder = Object.keys(exchangeCommodities);
+const exchangeCommodityDisplayNumbers = {
+    dried_fish: 1,
+    fish_roe: 2,
+    fish_oil: 3,
+    fantasy_stable: 4,
+    fantasy_high_risk: 5,
+    fantasy_speculative: 6,
+    scifi_stable: 7,
+    scifi_high_risk: 8,
+    scifi_speculative: 9,
+    xuanhuan_stable: 10,
+    xuanhuan_high_risk: 11,
+    xuanhuan_speculative: 12,
+    cthulhu_stable: 13,
+    cthulhu_high_risk: 14,
+    cthulhu_speculative: 15
+};
+
+function getCommodityDisplayNumber(commodityId) {
+    const id = String(commodityId);
+    if (exchangeCommodityDisplayNumbers[id]) {
+        return exchangeCommodityDisplayNumbers[id];
+    }
+    if (/^\d+$/.test(id)) {
+        return parseInt(id, 10);
+    }
+    const numericParts = id.match(/\d+/g);
+    if (numericParts && numericParts.length > 0) {
+        return parseInt(numericParts[numericParts.length - 1], 10);
+    }
+    return exchangeCommodityOrder.indexOf(id) + 1;
+}
+
+function isCommodityInCurrentExchangeGroup(commodityId) {
+    const group = exchangeGroups[currentExchangeGroup] || exchangeGroups.all;
+    if (!group.ids) return true;
+    const displayNumber = getCommodityDisplayNumber(commodityId);
+    return displayNumber > 0 && group.ids.includes(displayNumber);
+}
+
+function isCommodityVisibleInChart(commodityId) {
+    if (!isCommodityInCurrentExchangeGroup(commodityId)) return false;
+    return !selectedChartCommodityId || String(commodityId) === String(selectedChartCommodityId);
+}
 
 // 绘制价格走势图
 function drawPriceChart() {
     const canvas = document.getElementById('priceChart');
     if (!canvas || typeof Chart === 'undefined') return;
     const ctx = canvas.getContext('2d');
-
-    const labels = {{ labels | tojson }};
-    const commodities = {{ market_status.commodities | tojson }};
-    const historyData = {{ history_data | tojson }};
 
     const datasets = [];
     const palette = [
@@ -327,13 +394,14 @@ function drawPriceChart() {
         'fish_oil': { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' }
     };
 
-    Object.entries(commodities).forEach(([commodityId, commodity], index) => {
+    Object.entries(exchangeCommodities).forEach(([commodityId, commodity], index) => {
+        if (!isCommodityVisibleInChart(commodityId)) return;
         const color = colors[commodityId] || palette[index % palette.length];
-        if (Array.isArray(historyData[commodityId]) && historyData[commodityId].length > 0) {
+        if (Array.isArray(exchangeHistoryData[commodityId]) && exchangeHistoryData[commodityId].length > 0) {
             datasets.push({
                 label: commodity.name,
                 commodityId: commodityId,
-                data: historyData[commodityId],
+                data: exchangeHistoryData[commodityId],
                 borderColor: color.border,
                 backgroundColor: color.bg,
                 pointBackgroundColor: color.border,
@@ -352,7 +420,7 @@ function drawPriceChart() {
     priceChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels: exchangeLabels,
             datasets: datasets
         },
         options: {
@@ -394,20 +462,45 @@ function drawPriceChart() {
     });
 }
 
-function highlightCommodityLine(commodityId) {
-    if (!priceChart) return;
-    priceChart.data.datasets.forEach(dataset => {
-        const active = dataset.commodityId === commodityId;
-        dataset.borderWidth = active ? 4 : 1.5;
-        dataset.pointRadius = active ? 4 : 2;
-        dataset.borderDash = active ? [] : [4, 4];
-        dataset.hidden = false;
+function refreshExchangeFilterView() {
+    document.querySelectorAll('.exchange-commodity-col').forEach(col => {
+        col.classList.toggle('d-none', !isCommodityInCurrentExchangeGroup(col.dataset.commodityId));
     });
-    priceChart.update();
+
+    document.querySelectorAll('[data-commodity-id]').forEach(el => {
+        if (el.closest('.exchange-commodity-col') || el.classList.contains('exchange-commodity-card')) return;
+        el.classList.toggle('d-none', !isCommodityInCurrentExchangeGroup(el.dataset.commodityId));
+    });
 
     document.querySelectorAll('.exchange-commodity-card').forEach(card => {
-        card.classList.toggle('exchange-commodity-card-active', card.dataset.commodityId === commodityId);
+        card.classList.toggle('exchange-commodity-card-active', selectedChartCommodityId && String(card.dataset.commodityId) === String(selectedChartCommodityId));
     });
+
+    const group = exchangeGroups[currentExchangeGroup] || exchangeGroups.all;
+    const visibleCount = Object.keys(exchangeCommodities).filter(isCommodityInCurrentExchangeGroup).length;
+    const summary = document.getElementById('exchangeFilterSummary');
+    if (summary) {
+        summary.textContent = selectedChartCommodityId
+            ? `${group.label} · 图表仅显示 ${exchangeCommodities[selectedChartCommodityId]?.name || selectedChartCommodityId}`
+            : `${group.label} · 显示 ${visibleCount} 个期货`;
+    }
+}
+
+function filterExchangeGroup(groupName, button) {
+    currentExchangeGroup = exchangeGroups[groupName] ? groupName : 'all';
+    selectedChartCommodityId = null;
+    document.querySelectorAll('[data-exchange-filter]').forEach(btn => btn.classList.remove('active'));
+    if (button) {
+        button.classList.add('active');
+    }
+    refreshExchangeFilterView();
+    drawPriceChart();
+}
+
+function highlightCommodityLine(commodityId) {
+    selectedChartCommodityId = String(commodityId);
+    refreshExchangeFilterView();
+    drawPriceChart();
 
     const chartCanvas = document.getElementById('priceChart');
     if (chartCanvas) {
@@ -417,6 +510,7 @@ function highlightCommodityLine(commodityId) {
 
 // 页面加载完成后绘制图表
 if (document.getElementById('priceChart')) {
+    refreshExchangeFilterView();
     drawPriceChart();
 }
 
@@ -437,8 +531,8 @@ async function openAccount() {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -463,8 +557,8 @@ async function upgradeCapacity() {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -512,8 +606,8 @@ async function buyCommodity(commodityId, commodityName, currentPrice) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -567,8 +661,8 @@ async function sellCommodity(commodityId, commodityName, currentPrice, maxQty) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }

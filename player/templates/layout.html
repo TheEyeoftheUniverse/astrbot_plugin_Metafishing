@@ -91,7 +91,10 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{{ category }} alert-dismissible fade show webui-flash-message"
+                     data-flash-category="{{ category }}"
+                     data-flash-message="{{ message }}"
+                     role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
@@ -249,6 +252,50 @@ function webuiPrompt(message, options = {}) {
     });
 }
 
+function webuiAlert(message, options = {}) {
+    return new Promise((resolve) => {
+        const modalEl = document.getElementById('webuiActionModal');
+        const titleEl = document.getElementById('webuiActionModalLabel');
+        const messageEl = document.getElementById('webuiActionModalMessage');
+        const inputEl = document.getElementById('webuiActionModalInput');
+        const cancelBtn = document.getElementById('webuiActionModalCancel');
+        const confirmBtn = document.getElementById('webuiActionModalConfirm');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let resolved = false;
+
+        titleEl.textContent = options.title || '操作结果';
+        messageEl.textContent = message || '';
+        inputEl.classList.add('d-none');
+        inputEl.value = '';
+        cancelBtn.classList.add('d-none');
+        confirmBtn.textContent = options.confirmText || '知道了';
+        confirmBtn.className = `btn ${options.confirmClass || 'btn-primary'}`;
+
+        const cleanup = () => {
+            if (resolved) return;
+            resolved = true;
+            confirmBtn.onclick = null;
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                cancelBtn.classList.remove('d-none');
+                resolve(true);
+            }, {once: true});
+            modal.hide();
+        };
+
+        confirmBtn.onclick = cleanup;
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            if (!resolved) {
+                resolved = true;
+                confirmBtn.onclick = null;
+                cancelBtn.classList.remove('d-none');
+                resolve(true);
+            }
+        }, {once: true});
+
+        modal.show();
+    });
+}
+
 // 从 localStorage 恢复通知面板状态
 let notificationPanelCollapsed = localStorage.getItem('notificationPanelCollapsed') === 'true';
 
@@ -263,6 +310,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 从 sessionStorage 恢复通知列表
     restoreNotifications();
+
+    document.querySelectorAll('.webui-flash-message').forEach(item => {
+        const category = item.dataset.flashCategory || 'info';
+        const type = category === 'danger' ? 'error' : (category === 'success' ? 'success' : (category === 'warning' ? 'warning' : 'info'));
+        showToast(item.dataset.flashMessage || item.textContent.trim(), type);
+    });
 });
 
 // 切换通知面板折叠状态
@@ -330,7 +383,7 @@ function restoreNotifications() {
 }
 
 // 显示通知
-function showToast(message, type = 'success') {
+function showToast(message, type = 'success', options = {}) {
     const list = document.getElementById('notificationList');
     const body = document.getElementById('notificationBody');
     const badge = document.getElementById('unreadBadge');
@@ -394,6 +447,21 @@ function showToast(message, type = 'success') {
 
     // 保存通知
     saveNotifications();
+
+    const shouldPopup = options.popup ?? ['success', 'error', 'warning'].includes(type);
+    if (shouldPopup) {
+        const actionModal = document.getElementById('webuiActionModal');
+        if (actionModal && actionModal.classList.contains('show')) {
+            return Promise.resolve(false);
+        }
+        const titles = {success: '操作成功', error: '操作失败', warning: '请注意', info: '提示'};
+        const classes = {success: 'btn-success', error: 'btn-danger', warning: 'btn-warning', info: 'btn-primary'};
+        return webuiAlert(message, {
+            title: options.title || titles[type] || '提示',
+            confirmClass: options.confirmClass || classes[type] || 'btn-primary'
+        });
+    }
+    return Promise.resolve(false);
 }
 </script>
 {% block extra_js %}{% endblock %}

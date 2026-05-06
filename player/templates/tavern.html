@@ -227,7 +227,7 @@
                     </h5>
                 </button>
             </div>
-            <div class="collapse show" id="expeditionCollapse">
+            <div class="collapse" id="expeditionCollapse">
                 <div class="card-body">
                     {% if expeditions %}
                         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
@@ -400,6 +400,7 @@
                                 <div>
                                     <div class="text-muted small">当前奖池</div>
                                     <div class="h4 mb-0 text-danger" id="wipeBombJackpotText">--</div>
+                                    <div class="text-muted small mt-1">奖池由每日税收和擦弹亏损构成，用于支付高倍率奖金；如果付不起，就怪他们逃税的。</div>
                                 </div>
                                 <div class="flex-grow-1" style="min-width: 220px;">
                                     <label for="wipeBombAmountInput" class="form-label mb-1 text-muted small">擦弹金币</label>
@@ -657,7 +658,7 @@
                             <small class="text-muted">
                                 <span id="charCount">0</span>/500 字
                             </small>
-                            <button class="btn btn-primary" onclick="postMessage()">
+                            <button class="btn btn-primary" onclick="postTavernMessage()">
                                 <i class="fas fa-paper-plane"></i> 发送
                             </button>
                         </div>
@@ -772,7 +773,7 @@ document.getElementById('messageInput').addEventListener('input', function() {
 });
 
 // 发表留言
-async function postMessage() {
+async function postTavernMessage() {
     const content = document.getElementById('messageInput').value.trim();
 
     if (!content) {
@@ -795,8 +796,8 @@ async function postMessage() {
         const data = await response.json();
 
         if (data.success) {
-            showToast('留言发表成功！', 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast('留言发表成功！', 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -861,8 +862,8 @@ async function saveAnnouncement() {
         const data = await response.json();
 
         if (data.success) {
-            showToast('公告更新成功！', 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast('公告更新成功！', 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -874,7 +875,7 @@ async function saveAnnouncement() {
 // 回车发送（Ctrl+Enter）
 document.getElementById('messageInput').addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.key === 'Enter') {
-        postMessage();
+        postTavernMessage();
     }
 });
 
@@ -922,8 +923,8 @@ async function postExhibitionComment(fishKey) {
         const data = await response.json();
 
         if (data.success) {
-            showToast('评论发表成功！', 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast('评论发表成功！', 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -1029,8 +1030,8 @@ async function setExpeditionInvitePublic(expeditionId, isPublic) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message || (isPublic ? '邀请码已公开' : '邀请码已取消公开'), 'success');
-            window.setTimeout(() => window.location.reload(), 500);
+            await showToast(data.message || (isPublic ? '邀请码已公开' : '邀请码已取消公开'), 'success');
+            window.location.reload();
             return;
         }
 
@@ -1051,8 +1052,8 @@ async function joinExpedition(expeditionId) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message || '已加入科考', 'success');
-            window.setTimeout(() => window.location.reload(), 500);
+            await showToast(data.message || '已加入科考', 'success');
+            window.location.reload();
             return;
         }
 
@@ -1076,8 +1077,8 @@ async function claimExpeditionReward(expeditionId) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message || '领取成功！', 'success');
-            window.setTimeout(() => window.location.reload(), 500);
+            await showToast(data.message || '领取成功！', 'success');
+            window.location.reload();
             return;
         }
 

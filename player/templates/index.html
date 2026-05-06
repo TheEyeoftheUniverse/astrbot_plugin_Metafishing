@@ -224,8 +224,8 @@ async function dailyCheckin() {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 1000);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }

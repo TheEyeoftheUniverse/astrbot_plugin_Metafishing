@@ -71,8 +71,12 @@
                                     <i class="fas fa-hammer"></i>
                                 </button>
                                 {% endif %}
-                                {% if not rod.is_equipped and not rod.is_locked %}
+                                {% if not rod.is_equipped and not rod.is_locked and rod.rarity < 6 %}
                                 <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellRod('{{ rod.display_code }}', '{{ rod.name }}')">
+                                    <i class="fas fa-coins"></i>
+                                </button>
+                                {% elif not rod.is_equipped and not rod.is_locked %}
+                                <button class="btn btn-sm btn-outline-danger" title="6星及以上装备可兑换精炼材料，不能卖出" disabled>
                                     <i class="fas fa-coins"></i>
                                 </button>
                                 {% endif %}
@@ -140,8 +144,12 @@
                                     <i class="fas fa-hammer"></i>
                                 </button>
                                 {% endif %}
-                                {% if not acc.is_equipped and not acc.is_locked %}
+                                {% if not acc.is_equipped and not acc.is_locked and acc.rarity < 6 %}
                                 <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellAccessory('{{ acc.display_code }}', '{{ acc.name }}')">
+                                    <i class="fas fa-coins"></i>
+                                </button>
+                                {% elif not acc.is_equipped and not acc.is_locked %}
+                                <button class="btn btn-sm btn-outline-danger" title="6星及以上装备可兑换精炼材料，不能卖出" disabled>
                                     <i class="fas fa-coins"></i>
                                 </button>
                                 {% endif %}
@@ -199,7 +207,7 @@
                                         <i class="fas fa-hand-sparkles"></i>
                                     </button>
                                 {% endif %}
-                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})">
+                                <button class="btn btn-sm btn-outline-danger" title="{% if item.rarity >= 6 %}6星及以上道具可兑换精炼材料，不能卖出{% else %}卖出{% endif %}" {% if item.rarity >= 6 %}disabled{% else %}onclick="sellItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})"{% endif %}>
                                     <i class="fas fa-coins"></i>
                                 </button>
                             </div>
@@ -245,7 +253,7 @@
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 {% endif %}
-                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})">
+                                <button class="btn btn-sm btn-outline-danger" title="{% if bait.rarity >= 6 %}6星及以上鱼饵可兑换精炼材料，不能卖出{% else %}卖出{% endif %}" {% if bait.rarity >= 6 %}disabled{% else %}onclick="sellBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})"{% endif %}>
                                     <i class="fas fa-coins"></i>
                                 </button>
                             </div>
@@ -338,8 +346,8 @@ async function equipRod(code, name) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -358,8 +366,8 @@ async function equipAccessory(code, name) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -386,8 +394,8 @@ async function refineRod(code, name, currentLevel) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -406,8 +414,8 @@ async function refineAccessory(code, name, currentLevel) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -443,8 +451,8 @@ async function useItem(itemId, itemName, quantity) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -474,8 +482,8 @@ async function useBait(baitId, baitName, quantity) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -567,8 +575,8 @@ async function postInventoryAction(url, payload) {
         });
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }

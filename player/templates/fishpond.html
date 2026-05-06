@@ -52,13 +52,25 @@
         <div class="editorial-metric h-100">
             <h5><i class="fas fa-hand-holding-usd"></i> 批量操作</h5>
             <div class="compact-actions justify-content-start mt-2">
+                <button class="btn btn-outline-secondary btn-sm" onclick="sellSelectedFish()">
+                    <i class="fas fa-check-square"></i> 卖出选中
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="moveSelectedToAquarium()">
+                    <i class="fas fa-water"></i> 入箱选中
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="clearFishSelection()">
+                    <i class="fas fa-xmark"></i> 清除选择
+                </button>
+            </div>
+            <div class="compact-actions justify-content-start mt-3 pt-2 border-top">
                 <button class="btn btn-outline-secondary btn-sm" onclick="sellAllFish()">
                     <i class="fas fa-money-bill-wave"></i> 全部卖出
                 </button>
                 <button class="btn btn-outline-secondary btn-sm" onclick="showBatchMoveToAquarium()">
-                    <i class="fas fa-arrow-right"></i> 批量入箱
+                    <i class="fas fa-layer-group"></i> 按星级入箱
                 </button>
             </div>
+            <span class="metric-note" id="fishSelectionSummary">已选择 0 种鱼</span>
         </div>
     </div>
 </div>
@@ -108,9 +120,15 @@
         <div class="row g-3 mb-3 rarity-section" data-rarity="{{ rarity }}">
             {% for fish in fish_by_rarity[rarity] %}
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 collection-card">
+                <div class="card h-100 collection-card selectable-fish-card"
+                     data-fish-id="{{ fish.fish_id }}"
+                     data-quality-level="{{ fish.quality_level }}"
+                     data-quantity="{{ fish.quantity }}"
+                     data-name="{{ fish.name }}"
+                     onclick="toggleFishSelection(event, this)">
                     <div class="card-body d-flex flex-column">
                         <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+                            <input class="form-check-input fish-select-check mt-1" type="checkbox" aria-label="选择 {{ fish.name }}" onclick="event.stopPropagation(); syncFishSelectionFromCheckbox(this)">
                             <h5 class="card-title mb-0">
                                 {{ fish.name }} <span class="star-inline">{{ star_label(fish.rarity) }}</span>
                                 {% if fish.quality_level == 1 %}<span class="badge">✨</span>{% endif %}
@@ -122,10 +140,10 @@
                             <div>总值 {{ fish.actual_value * fish.quantity }}</div>
                         </div>
                         <div class="d-flex gap-2 mt-auto flex-wrap">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="sellFish({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); sellFish({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
                                 <i class="fas fa-hand-holding-usd"></i> 出售
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="moveToAquarium({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); moveToAquarium({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
                                 <i class="fas fa-water"></i> 入箱
                             </button>
                         </div>
@@ -163,6 +181,107 @@
 
 {% block extra_js %}
 <script>
+function getSelectedFishCards() {
+    return Array.from(document.querySelectorAll('.selectable-fish-card.is-selected'));
+}
+
+function getSelectedFishPayload() {
+    return getSelectedFishCards().map(card => ({
+        fish_id: parseInt(card.dataset.fishId),
+        quality_level: parseInt(card.dataset.qualityLevel || '0'),
+        quantity: parseInt(card.dataset.quantity || '0'),
+        name: card.dataset.name || ''
+    })).filter(item => item.fish_id > 0 && item.quantity > 0);
+}
+
+function updateFishSelectionSummary() {
+    const selected = getSelectedFishPayload();
+    const total = selected.reduce((sum, item) => sum + item.quantity, 0);
+    const summary = document.getElementById('fishSelectionSummary');
+    if (summary) {
+        summary.textContent = `已选择 ${selected.length} 种鱼，共 ${total} 条`;
+    }
+}
+
+function setFishCardSelected(card, selected) {
+    card.classList.toggle('is-selected', selected);
+    const checkbox = card.querySelector('.fish-select-check');
+    if (checkbox) {
+        checkbox.checked = selected;
+    }
+    updateFishSelectionSummary();
+}
+
+function toggleFishSelection(event, card) {
+    if (event.target.closest('button, a, input, textarea, select')) return;
+    setFishCardSelected(card, !card.classList.contains('is-selected'));
+}
+
+function syncFishSelectionFromCheckbox(checkbox) {
+    const card = checkbox.closest('.selectable-fish-card');
+    if (card) {
+        setFishCardSelected(card, checkbox.checked);
+    }
+}
+
+function clearFishSelection() {
+    document.querySelectorAll('.selectable-fish-card.is-selected').forEach(card => setFishCardSelected(card, false));
+}
+
+async function submitSelectedFishBatch(action, confirmMessage, loadingMessage) {
+    const fishes = getSelectedFishPayload();
+    if (fishes.length === 0) {
+        showToast('请先选择要操作的鱼', 'warning');
+        return;
+    }
+
+    if (!await webuiConfirm(confirmMessage(fishes), {
+        title: action === 'sell' ? '卖出选中' : '入箱选中',
+        confirmText: action === 'sell' ? '卖出' : '入箱',
+        confirmClass: action === 'sell' ? 'btn-danger' : 'btn-primary'
+    })) {
+        return;
+    }
+
+    showToast(loadingMessage, 'info', {popup: false});
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_selected_fish_batch") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                source: 'pond',
+                action: action,
+                fishes: fishes
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await showToast(data.message, 'success');
+            location.reload();
+        } else {
+            showToast(data.message || '批量操作失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+async function sellSelectedFish() {
+    await submitSelectedFishBatch(
+        'sell',
+        fishes => `确认卖出选中的 ${fishes.length} 种鱼，共 ${fishes.reduce((sum, item) => sum + item.quantity, 0)} 条吗？`,
+        '正在卖出选中鱼类...'
+    );
+}
+
+async function moveSelectedToAquarium() {
+    await submitSelectedFishBatch(
+        'aquarium',
+        fishes => `确认将选中的 ${fishes.length} 种鱼，共 ${fishes.reduce((sum, item) => sum + item.quantity, 0)} 条放入水族箱吗？`,
+        '正在放入水族箱...'
+    );
+}
+
 // 稀有度筛选功能
 function filterByRarity(rarity) {
     const sections = document.querySelectorAll('.rarity-section');
@@ -201,8 +320,8 @@ async function upgradeFishpondCapacity() {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -222,8 +341,8 @@ async function sellAllFish() {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -263,8 +382,8 @@ async function sellFish(fishId, qualityLevel, fishName, maxQuantity) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -304,8 +423,8 @@ async function moveToAquarium(fishId, qualityLevel, fishName, maxQuantity) {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 500);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }
@@ -420,8 +539,8 @@ async function executeBatchMoveToAquarium() {
 
         const data = await response.json();
         if (data.success) {
-            showToast(data.message, 'success');
-            setTimeout(() => location.reload(), 1000);
+            await showToast(data.message, 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
         }

@@ -667,6 +667,35 @@ a:hover {
     align-items: baseline;
 }
 
+.selectable-fish-card {
+    cursor: pointer;
+    position: relative;
+}
+
+.selectable-fish-card .fish-select-check {
+    flex: 0 0 auto;
+}
+
+.selectable-fish-card.is-selected {
+    border-color: var(--aqua);
+    background: rgba(21, 166, 166, 0.08);
+    box-shadow: 0 0 0 0.16rem rgba(21, 166, 166, 0.18);
+}
+
+.selectable-fish-card.is-selected .card-title::after {
+    content: "已选";
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.2rem;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid rgba(21, 166, 166, 0.4);
+    border-radius: 999px;
+    color: #0d686b;
+    font-family: var(--sans);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
 .inventory-card .card-body > .d-flex:first-child {
     min-height: 3rem;
 }
