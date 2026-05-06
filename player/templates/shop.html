@@ -207,9 +207,9 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    initializeShopDescriptionToggles();
+    requestAnimationFrame(initializeShopDescriptionToggles);
     document.querySelectorAll('.shop-collapse').forEach(collapseEl => {
-        collapseEl.addEventListener('shown.bs.collapse', initializeShopDescriptionToggles);
+        collapseEl.addEventListener('shown.bs.collapse', () => requestAnimationFrame(initializeShopDescriptionToggles));
     });
 
     const openShopId = sessionStorage.getItem('openShopAfterPurchase');
@@ -320,7 +320,7 @@ function toggleShopDescription(button) {
     renderShopDescription(description);
 }
 
-window.addEventListener('resize', initializeShopDescriptionToggles);
+window.addEventListener('resize', () => requestAnimationFrame(initializeShopDescriptionToggles));
 
 function buyShopItemFromButton(button) {
     const itemId = Number(button.dataset.itemId || 0);
