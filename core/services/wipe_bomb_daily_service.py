@@ -110,7 +110,9 @@ def _read_state_unlocked(reset_hour: int) -> Dict[str, Any]:
 
     normalized = normalize_wipe_bomb_daily_state(data, reset_marker)
     if normalized.get("reset_marker") != reset_marker:
-        return default_state
+        rolled_state = create_default_wipe_bomb_daily_state(reset_marker)
+        rolled_state["jackpot_amount"] = max(0, int(normalized.get("jackpot_amount", 0) or 0))
+        return rolled_state
     return normalized
 
 

@@ -91,66 +91,126 @@
 
 <!-- 详细状态信息 -->
 <div class="section-title"><i class="fas fa-list-check"></i> 状态手稿</div>
-<div class="row g-4">
+<div class="row g-4 align-items-stretch">
     <!-- 装备信息 -->
     <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0"><i class="fas fa-tools"></i> 装备信息</h5>
             </div>
-            <div class="card-body">
-                <!-- 鱼竿 -->
-                <div class="mb-3 pb-3 border-bottom">
-                    <h6 class="text-muted mb-2"><i class="fas fa-fish"></i> 鱼竿</h6>
-                    {% if user_state.current_rod %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">
-                                {{ user_state.current_rod.name }}
-                                <span class="star-inline">{{ star_label(user_state.current_rod.rarity) }}{% if user_state.current_rod.refine_level %} +{{ user_state.current_rod.refine_level }}{% endif %}</span>
-                            </span>
-                        </div>
-                        <div class="mt-2">
-                            {% if user_state.current_rod.current_durability is not none %}
-                                <small class="text-muted">耐久:</small>
-                                <span class="text-info">{{ user_state.current_rod.current_durability }}/{{ user_state.current_rod.max_durability }}</span>
-                            {% else %}
-                                <span class="text-success">永久耐久</span>
+            <div class="card-body compact-status-body">
+                <div class="equipment-summary-strip">
+                    <div class="equipment-summary-item">
+                        <div class="equipment-summary-heading">
+                            <h6 class="text-muted mb-1"><i class="fas fa-fish"></i> 鱼竿</h6>
+                            {% if user_state.current_rod %}
+                                {% if user_state.current_rod.current_durability is not none %}
+                                    {% set rod_percent = ((user_state.current_rod.current_durability / user_state.current_rod.max_durability * 100) if user_state.current_rod.max_durability else 0) | int %}
+                                    <div class="equipment-durability-inline">
+                                        <span class="equipment-durability-value {% if rod_percent <= 30 %}is-danger{% elif rod_percent <= 60 %}is-warning{% endif %}">
+                                            {{ user_state.current_rod.current_durability }}/{{ user_state.current_rod.max_durability }}
+                                        </span>
+                                        <div class="equipment-durability-track">
+                                            <div class="equipment-durability-fill {% if rod_percent <= 30 %}is-danger{% elif rod_percent <= 60 %}is-warning{% endif %}" style="width: {{ rod_percent }}%;"></div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="small text-success">永久耐久</span>
+                                {% endif %}
                             {% endif %}
                         </div>
-                    {% else %}
-                        <span class="text-muted">未装备</span>
-                    {% endif %}
-                </div>
+                        {% if user_state.current_rod %}
+                            <div class="fw-bold equipment-summary-name">
+                                {{ user_state.current_rod.name }}
+                                <span class="star-inline">{{ star_label(user_state.current_rod.rarity) }}{% if user_state.current_rod.refine_level %} +{{ user_state.current_rod.refine_level }}{% endif %}</span>
+                            </div>
+                        {% else %}
+                            <span class="text-muted">未装备</span>
+                        {% endif %}
+                    </div>
 
-                <!-- 饰品 -->
-                <div class="mb-3 pb-3 border-bottom">
-                    <h6 class="text-muted mb-2"><i class="fas fa-gem"></i> 饰品</h6>
-                    {% if user_state.current_accessory %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">
+                    <div class="equipment-summary-item">
+                        <h6 class="text-muted mb-1"><i class="fas fa-gem"></i> 饰品</h6>
+                        {% if user_state.current_accessory %}
+                            <div class="fw-bold equipment-summary-name">
                                 {{ user_state.current_accessory.name }}
                                 <span class="star-inline">{{ star_label(user_state.current_accessory.rarity) }}{% if user_state.current_accessory.refine_level %} +{{ user_state.current_accessory.refine_level }}{% endif %}</span>
-                            </span>
+                            </div>
+                        {% else %}
+                            <span class="text-muted">未装备</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="equipment-summary-item equipment-summary-item-last">
+                        <div class="equipment-summary-heading">
+                            <h6 class="text-muted mb-1"><i class="fas fa-bug"></i> 鱼饵</h6>
+                            {% if user_state.current_bait %}
+                                <span class="small text-muted">剩余 <span class="badge bg-info">{{ user_state.current_bait.quantity }}</span></span>
+                            {% endif %}
                         </div>
-                    {% else %}
-                        <span class="text-muted">未装备</span>
-                    {% endif %}
+                        {% if user_state.current_bait %}
+                            <div class="fw-bold equipment-summary-name">
+                                {{ user_state.current_bait.name }} <span class="star-inline">{{ star_label(user_state.current_bait.rarity) }}</span>
+                            </div>
+                        {% else %}
+                            <span class="text-muted">未使用</span>
+                        {% endif %}
+                    </div>
                 </div>
 
-                <!-- 鱼饵 -->
-                <div>
-                    <h6 class="text-muted mb-2"><i class="fas fa-bug"></i> 鱼饵</h6>
-                    {% if user_state.current_bait %}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">{{ user_state.current_bait.name }} <span class="star-inline">{{ star_label(user_state.current_bait.rarity) }}</span></span>
+                {% set effective = user_state.effective_fishing_stats or {} %}
+                <div class="status-detail-row status-detail-row-last">
+                    <h6 class="text-muted mb-2"><i class="fas fa-gauge-high"></i> 钓鱼仪表盘</h6>
+                    <div class="stat-dashboard-board">
+                        <div class="stat-dashboard-cell">
+                            <span class="stat-line-icon text-success"><i class="fas fa-bullseye"></i></span>
+                            <div class="stat-line-copy">
+                                <span class="stat-line-label">成功率</span>
+                                <span class="stat-line-note">绝不空军！</span>
+                            </div>
+                            <strong>{{ "%.1f"|format((effective.success_rate or 0) * 100) }}%</strong>
                         </div>
-                        <div class="mt-2">
-                            <small class="text-muted">剩余数量:</small>
-                            <span class="badge bg-info">{{ user_state.current_bait.quantity }}</span>
+                        <div class="stat-dashboard-cell">
+                            <span class="stat-line-icon text-warning"><i class="fas fa-coins"></i></span>
+                            <div class="stat-line-copy">
+                                <span class="stat-line-label">价值</span>
+                                <span class="stat-line-note">值钱的鱼！</span>
+                            </div>
+                            <strong>+{{ "%.1f"|format((effective.value_bonus or 0) * 100) }}%</strong>
                         </div>
-                    {% else %}
-                        <span class="text-muted">未使用</span>
-                    {% endif %}
+                        <div class="stat-dashboard-cell">
+                            <span class="stat-line-icon text-info"><i class="fas fa-clock"></i></span>
+                            <div class="stat-line-copy">
+                                <span class="stat-line-label">CD减少</span>
+                                <span class="stat-line-note">更快钓鱼！</span>
+                            </div>
+                            <strong>-{{ "%.1f"|format((effective.cooldown_reduction or 0) * 100) }}%</strong>
+                        </div>
+                        <div class="stat-dashboard-cell">
+                            <span class="stat-line-icon text-primary"><i class="fas fa-layer-group"></i></span>
+                            <div class="stat-line-copy">
+                                <span class="stat-line-label">数量</span>
+                                <span class="stat-line-note">更多的鱼！</span>
+                            </div>
+                            <strong>+{{ "%.1f"|format((effective.quantity_bonus or 0) * 100) }}%</strong>
+                        </div>
+                        <div class="stat-dashboard-cell">
+                            <span class="stat-line-icon text-success"><i class="fas fa-arrow-up"></i></span>
+                            <div class="stat-line-copy">
+                                <span class="stat-line-label">品质</span>
+                                <span class="stat-line-note">更好的鱼！</span>
+                            </div>
+                            <strong>+{{ "%.1f"|format((effective.quality_bonus or 0) * 100) }}%</strong>
+                        </div>
+                        <div class="stat-dashboard-cell">
+                            <span class="stat-line-icon text-warning"><i class="fas fa-star"></i></span>
+                            <div class="stat-line-copy">
+                                <span class="stat-line-label">稀有度</span>
+                                <span class="stat-line-note">少见的鱼！</span>
+                            </div>
+                            <strong>+{{ "%.1f"|format((effective.rare_bonus or 0) * 100) }}%</strong>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -162,15 +222,15 @@
             <div class="card-header bg-info text-white">
                 <h5 class="mb-0"><i class="fas fa-info-circle"></i> 状态信息</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body compact-status-body">
                 <!-- 钓鱼区域 -->
-                <div class="mb-3 pb-3 border-bottom">
-                    <h6 class="text-muted mb-2"><i class="fas fa-map-marked-alt"></i> 当前区域</h6>
+                <div class="status-detail-row">
+                    <h6 class="text-muted mb-1"><i class="fas fa-map-marked-alt"></i> 当前区域</h6>
                     {% if user_state.fishing_zone %}
                         <div class="fw-bold">{{ user_state.fishing_zone.name }}</div>
                         <small class="text-muted">{{ user_state.fishing_zone.description }}</small>
                         {% if user_state.fishing_zone.rare_fish_quota > 0 %}
-                            <div class="mt-2">
+                            <div class="mt-1">
                                 <small>稀有鱼配额:</small>
                                 <span class="badge {% if user_state.fishing_zone.rare_fish_caught >= user_state.fishing_zone.rare_fish_quota %}bg-danger{% else %}bg-success{% endif %}">
                                     {{ user_state.fishing_zone.rare_fish_caught }}/{{ user_state.fishing_zone.rare_fish_quota }}
@@ -182,15 +242,9 @@
                     {% endif %}
                 </div>
 
-                <!-- 总钓鱼次数 -->
-                <div class="mb-3 pb-3 border-bottom">
-                    <h6 class="text-muted mb-2"><i class="fas fa-fish"></i> 总钓鱼次数</h6>
-                    <div class="fw-bold">{{ "{:,}".format(stats.total_fishing_count) }}</div>
-                </div>
-
                 <!-- 鱼塘状态 -->
-                <div>
-                    <h6 class="text-muted mb-2"><i class="fas fa-water"></i> 鱼塘状态</h6>
+                <div class="status-detail-row status-detail-row-last">
+                    <h6 class="text-muted mb-1"><i class="fas fa-water"></i> 鱼塘状态</h6>
                     <div class="d-flex justify-content-between mb-1 small">
                         <span>容量</span>
                         <strong>{{ stats.fish_count }} / {{ stats.fish_pond_capacity }}</strong>

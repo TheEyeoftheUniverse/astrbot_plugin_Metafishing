@@ -263,7 +263,7 @@ class FishingService:
         user.coins -= fishing_cost
 
         # 2. 计算各种加成和修正值
-        base_success_rate = 0.7 # 基础成功率70%
+        base_success_rate = 0.5 # 基础成功率50%
         quality_bonus_total = 0.0 # 品质加成（加法累计）
         quantity_bonus_total = 0.0 # 数量加成（加法累计）
         rare_chance = 0.0 # 稀有鱼出现几率

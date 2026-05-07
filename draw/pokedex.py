@@ -69,19 +69,19 @@ async def draw_pokedex(pokedex_data: Dict[str, Any], user_info: Dict[str, Any], 
     img_height = HEADER_HEIGHT + (FISH_CARD_HEIGHT + FISH_CARD_MARGIN) * len(page_fishes) + PADDING * 2 + FOOTER_HEIGHT
     
     # 创建渐变背景 - 参考背包设计
-    bg_top = (174, 214, 241)  # 柔和天蓝色
-    bg_bot = (245, 251, 255)  # 温和淡蓝色
+    bg_top = (255, 248, 236)  # 纸张暖白
+    bg_bot = (246, 237, 220)  # 纸张暖米
     img = create_vertical_gradient(IMG_WIDTH, img_height, bg_top, bg_bot)
     draw = ImageDraw.Draw(img)
     
     # 背包风格的颜色定义
-    primary_dark = (52, 73, 94)      # 温和深蓝 - 主标题
-    primary_medium = (74, 105, 134)  # 柔和中蓝 - 副标题
-    primary_light = (108, 142, 191)  # 淡雅蓝 - 强调色
-    text_primary = (55, 71, 79)      # 温和深灰 - 主要文本
-    text_secondary = (120, 144, 156) # 柔和灰蓝 - 次要文本
-    text_muted = (176, 190, 197)     # 温和浅灰 - 弱化文本
-    card_bg = (255, 255, 255, 240)   # 高透明度白色
+    primary_dark = (38, 33, 27)      # 纸面深墨
+    primary_medium = (18, 127, 130)  # 水色强调
+    primary_light = (255, 90, 61)  # 珊瑚强调
+    text_primary = (38, 33, 27)      # 纸面正文
+    text_secondary = (113, 104, 92) # 温和副文
+    text_muted = (151, 139, 122)     # 温和弱化文
+    card_bg = (255, 252, 245, 240)   # 纸面卡底
 
     # 绘制头部 - 使用背包风格
     draw_rounded_rectangle(draw, (PADDING, PADDING, IMG_WIDTH - PADDING, PADDING + HEADER_HEIGHT), CORNER_RADIUS, fill=card_bg)

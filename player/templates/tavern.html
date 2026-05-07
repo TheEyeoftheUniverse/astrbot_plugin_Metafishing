@@ -61,15 +61,9 @@
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="fishing-tab" data-bs-toggle="tab"
-                                    data-bs-target="#fishing-leaderboard" type="button" role="tab">
-                                <i class="fas fa-fish text-info"></i> 钓鱼次数榜
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="earned-tab" data-bs-toggle="tab"
-                                    data-bs-target="#earned-leaderboard" type="button" role="tab">
-                                <i class="fas fa-chart-line text-success"></i> 累计收入榜
+                            <button class="nav-link" id="premium-tab" data-bs-toggle="tab"
+                                    data-bs-target="#premium-leaderboard" type="button" role="tab">
+                                <i class="fas fa-gem text-info"></i> 钻石榜
                             </button>
                         </li>
                     </ul>
@@ -84,6 +78,7 @@
                                         <tr>
                                             <th>排名</th>
                                             <th>钓鱼佬</th>
+                                            <th>装备</th>
                                             <th>金币</th>
                                         </tr>
                                     </thead>
@@ -102,14 +97,17 @@
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                {{ rank.nickname or '渔夫' + rank.user_id[-4:] }}                                                {% if rank.title and rank.title != '无称号' %}
-                                                <span class="badge bg-success" style="font-size: 0.75rem;">{{ rank.title }}</span>
-                                                {% endif %}                                                {% if rank.title and rank.title != '无称号' %}
-                                                <span class="badge bg-success" style="font-size: 0.75rem;">{{ rank.title }}</span>
-                                                {% endif %}
-                                                {% if rank.user_id == current_user_id %}
-                                                <span class="badge bg-primary">你</span>
-                                                {% endif %}
+                                                <div class="fw-semibold">{{ rank.nickname or '渔夫' + rank.user_id[-4:] }}</div>
+                                                <div class="small text-muted mt-1">
+                                                    <span class="badge">{{ rank.title or '无称号' }}</span>
+                                                    {% if rank.user_id == current_user_id %}
+                                                    <span class="badge bg-primary">你</span>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td class="small">
+                                                <div><i class="fas fa-fish text-muted me-1"></i>{{ rank.fishing_rod or '无鱼竿' }}</div>
+                                                <div class="mt-1"><i class="fas fa-gem text-muted me-1"></i>{{ rank.accessory or '无饰品' }}</div>
                                             </td>
                                             <td><strong class="text-warning">{{ rank.coins | default(0) }}</strong></td>
                                         </tr>
@@ -119,19 +117,20 @@
                             </div>
                         </div>
 
-                        <!-- 钓鱼次数榜 -->
-                        <div class="tab-pane fade" id="fishing-leaderboard" role="tabpanel">
+                        <!-- 钻石榜 -->
+                        <div class="tab-pane fade" id="premium-leaderboard" role="tabpanel">
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="table table-hover leaderboard-table">
                                     <thead>
                                         <tr>
                                             <th>排名</th>
                                             <th>钓鱼佬</th>
-                                            <th>钓鱼次数</th>
+                                            <th>装备</th>
+                                            <th>钻石</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for rank in leaderboard.fishing %}
+                                        {% for rank in leaderboard.premium_currency %}
                                         <tr {% if rank.user_id == current_user_id %}class="table-primary"{% endif %}>
                                             <td>
                                                 {% if rank.rank == 1 %}
@@ -145,57 +144,19 @@
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                {{ rank.nickname or '渔夫' + rank.user_id[-4:] }}
-                                                {% if rank.title and rank.title != '无称号' %}
-                                                <span class="badge bg-success" style="font-size: 0.75rem;">{{ rank.title }}</span>
-                                                {% endif %}
-                                                {% if rank.user_id == current_user_id %}
-                                                <span class="badge bg-primary">你</span>
-                                                {% endif %}
+                                                <div class="fw-semibold">{{ rank.nickname or '渔夫' + rank.user_id[-4:] }}</div>
+                                                <div class="small text-muted mt-1">
+                                                    <span class="badge">{{ rank.title or '无称号' }}</span>
+                                                    {% if rank.user_id == current_user_id %}
+                                                    <span class="badge bg-primary">你</span>
+                                                    {% endif %}
+                                                </div>
                                             </td>
-                                            <td><strong class="text-info">{{ rank.total_fishing_count | default(0) }}</strong></td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- 累计收入榜 -->
-                        <div class="tab-pane fade" id="earned-leaderboard" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>排名</th>
-                                            <th>钓鱼佬</th>
-                                            <th>累计收入</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for rank in leaderboard.earned %}
-                                        <tr {% if rank.user_id == current_user_id %}class="table-primary"{% endif %}>
-                                            <td>
-                                                {% if rank.rank == 1 %}
-                                                <i class="fas fa-crown text-warning"></i>
-                                                {% elif rank.rank == 2 %}
-                                                <i class="fas fa-medal text-secondary"></i>
-                                                {% elif rank.rank == 3 %}
-                                                <i class="fas fa-medal" style="color: #cd7f32;"></i>
-                                                {% else %}
-                                                {{ rank.rank }}
-                                                {% endif %}
+                                            <td class="small">
+                                                <div><i class="fas fa-fish text-muted me-1"></i>{{ rank.fishing_rod or '无鱼竿' }}</div>
+                                                <div class="mt-1"><i class="fas fa-gem text-muted me-1"></i>{{ rank.accessory or '无饰品' }}</div>
                                             </td>
-                                            <td>
-                                                {{ rank.nickname or '渔夫' + rank.user_id[-4:] }}
-                                                {% if rank.title and rank.title != '无称号' %}
-                                                <span class="badge bg-success" style="font-size: 0.75rem;">{{ rank.title }}</span>
-                                                {% endif %}
-                                                {% if rank.user_id == current_user_id %}
-                                                <span class="badge bg-primary">你</span>
-                                                {% endif %}
-                                            </td>
-                                            <td><strong class="text-success">{{ rank.total_coins_earned | default(0) }}</strong></td>
+                                            <td><strong class="text-info">{{ rank.premium_currency | default(0) }}</strong></td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -1189,7 +1150,11 @@ async function submitDailyWipeBomb(allIn) {
         }
 
         if (!response.ok || !data.success) {
-            throw new Error(data.message || '擦弹失败');
+            const shouldSuppressErrorToast = (data.message || '').includes('次数已用完');
+            if (!shouldSuppressErrorToast) {
+                showToast(data.message || '擦弹失败', 'error');
+            }
+            return;
         }
 
         const amountInput = document.getElementById('wipeBombAmountInput');

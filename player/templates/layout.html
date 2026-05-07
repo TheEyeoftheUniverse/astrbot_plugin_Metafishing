@@ -103,19 +103,19 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show webui-flash-message"
+                <div class="webui-flash-message d-none"
                      data-flash-category="{{ category }}"
                      data-flash-message="{{ message }}"
-                     role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                     role="status"
+                     aria-hidden="true"></div>
             {% endfor %}
         {% endif %}
     {% endwith %}
 
     {% block content %}{% endblock %}
 </main>
+
+<div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3 player-toast-stack" id="playerToastStack" aria-live="polite" aria-atomic="true"></div>
 
 <footer class="editorial-footer py-3 text-center">
     <div class="container">
@@ -460,12 +460,7 @@ function showToast(message, type = 'success', options = {}) {
     // 保存通知
     saveNotifications();
 
-    const shouldPopup = options.popup ?? ['success', 'error', 'warning'].includes(type);
-    if (shouldPopup) {
-        const actionModal = document.getElementById('webuiActionModal');
-        if (actionModal && actionModal.classList.contains('show')) {
-            return Promise.resolve(false);
-        }
+    if (options.popup === true) {
         const titles = {success: '操作成功', error: '操作失败', warning: '请注意', info: '提示'};
         const classes = {success: 'btn-success', error: 'btn-danger', warning: 'btn-warning', info: 'btn-primary'};
         return webuiAlert(message, {
@@ -473,7 +468,61 @@ function showToast(message, type = 'success', options = {}) {
             confirmClass: options.confirmClass || classes[type] || 'btn-primary'
         });
     }
-    return Promise.resolve(false);
+
+    const stack = document.getElementById('playerToastStack');
+    if (!stack || !window.bootstrap?.Toast) {
+        return Promise.resolve(false);
+    }
+
+    const toast = document.createElement('div');
+    const palette = {
+        success: 'success',
+        error: 'danger',
+        warning: 'warning',
+        info: 'info',
+    };
+    const accentClass = `toast-${palette[type] || 'info'}`;
+    const titles = {
+        success: options.title || '操作成功',
+        error: options.title || '操作失败',
+        warning: options.title || '请注意',
+        info: options.title || '提示',
+    };
+    const icons = {
+        success: 'fa-circle-check',
+        error: 'fa-circle-xmark',
+        warning: 'fa-triangle-exclamation',
+        info: 'fa-circle-info',
+    };
+    const delay = Number.isFinite(options.delay) ? options.delay : (type === 'success' ? 1400 : type === 'info' ? 1600 : 2200);
+
+    toast.className = `toast player-floating-toast ${accentClass}`;
+    toast.role = 'alert';
+    toast.ariaLive = 'assertive';
+    toast.ariaAtomic = 'true';
+    toast.innerHTML = `
+        <div class="toast-header">
+            <i class="fas ${icons[type] || icons.info} me-2"></i>
+            <strong class="me-auto">${titles[type] || titles.info}</strong>
+            <small class="text-muted">${timeStr}</small>
+            <button type="button" class="btn-close ms-2 mb-1" data-bs-dismiss="toast" aria-label="关闭"></button>
+        </div>
+        <div class="toast-body">${message}</div>
+    `;
+    stack.appendChild(toast);
+
+    const toastInstance = bootstrap.Toast.getOrCreateInstance(toast, {
+        autohide: options.autohide !== false,
+        delay,
+    });
+
+    return new Promise((resolve) => {
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
+            resolve(true);
+        }, {once: true});
+        toastInstance.show();
+    });
 }
 </script>
 {% block extra_js %}{% endblock %}

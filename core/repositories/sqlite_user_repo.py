@@ -169,7 +169,7 @@ class SqliteUserRepository(AbstractUserRepository):
     def _get_top_users_base_query(self, order_by_column: str, limit: int) -> List[User]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            if order_by_column not in ["total_fishing_count", "coins", "max_coins"]:
+            if order_by_column not in ["total_fishing_count", "coins", "premium_currency", "max_coins"]:
                 raise ValueError("Invalid order by column")
             
             query = f"SELECT * FROM users ORDER BY {order_by_column} DESC LIMIT ?"
@@ -181,6 +181,9 @@ class SqliteUserRepository(AbstractUserRepository):
 
     def get_top_users_by_coins(self, limit: int) -> List[User]:
         return self._get_top_users_base_query("coins", limit)
+
+    def get_top_users_by_premium_currency(self, limit: int) -> List[User]:
+        return self._get_top_users_base_query("premium_currency", limit)
 
     def get_top_users_by_max_coins(self, limit: int) -> List[User]:
         """获取历史最高金币排行榜"""

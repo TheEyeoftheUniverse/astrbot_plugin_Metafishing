@@ -1,234 +1,202 @@
 import os
+from datetime import datetime
+from typing import List, Dict
 
 from PIL import Image, ImageDraw, ImageFont
-from typing import List, Dict
 from astrbot.api import logger
-from .styles import (
-    IMG_WIDTH, PADDING, CORNER_RADIUS,
-    HEADER_HEIGHT, USER_CARD_HEIGHT, USER_CARD_MARGIN,
-    COLOR_BACKGROUND, COLOR_HEADER_BG, COLOR_TEXT_WHITE as COLOR_HEADER_TEXT,
-    COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_TEXT_DARK,
-    COLOR_ACCENT, COLOR_TEXT_GOLD, COLOR_TEXT_SILVER, COLOR_TEXT_BRONZE,
-    COLOR_FISH_COUNT, COLOR_COINS, load_font
-)
 
-def draw_rounded_rectangle(draw, xy, radius=10, fill=None, outline=None, width=1):
-    """绘制圆角矩形"""
-    x1, y1, x2, y2 = xy
-    draw.rectangle((x1+radius, y1, x2-radius, y2), fill=fill, outline=fill)
-    draw.rectangle((x1, y1+radius, x2, y2-radius), fill=fill, outline=fill)
-    draw.ellipse((x1, y1, x1+2*radius, y1+2*radius), fill=fill, outline=fill)
-    draw.ellipse((x2-2*radius, y1, x2, y1+2*radius), fill=fill, outline=fill)
-    draw.ellipse((x1, y2-2*radius, x1+2*radius, y2), fill=fill, outline=fill)
-    draw.ellipse((x2-2*radius, y2-2*radius, x2, y2), fill=fill, outline=fill)
+from .gradient_utils import create_vertical_gradient
+from .styles import load_font
 
-    if outline:
-        draw.arc((x1, y1, x1+2*radius, y1+2*radius), 180, 270, fill=outline, width=width)
-        draw.arc((x2-2*radius, y1, x2, y1+2*radius), 270, 360, fill=outline, width=width)
-        draw.arc((x1, y2-2*radius, x1+2*radius, y2), 90, 180, fill=outline, width=width)
-        draw.arc((x2-2*radius, y2-2*radius, x2, y2), 0, 90, fill=outline, width=width)
-        draw.line((x1+radius, y1, x2-radius, y1), fill=outline, width=width)
-        draw.line((x1+radius, y2, x2-radius, y2), fill=outline, width=width)
-        draw.line((x1, y1+radius, x1, y2-radius), fill=outline, width=width)
-        draw.line((x2, y1+radius, x2, y2-radius), fill=outline, width=width)
 
-def get_text_metrics(text, font, draw):
-    """获取文本指标，返回边界框和大小"""
+IMG_WIDTH = 900
+PADDING = 28
+HEADER_HEIGHT = 78
+ROW_HEIGHT = 96
+ROW_GAP = 10
+
+# ===== 配色（沿用纸面 paper / editorial 风格，与背包一致）=====
+HAIRLINE = (228, 216, 198)
+BG_TOP = (255, 248, 236)
+BG_BOTTOM = (246, 237, 220)
+TEXT_PRIMARY = (38, 33, 27)
+TEXT_SECONDARY = (113, 104, 92)
+TEXT_MUTED = (151, 139, 122)
+AQUA = (18, 127, 130)
+GOLD = (217, 151, 36)
+CORAL = (255, 90, 61)
+VIOLET = (121, 103, 217)
+SILVER = (148, 154, 168)
+BRONZE = (184, 120, 72)
+CARD_BG = (255, 252, 245)
+CARD_BORDER = (231, 220, 200)
+TOP_CARD_TINT = (255, 246, 226)
+
+
+def _text_size(draw, text, font):
     bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    return bbox, (text_width, text_height)
+    return bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+
+def _ellipsize(draw, text: str, font, max_width: int) -> str:
+    text = text or ""
+    if _text_size(draw, text, font)[0] <= max_width:
+        return text
+    trimmed = text
+    while trimmed:
+        candidate = trimmed + "..."
+        if _text_size(draw, candidate, font)[0] <= max_width:
+            return candidate
+        trimmed = trimmed[:-1]
+    return "..."
+
+
+def _rank_color(index: int):
+    if index == 0:
+        return GOLD
+    if index == 1:
+        return SILVER
+    if index == 2:
+        return BRONZE
+    return TEXT_SECONDARY
+
 
 def format_large_number(number):
-    """将大数字格式化为带单位的字符串（K、M、B等）"""
-    if number < 1000:
-        return str(number)
-    elif number < 1000000:
-        return f"{number/1000:.1f}K".replace(".0K", "K")
-    elif number < 1000000000:
-        return f"{number/1000000:.1f}M".replace(".0M", "M")
-    else:
-        return f"{number/1000000000:.1f}B".replace(".0B", "B")
+    value = int(number or 0)
+    if value < 1000:
+        return str(value)
+    if value < 1_000_000:
+        return f"{value / 1000:.1f}K".replace(".0K", "K")
+    if value < 1_000_000_000:
+        return f"{value / 1_000_000:.1f}M".replace(".0M", "M")
+    return f"{value / 1_000_000_000:.1f}B".replace(".0B", "B")
+
 
 def draw_fishing_ranking(user_data: List[Dict], output_path: str, ranking_type: str = "coins"):
-    """
-    绘制钓鱼排行榜图片
-
-    参数:
-    user_data: 用户数据列表，每个用户是一个字典，包含昵称、称号、金币、钓鱼数量、鱼竿、饰品等信息
-    output_path: 输出图片路径
-    ranking_type: 排行榜类型 ('coins', 'max_coins', 'fish_count')
-    """
-    # 准备字体
     try:
-        font_title = load_font(42)
-        font_rank = load_font(32)
-        font_name = load_font(22)
-        font_regular = load_font(18)
-        font_small = load_font(16)
+        title_font = load_font(30)
+        kicker_font = load_font(12)
+        subtitle_font = load_font(15)
+        rank_font = load_font(28)
+        name_font = load_font(21)
+        body_font = load_font(15)
+        small_font = load_font(13)
+        metric_font = load_font(26)
     except IOError:
-        logger.warning("指定的字体文件未找到，使用默认字体。")
-        font_title = ImageFont.load_default()
-        font_rank = ImageFont.load_default()
-        font_name = ImageFont.load_default()
-        font_regular = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+        logger.warning("加载排行榜字体失败，回退默认字体。")
+        title_font = ImageFont.load_default()
+        kicker_font = ImageFont.load_default()
+        subtitle_font = ImageFont.load_default()
+        rank_font = ImageFont.load_default()
+        name_font = ImageFont.load_default()
+        body_font = ImageFont.load_default()
+        small_font = ImageFont.load_default()
+        metric_font = ImageFont.load_default()
 
-    # 取前10名用户
-    top_users = user_data[:10] if len(user_data) > 10 else user_data
+    top_users = user_data[:10]
+    rows = max(1, len(top_users))
+    total_height = PADDING * 2 + HEADER_HEIGHT + rows * ROW_HEIGHT + (rows - 1) * ROW_GAP + 32
 
-    # 计算图片高度
-    total_height = HEADER_HEIGHT + (USER_CARD_HEIGHT + USER_CARD_MARGIN) * len(top_users) + PADDING * 2
+    image = create_vertical_gradient(IMG_WIDTH, total_height, BG_TOP, BG_BOTTOM)
+    draw = ImageDraw.Draw(image)
 
-    # 创建图片和绘图对象
-    img = Image.new("RGB", (IMG_WIDTH, total_height), COLOR_BACKGROUND)
-    draw = ImageDraw.Draw(img)
+    left = PADDING
+    right = IMG_WIDTH - PADDING
 
-    # 绘制标题区域
-    draw_rounded_rectangle(draw, (PADDING, PADDING, IMG_WIDTH - PADDING, PADDING + HEADER_HEIGHT),
-                          radius=CORNER_RADIUS, fill=COLOR_HEADER_BG)
+    if ranking_type in {"premium", "premium_currency", "diamond", "diamonds", "gem", "gems"}:
+        title_text = "钻石榜 TOP 10"
+        subtitle_text = "按当前钻石持有量排序"
+        metric_key = "premium_currency"
+        metric_color = CORAL
+        metric_label = "钻石"
+    else:
+        title_text = "金币榜 TOP 10"
+        subtitle_text = "按当前金币持有量排序"
+        metric_key = "coins"
+        metric_color = GOLD
+        metric_label = "金币"
 
-    # 根据排行榜类型设置标题
-    title_text = "钓鱼排行榜 TOP10"
-    if ranking_type == "max_coins":
-        title_text = "金币历史最高 TOP10"
-    elif ranking_type == "fish_count":
-        title_text = "钓获数量排行榜 TOP10"
-    
-    _, (title_width, title_height) = get_text_metrics(title_text, font_title, draw)
-    title_x = (IMG_WIDTH - title_width) // 2
-    title_y = PADDING + (HEADER_HEIGHT - title_height) // 2
-    draw.text((title_x, title_y), title_text, font=font_title, fill=COLOR_HEADER_TEXT)
+    # ---- 顶部标题：editorial-kicker + 大标题（与状态页一致）----
+    kicker_text = "FISHING  RANKING  ·  METAFISHING"
+    draw.text((left, PADDING), kicker_text, font=kicker_font, fill=CORAL)
+    draw.text((left, PADDING + 18), title_text, font=title_font, fill=TEXT_PRIMARY)
+    sub_w, _ = _text_size(draw, subtitle_text, subtitle_font)
+    draw.text((right - sub_w, PADDING + 26), subtitle_text, font=subtitle_font, fill=TEXT_SECONDARY)
 
-    # 绘制用户卡片
-    current_y = PADDING + HEADER_HEIGHT + USER_CARD_MARGIN
+    current_y = PADDING + HEADER_HEIGHT
 
-    # 奖杯符号
-    trophy_symbols = []
-    try:
-        gold_trophy = Image.open(os.path.join(os.path.dirname(__file__),"resource", "gold.png") ).resize((40, 40))
-        silver_trophy = Image.open(os.path.join(os.path.dirname(__file__),"resource", "silver.png")).resize((35, 35))
-        bronze_trophy = Image.open(os.path.join(os.path.dirname(__file__),"resource", "bronze.png")).resize((35, 35))
-        trophy_symbols = [gold_trophy, silver_trophy, bronze_trophy]
-    except Exception as e:
-        logger.warning(f"加载奖杯图片失败: {e}")
-        trophy_symbols = ["1", "2", "3"]
-
+    # ---- 排行榜白底卡片（每行一张）----
     for idx, user in enumerate(top_users):
-        # 获取用户数据
-        nickname = user.get("nickname", "未知用户")
-        title = user.get("title", "无称号")
-        coins = user.get("coins", 0)
-        max_coins = user.get("max_coins", 0)
-        fish_count = user.get("fish_count", 0)
-        fishing_rod = user.get("fishing_rod", "普通鱼竿")
-        accessory = user.get("accessory", "无饰品")
+        row_top = current_y + idx * (ROW_HEIGHT + ROW_GAP)
+        row_bottom = row_top + ROW_HEIGHT
 
-        # 排名颜色
-        rank_color = COLOR_TEXT_GOLD if idx == 0 else COLOR_TEXT_SILVER if idx == 1 else COLOR_TEXT_BRONZE if idx == 2 else COLOR_TEXT_DARK
+        # 前三名使用淡金色卡底，强化视觉
+        bg_fill = TOP_CARD_TINT if idx < 3 else CARD_BG
+        border_color = _rank_color(idx) if idx < 3 else CARD_BORDER
+        border_w = 2 if idx < 3 else 1
 
-        # 绘制卡片背景
-        card_y1 = current_y
-        card_y2 = card_y1 + USER_CARD_HEIGHT
-        draw_rounded_rectangle(draw,
-                              (PADDING, card_y1, IMG_WIDTH - PADDING, card_y2),
-                              radius=10,
-                              fill=COLOR_CARD_BG,
-                              outline=COLOR_CARD_BORDER,
-                              width=2)
+        draw.rounded_rectangle(
+            (left, row_top, right, row_bottom),
+            radius=14,
+            fill=bg_fill,
+            outline=border_color,
+            width=border_w,
+        )
 
-        # 绘制排名
-        rank_x = PADDING + 15
-        if idx < 3 and isinstance(trophy_symbols[0], Image.Image):
-            trophy_img = trophy_symbols[idx]
-            trophy_x = PADDING + 15
-            trophy_y = card_y1 + (USER_CARD_HEIGHT - trophy_img.height) // 2
-            img.paste(trophy_img, (trophy_x, trophy_y), trophy_img if trophy_img.mode == "RGBA" else None)
+        # 内部布局
+        inner_left = left + 22
+        rank_color = _rank_color(idx)
+        rank_text = f"#{idx + 1}"
+        rank_w, _ = _text_size(draw, rank_text, rank_font)
+        # 排名居中显示在左侧
+        rank_y = row_top + (ROW_HEIGHT - 28) // 2 - 2
+        draw.text((inner_left, rank_y), rank_text, font=rank_font, fill=rank_color)
+
+        # 排名右侧装饰小圆点（前三名突出）
+        if idx < 3:
+            dot_x = inner_left + rank_w + 12
+            dot_y = row_top + ROW_HEIGHT // 2 - 3
+            draw.ellipse((dot_x, dot_y, dot_x + 6, dot_y + 6), fill=rank_color)
+            name_col_x = dot_x + 22
         else:
-            rank_text = f"#{idx+1}"
-            rank_y = card_y1 + (USER_CARD_HEIGHT - get_text_metrics(rank_text, font_rank, draw)[1][1]) // 2
-            draw.text((rank_x, rank_y), rank_text, font=font_rank, fill=rank_color)
+            name_col_x = inner_left + max(rank_w, 56) + 18
 
-        # 绘制用户名和称号
-        name_x = PADDING + 70
-        name_y = card_y1 + 15
-        
-        if len(nickname) > 12:
-            nickname = nickname[:10] + "..."
-        draw.text((name_x, name_y), nickname, font=font_name, fill=COLOR_TEXT_DARK)
+        gear_col_x = left + 460
+        metric_col_x = right - 180
 
-        _, (name_width, _) = get_text_metrics(nickname, font_name, draw)
-        title_x = name_x + name_width + 10
-        title_y = name_y + 2
-        title_display = title if len(title) <= 8 else title[:6] + ".."
-        draw.text((title_x, title_y), f"【{title_display}】", font=font_small, fill=COLOR_ACCENT)
+        nickname = _ellipsize(
+            draw,
+            user.get("nickname") or f"渔夫{str(user.get('user_id', ''))[-4:]}",
+            name_font,
+            gear_col_x - name_col_x - 16,
+        )
+        title = _ellipsize(draw, user.get("title") or "无称号", small_font, gear_col_x - name_col_x - 16)
+        rod = _ellipsize(draw, user.get("fishing_rod") or "无鱼竿", body_font, metric_col_x - gear_col_x - 16)
+        accessory = _ellipsize(draw, user.get("accessory") or "无饰品", body_font, metric_col_x - gear_col_x - 16)
+        metric_value = format_large_number(user.get(metric_key, 0))
 
-        # --- 修改：重新布局底部信息行（根据排行榜类型显示）---
-        bottom_line_y = name_y + get_text_metrics(nickname, font_name, draw)[1][1] + 10
-        
-        # 卡片的可用宽度
-        card_left = PADDING
-        card_right = IMG_WIDTH - PADDING
-        card_center = (card_left + card_right) // 2
+        name_y = row_top + 18
+        draw.text((name_col_x, name_y), nickname, font=name_font, fill=TEXT_PRIMARY)
+        draw.text((name_col_x, name_y + 32), f"〔{title}〕", font=small_font, fill=VIOLET)
 
-        # 1. 钓获信息 - 左对齐
-        fish_text = f"钓获: {format_large_number(fish_count)}条"
-        fish_x = name_x
-        draw.text((fish_x, bottom_line_y), fish_text, font=font_regular, fill=COLOR_FISH_COUNT)
+        # 装备列
+        gear_y = row_top + 22
+        draw.text((gear_col_x, gear_y), f"鱼竿  {rod}", font=body_font, fill=TEXT_SECONDARY)
+        draw.text((gear_col_x, gear_y + 26), f"饰品  {accessory}", font=body_font, fill=TEXT_SECONDARY)
 
-        # 2. 金币信息 - 固定在中间位置（根据排行榜类型显示）
-        if ranking_type == "max_coins":
-            # 显示历史最高金币和当前金币（简化版本避免重叠）
-            max_str = format_large_number(max_coins)
-            curr_str = format_large_number(coins)
-            coins_text = f"最高:{max_str} 当前:{curr_str}"
-            # 使用小字体避免重叠
-            coins_font = font_small
-        else:
-            coins_text = f"金币: {format_large_number(coins)}"
-            coins_font = font_regular
-        
-        # 固定"金币:"标签的起始位置在卡片中间偏左一点
-        coins_x = card_center - 80
-        draw.text((coins_x, bottom_line_y), coins_text, font=coins_font, fill=COLOR_COINS)
+        # 指标列：标签 + 大数值
+        metric_y = row_top + 18
+        draw.text((metric_col_x, metric_y), metric_label, font=small_font, fill=TEXT_MUTED)
+        draw.text((metric_col_x, metric_y + 18), metric_value, font=metric_font, fill=metric_color)
 
-        # 3. 装备信息 - 固定在右侧位置
-        rod_display = fishing_rod if len(fishing_rod) <= 8 else fishing_rod[:7] + ".."
-        acc_display = accessory if len(accessory) <= 8 else accessory[:7] + ".."
-        equip_text = f"装备: {rod_display} / {acc_display}"
-        
-        # 装备信息固定从右侧往左260像素开始
-        equip_x = card_right - 260
-        equip_max_width = card_right - equip_x - 15  # 右侧留15像素边距
-        
-        # 尝试使用常规字体
-        _, (equip_text_width, _) = get_text_metrics(equip_text, font_regular, draw)
-        if equip_text_width <= equip_max_width:
-            draw.text((equip_x, bottom_line_y), equip_text, font=font_regular, fill=COLOR_TEXT_DARK)
-        else:
-            # 尝试使用小号字体
-            _, (small_equip_text_width, _) = get_text_metrics(equip_text, font_small, draw)
-            if small_equip_text_width <= equip_max_width:
-                draw.text((equip_x, bottom_line_y), equip_text, font=font_small, fill=COLOR_TEXT_DARK)
-            else:
-                # 进行动态截断
-                temp_text = equip_text
-                while len(temp_text) > 0:
-                    display_text = temp_text + "..."
-                    _, (w, _) = get_text_metrics(display_text, font_small, draw)
-                    if w <= equip_max_width:
-                        draw.text((equip_x, bottom_line_y), display_text, font=font_small, fill=COLOR_TEXT_DARK)
-                        break
-                    temp_text = temp_text[:-1]
-        # --- 修改结束 ---
+    # ---- 页脚 ----
+    footer_text = f"Generated · {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    fw, _ = _text_size(draw, footer_text, small_font)
+    draw.text(((IMG_WIDTH - fw) // 2, total_height - 24), footer_text, font=small_font, fill=TEXT_MUTED)
 
-        # 更新Y坐标
-        current_y = card_y2 + USER_CARD_MARGIN
-
-    # 保存图片
     try:
-        img.save(output_path)
+        image.save(output_path)
         logger.info(f"排行榜图片已保存到 {output_path}")
     except Exception as e:
         logger.error(f"保存排行榜图片失败: {e}")
-        raise e
+        raise

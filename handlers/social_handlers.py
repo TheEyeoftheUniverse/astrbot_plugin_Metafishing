@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 async def ranking(plugin: "FishingPlugin", event: AstrMessageEvent):
     """
     查看排行榜。
-    支持按不同标准排序，例如：/排行榜 数量 或 /排行榜 历史
+    默认按金币排名，支持钻石榜。
     默认按金币排名。
     """
     args = event.message_str.split()
@@ -21,12 +21,10 @@ async def ranking(plugin: "FishingPlugin", event: AstrMessageEvent):
 
     if len(args) > 1:
         sort_key = args[1]
-        if sort_key in ["数量", "钓获", "fish"]:
-            ranking_type = "fish_count"
-        elif sort_key in ["历史", "最高", "max", "history", "历史最高"]:
-            ranking_type = "max_coins"
+        if sort_key in ["钻石", "宝石", "高级货币", "premium", "diamond", "diamonds", "gem", "gems"]:
+            ranking_type = "premium_currency"
 
-    # 1. 从服务层获取基础排行榜数据（现在已包含 user_id 和 current_title_id）
+    # 1. 从服务层获取排行榜数据（已包含称号和装备名称）
     user_data = plugin.user_service.get_leaderboard_data(sort_by=ranking_type).get(
         "leaderboard", []
     )
@@ -35,44 +33,11 @@ async def ranking(plugin: "FishingPlugin", event: AstrMessageEvent):
         yield event.plain_result("❌ 当前没有排行榜数据。")
         return
 
-    # 2. 遍历列表，为每个用户查询并填充装备和称号的【名称】
+    # 2. 向后兼容默认字段
     for user_dict in user_data:
-        user_id = user_dict.get("user_id")
-
-        # 如果（因为某些意外）没有 user_id，则跳过查询，使用默认值
-        if not user_id:
-            user_dict["title"] = "无称号"
-            user_dict["fishing_rod"] = "无鱼竿"
-            user_dict["accessory"] = "无饰品"
-            continue
-
-        # 获取鱼竿名称
-        rod_name = "无鱼竿"
-        rod_instance = plugin.inventory_repo.get_user_equipped_rod(user_id)
-        if rod_instance:
-            rod_template = plugin.item_template_repo.get_rod_by_id(rod_instance.rod_id)
-            if rod_template:
-                rod_name = rod_template.name
-        user_dict["fishing_rod"] = rod_name
-
-        # 获取饰品名称
-        accessory_name = "无饰品"
-        accessory_instance = plugin.inventory_repo.get_user_equipped_accessory(user_id)
-        if accessory_instance:
-            accessory_template = plugin.item_template_repo.get_accessory_by_id(
-                accessory_instance.accessory_id
-            )
-            if accessory_template:
-                accessory_name = accessory_template.name
-        user_dict["accessory"] = accessory_name
-
-        # 获取称号名称
-        title_name = "无称号"
-        if current_title_id := user_dict.get("current_title_id"):
-            title_info = plugin.item_template_repo.get_title_by_id(current_title_id)
-            if title_info:
-                title_name = title_info.name
-        user_dict["title"] = title_name
+        user_dict.setdefault("title", "无称号")
+        user_dict.setdefault("fishing_rod", "无鱼竿")
+        user_dict.setdefault("accessory", "无饰品")
 
     # 3. 绘制并发送图片
     user_id_for_filename = plugin._get_effective_user_id(event)

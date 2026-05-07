@@ -138,8 +138,8 @@ async def _draw_backpack_image_impl(user_data: Dict[str, Any], data_dir: str) ->
     # 导入优化的渐变生成函数
     from .gradient_utils import create_vertical_gradient
 
-    bg_top = (174, 214, 241)  # 柔和天蓝色
-    bg_bot = (245, 251, 255)  # 温和淡蓝色
+    bg_top = (255, 248, 236)  # 纸张暖白
+    bg_bot = (246, 237, 220)  # 纸张暖米
     image = create_vertical_gradient(width, height, bg_top, bg_bot)
     draw = ImageDraw.Draw(image)
 
@@ -151,14 +151,14 @@ async def _draw_backpack_image_impl(user_data: Dict[str, Any], data_dir: str) ->
     tiny_font = load_font(14)
 
     # 3. 颜色定义 - 使用统一颜色系统
-    primary_dark = (52, 73, 94)      # 温和深蓝 - 主标题
-    primary_medium = (74, 105, 134)  # 柔和中蓝 - 副标题
-    primary_light = (108, 142, 191)  # 淡雅蓝 - 强调色
+    primary_dark = (38, 33, 27)      # 纸面深墨
+    primary_medium = (18, 127, 130)  # 水色强调
+    primary_light = (255, 90, 61)  # 珊瑚强调
     
     # 文本色：和谐灰蓝色系
-    text_primary = (55, 71, 79)      # 温和深灰 - 主要文本
-    text_secondary = (120, 144, 156) # 柔和灰蓝 - 次要文本
-    text_muted = (176, 190, 197)     # 温和浅灰 - 弱化文本
+    text_primary = (38, 33, 27)      # 纸面正文
+    text_secondary = (113, 104, 92) # 温和副文
+    text_muted = (151, 139, 122)     # 温和弱化文
     
     # 状态色：使用统一颜色
     success_color = COLOR_SUCCESS
@@ -167,7 +167,7 @@ async def _draw_backpack_image_impl(user_data: Dict[str, Any], data_dir: str) ->
     lock_color = COLOR_LOCK
     
     # 背景色：更柔和的对比
-    card_bg = (255, 255, 255, 240)   # 高透明度白色
+    card_bg = (255, 252, 245, 240)   # 纸面卡底
     
     # 特殊色：使用统一颜色
     gold_color = COLOR_GOLD

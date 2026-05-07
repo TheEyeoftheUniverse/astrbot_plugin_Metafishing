@@ -665,44 +665,18 @@ def _get_user_title(current_title_id, item_template_repo):
     }
     return title_names.get(current_title_id, f"称号#{current_title_id}")
 
-def _get_leaderboard_data(user_repo, item_template_repo, top_n=10):
-    """获取排行榜数据，包含用户称号显示"""
+def _get_leaderboard_data(user_service, top_n=10):
+    """获取排行榜数据，仅保留金币榜与钻石榜。"""
     try:
-        # 获取所有用户
-        all_users = user_repo.get_all_users()
-
-        def _build_rank_list(users, key_fn, extra_field_name=None):
-            ranking = sorted(users, key=key_fn, reverse=True)[:top_n]
-            result = []
-            for idx, u in enumerate(ranking):
-                title = _get_user_title(getattr(u, 'current_title_id', None), item_template_repo)
-                entry = {
-                    "rank": idx + 1,
-                    "user_id": u.user_id,
-                    "nickname": u.nickname,
-                    "current_title_id": getattr(u, 'current_title_id', None),
-                    "title": title
-                }
-                if extra_field_name:
-                    entry[extra_field_name] = getattr(u, extra_field_name, 0)
-                result.append(entry)
-            return result
-
-        coins_leaderboard = _build_rank_list(all_users, lambda u: u.coins, 'coins')
-        fishing_leaderboard = _build_rank_list(all_users, lambda u: u.total_fishing_count, 'total_fishing_count')
-        earned_leaderboard = _build_rank_list(all_users, lambda u: u.total_coins_earned, 'total_coins_earned')
-
         return {
-            "coins": coins_leaderboard,
-            "fishing": fishing_leaderboard,
-            "earned": earned_leaderboard
+            "coins": user_service.get_leaderboard_data(sort_by="coins", limit=top_n).get("leaderboard", []),
+            "premium_currency": user_service.get_leaderboard_data(sort_by="premium_currency", limit=top_n).get("leaderboard", []),
         }
     except Exception as e:
         logger.error(f"获取排行榜数据失败: {e}")
         return {
             "coins": [],
-            "fishing": [],
-            "earned": []
+            "premium_currency": []
         }
 
 def _get_or_create_daily_exhibition(exhibition_file, user_repo, aquarium_service, inventory_repo, item_template_repo):
@@ -2516,7 +2490,7 @@ async def index():
     
     # 使用与游戏中状态显示相同的数据获取函数
     from ..draw.state import get_user_state_data
-    from ..core.utils import get_current_daily_marker, get_now
+    from ..core.utils import get_current_daily_marker
     
     game_config = current_app.config.get("FISHING_SERVICE").config if fishing_service else {}
     user_state = get_user_state_data(
@@ -2534,32 +2508,6 @@ async def index():
     
     # 计算鱼塘总价值
     fish_pond_value = inventory_repo.get_fish_inventory_value(user_id)
-    
-    # 计算钓鱼CD剩余时间（考虑鱼饵星级）
-    fishing_cooldown_remaining = 0
-    if user.last_fishing_time:
-        base_cooldown = game_config.get("fishing", {}).get("cooldown_seconds", 180)
-        
-        # 获取当前鱼饵的星级来计算CD减少
-        cooldown_seconds = base_cooldown
-        if user.current_bait_id:
-            bait_template = item_template_repo.get_bait_by_id(user.current_bait_id)
-            if bait_template and bait_template.rarity >= 5:
-                # 5星开始，每星减少10%，上限60%（10星）
-                reduction_percent = min((bait_template.rarity - 4) * 0.1, 0.6)
-                cooldown_seconds = base_cooldown * (1.0 - reduction_percent)
-        
-        now = get_now()
-        if user.last_fishing_time.tzinfo is None and now.tzinfo is not None:
-            now = now.replace(tzinfo=None)
-        elif user.last_fishing_time.tzinfo is not None and now.tzinfo is None:
-            now = now.replace(tzinfo=user.last_fishing_time.tzinfo)
-        
-        elapsed = (now - user.last_fishing_time).total_seconds()
-        if elapsed < cooldown_seconds:
-            fishing_cooldown_remaining = int(cooldown_seconds - elapsed)
-    
-    user_state['fishing_cooldown_remaining'] = fishing_cooldown_remaining
     
     # 检查当前刷新周期是否已签到
     reset_hour = int(game_config.get("daily_reset_hour", 0) or 0)
@@ -3420,7 +3368,8 @@ async def tavern():
     page_messages = messages[start_idx:end_idx]
     
     # 获取排行榜数据
-    leaderboard = _get_leaderboard_data(user_repo, item_template_repo)
+    user_service = current_app.config.get("USER_SERVICE")
+    leaderboard = _get_leaderboard_data(user_service)
     
     # 获取今日展览数据
     exhibition_data = _get_or_create_daily_exhibition(

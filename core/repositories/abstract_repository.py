@@ -50,6 +50,11 @@ class AbstractUserRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_top_users_by_premium_currency(self, limit: int) -> List[User]:
+        """按钻石数获取排行榜用户列表。"""
+        raise NotImplementedError
+
+    @abstractmethod
     def get_top_users_by_max_coins(self, limit: int) -> List[User]:
         """按历史最高金币数获取排行榜用户列表。"""
         raise NotImplementedError

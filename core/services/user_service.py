@@ -111,7 +111,7 @@ class UserService:
         获取排行榜数据，支持按不同标准排序。
 
         Args:
-            sort_by: 排序标准 ('coins', 'max_coins', 'fish_count')
+            sort_by: 排序标准 ('coins', 'premium_currency', 'max_coins', 'fish_count')
             limit: 返回的用户数量限制
 
         Returns:
@@ -120,26 +120,49 @@ class UserService:
         top_users = []
         if sort_by == "fish_count":
             top_users = self.user_repo.get_top_users_by_fish_count(limit)
+        elif sort_by in {"premium", "premium_currency", "diamond", "diamonds", "gem", "gems"}:
+            top_users = self.user_repo.get_top_users_by_premium_currency(limit)
         elif sort_by == "max_coins":
             top_users = self.user_repo.get_top_users_by_max_coins(limit)
         else: # 默认按金币排序
             top_users = self.user_repo.get_top_users_by_coins(limit)
-        
+
         leaderboard = []
-        for user in top_users:
-            # --- [核心修复] ---
-            # 在组装字典时，必须包含 user_id 和 current_title_id
-            # 这样下游的 handler 才能根据这些ID去查询详细信息
+        for idx, user in enumerate(top_users, start=1):
+            rod_name = "无鱼竿"
+            rod_instance = self.inventory_repo.get_user_equipped_rod(user.user_id)
+            if rod_instance:
+                rod_template = self.item_template_repo.get_rod_by_id(rod_instance.rod_id)
+                if rod_template:
+                    rod_name = rod_template.name
+
+            accessory_name = "无饰品"
+            accessory_instance = self.inventory_repo.get_user_equipped_accessory(user.user_id)
+            if accessory_instance:
+                accessory_template = self.item_template_repo.get_accessory_by_id(accessory_instance.accessory_id)
+                if accessory_template:
+                    accessory_name = accessory_template.name
+
+            title_name = "无称号"
+            if getattr(user, "current_title_id", None):
+                title_template = self.item_template_repo.get_title_by_id(user.current_title_id)
+                if title_template:
+                    title_name = title_template.name
+
             leaderboard.append({
-                "user_id": user.user_id,  # <--- 添加 user_id
+                "rank": idx,
+                "user_id": user.user_id,
                 "nickname": user.nickname,
                 "coins": user.coins,
-                "max_coins": user.max_coins,  # 添加历史最高金币
+                "premium_currency": getattr(user, "premium_currency", 0),
+                "max_coins": user.max_coins,
                 "fish_count": user.total_fishing_count,
-                "current_title_id": user.current_title_id, # <--- 添加 current_title_id
+                "current_title_id": user.current_title_id,
+                "title": title_name,
+                "fishing_rod": rod_name,
+                "accessory": accessory_name,
             })
-        # --- [修复结束] ---
-        
+
         return {
             "success": True,
             "leaderboard": leaderboard
