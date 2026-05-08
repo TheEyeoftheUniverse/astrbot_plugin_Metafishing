@@ -156,6 +156,7 @@ async def peek_pond(plugin: "FishingPlugin", event: AstrMessageEvent):
             "❌ 请指定要查看的用户！\n用法：/偷看鱼塘 @用户 或 /偷看鱼塘 用户ID"
         )
         return
+    target_user_id = plugin._resolve_external_user_id(target_user_id)
 
     # 检查目标用户是否存在
     target_user = plugin.user_repo.get_by_id(target_user_id)

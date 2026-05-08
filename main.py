@@ -19,6 +19,7 @@ from .core.repositories.sqlite_log_repo import SqliteLogRepository
 from .core.repositories.sqlite_achievement_repo import SqliteAchievementRepository
 from .core.repositories.sqlite_user_buff_repo import SqliteUserBuffRepository
 from .core.repositories.sqlite_exchange_repo import SqliteExchangeRepository # 新增交易所Repo
+from .core.repositories.sqlite_aquarium_income_repo import SqliteAquariumIncomeRepository
 
 from .core.services.data_setup_service import DataSetupService
 from .core.services.item_template_service import ItemTemplateService
@@ -33,9 +34,19 @@ from .core.services.game_mechanics_service import GameMechanicsService
 from .core.services.effect_manager import EffectManager
 from .core.services.fishing_zone_service import FishingZoneService
 from .core.services.exchange_service import ExchangeService # 新增交易所Service
+from .core.services.aquarium_income_service import AquariumIncomeService
+from .core.services.aquarium_quips_service import AquariumQuipsService
 
 from .core.database.migration import run_migrations
-from .utils import _is_port_available, kill_processes_on_port
+from .utils import (
+    _is_port_available,
+    kill_processes_on_port,
+    confirm_pending_external_account_binding,
+    detect_event_account_provider,
+    normalize_external_account_id,
+    resolve_bound_game_user_id,
+    resolve_event_user_id,
+)
 
 # ==========================================================
 # 导入所有指令函数
@@ -244,6 +255,7 @@ class FishingPlugin(Star):
         self.achievement_repo = SqliteAchievementRepository(db_path)
         self.buff_repo = SqliteUserBuffRepository(db_path)
         self.exchange_repo = SqliteExchangeRepository(db_path)
+        self.aquarium_income_repo = SqliteAquariumIncomeRepository(db_path)
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
         # 3.1 核心服务必须在效果管理器之前实例化，以解决依赖问题
@@ -312,9 +324,27 @@ class FishingPlugin(Star):
         
         # 初始化交易所服务
         self.exchange_service = ExchangeService(self.user_repo, self.exchange_repo, self.game_config, self.log_repo, self.market_service)
-        
+
         # 初始化交易所处理器
         self.exchange_handlers = ExchangeHandlers(self)
+
+        # 初始化水族箱被动收益与 LLM 短评服务
+        self.aquarium_quips_service = AquariumQuipsService(
+            income_repo=self.aquarium_income_repo,
+            item_template_repo=self.item_template_repo,
+            data_dir=self.data_dir,
+            game_config=self.game_config,
+            context=self.context,
+        )
+        self.aquarium_income_service = AquariumIncomeService(
+            income_repo=self.aquarium_income_repo,
+            inventory_repo=self.inventory_repo,
+            user_repo=self.user_repo,
+            item_template_repo=self.item_template_repo,
+            game_config=self.game_config,
+            exchange_price_service=self.exchange_service.price_service,
+            aquarium_quips_service=self.aquarium_quips_service,
+        )
         
         #初始化钓鱼处理器
         self.fishing_handlers = FishingHandlers(self)
@@ -349,6 +379,7 @@ class FishingPlugin(Star):
             self.fishing_service.start_daily_tax_task()  # 启动独立的税收线程
         self.achievement_service.start_achievement_check_task()
         self.exchange_service.start_daily_price_update_task() # 启动交易所后台任务
+        self.aquarium_quips_service.start_daily_refresh_task()  # 启动水族箱短评每日刷新任务
         
         # --- 5. 初始化核心游戏数据 ---
         data_setup_service = DataSetupService(
@@ -413,10 +444,18 @@ class FishingPlugin(Star):
         """获取在当前上下文中应当作为指令执行者的用户ID。
         - 默认返回消息发送者ID
         - 若发送者是管理员且已开启代理，则返回被代理用户ID
+        - 若发送者绑定了 QQ/Telegram 别名，则返回主游戏账号ID
         注意：仅在非管理员指令中调用该方法；管理员指令应使用真实管理员ID。
         """
         admin_id = event.get_sender_id()
-        return self.impersonation_map.get(admin_id, admin_id)
+        impersonated_id = self.impersonation_map.get(admin_id)
+        if impersonated_id:
+            return impersonated_id
+        return resolve_event_user_id(event)
+
+    def _resolve_external_user_id(self, raw_user_id: str, provider: str = "") -> str:
+        """将外部平台数字ID解析为绑定后的主游戏账号ID。"""
+        return resolve_bound_game_user_id(raw_user_id, provider)
 
     def _is_group_message_event(self, event: AstrMessageEvent) -> bool:
         """尽量兼容不同平台适配器的群聊判断。"""
@@ -554,6 +593,12 @@ class FishingPlugin(Star):
         async for r in aquarium_handlers.remove_rarity_from_aquarium(self, event):
             yield r
 
+    @filter.command("水族箱领取", alias={"领取水族箱", "水族箱收益"})
+    async def claim_aquarium_income(self, event: AstrMessageEvent):
+        """领取水族箱被动收益钱袋（每日三次窗口与交易所同步刷新）"""
+        async for r in aquarium_handlers.claim_aquarium_income(self, event):
+            yield r
+
     @filter.command("鱼竿")
     async def rod(self, event: AstrMessageEvent):
         """查看你拥有的所有鱼竿"""
@@ -671,6 +716,30 @@ class FishingPlugin(Star):
         from .player.server import reset_user_password_to_new_initial
         new_initial_password = reset_user_password_to_new_initial(user_id)
         yield event.plain_result(f"你的 WebUI/App 登录密钥已重置。新的初始密码是：{new_initial_password}")
+
+    @filter.command("账号绑定")
+    async def confirm_account_binding(self, event: AstrMessageEvent):
+        """确认 WebUI 端提交的 QQ/Telegram 账号绑定申请。用法：账号绑定 <WebUI登录账号ID>"""
+        parts = event.message_str.strip().split()
+        if len(parts) < 2:
+            yield event.plain_result("❌ 用法：账号绑定 <WebUI登录账号ID>")
+            return
+
+        webui_user_id = parts[1].strip()
+        provider = detect_event_account_provider(event)
+        external_id = normalize_external_account_id(event.get_sender_id())
+        provider_candidates = [provider] if provider else ["qq", "telegram"]
+        result = {}
+        for provider_candidate in provider_candidates:
+            result = confirm_pending_external_account_binding(
+                webui_user_id=webui_user_id,
+                provider=provider_candidate,
+                external_id=external_id,
+                user_repo=self.user_repo,
+            )
+            if result.get("success"):
+                break
+        yield event.plain_result(result.get("message", "账号绑定处理完成"))
 
     @filter.command("获取网页端地址", alias={"网页端地址", "获取WebUI地址", "WebUI地址", "获取网页地址"})
     async def get_player_webui_url(self, event: AstrMessageEvent):
@@ -1335,6 +1404,8 @@ class FishingPlugin(Star):
                 "gacha_service": self.gacha_service,
                 "exchange_service": self.exchange_service,
                 "aquarium_service": self.aquarium_service,
+                "aquarium_income_service": self.aquarium_income_service,
+                "aquarium_quips_service": self.aquarium_quips_service,
                 "expedition_service": self.expedition_service,
             }
 

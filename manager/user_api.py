@@ -919,27 +919,29 @@ async def api_login():
             return jsonify({"success": False, "message": "请输入登录密钥"}), 400
 
         user_repo = current_app.config["USER_REPO"]
-        user = user_repo.get_by_id(user_id)
+        from ..utils import resolve_bound_game_user_id
+        login_user_id = resolve_bound_game_user_id(user_id)
+        user = user_repo.get_by_id(login_user_id)
         if not user:
             logger.warning(f"[WebUI] 未注册用户 {user_id} 尝试通过 API 登录")
             return jsonify({"success": False, "message": "该用户不存在"}), 404
 
         from ..player import server as player_server
 
-        player_server.ensure_initial_password(user_id)
-        if not player_server.verify_user_password(user_id, password):
+        player_server.ensure_initial_password(login_user_id)
+        if not player_server.verify_user_password(login_user_id, password):
             return jsonify({"success": False, "message": "密钥错误"}), 401
 
         player_server._login_player_session(user)
-        login_message = f"欢迎回来，{user.nickname or user_id}！"
+        login_message = f"欢迎回来，{user.nickname or login_user_id}！"
 
-        logger.info(f"[WebUI] 用户 {user_id} 通过 API 登录成功")
+        logger.info(f"[WebUI] 用户 {user_id} 通过 API 登录成功，实际账号 {login_user_id}")
         return jsonify({
             "success": True,
             "message": login_message,
             "data": {
-                "user_id": user_id,
-                "nickname": user.nickname or user_id,
+                "user_id": login_user_id,
+                "nickname": user.nickname or login_user_id,
                 "first_login": False
             }
         })
@@ -1358,6 +1360,42 @@ async def get_aquarium():
     except Exception as e:
         logger.error(f"获取水族箱富数据失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/aquarium/income/pending", methods=["GET"])
+@api_login_required
+async def get_aquarium_income_pending():
+    """查询当前用户的水族箱被动收益待领取摘要。"""
+    user_id = session.get("user_id")
+    income_service = current_app.config.get("AQUARIUM_INCOME_SERVICE")
+    if income_service is None:
+        return jsonify({"success": False, "message": "被动收益服务未启用"}), 500
+    try:
+        summary = income_service.get_pending_summary(user_id)
+        return jsonify({
+            "success": True,
+            "pending_count": int(summary.get("pending_count", 0) or 0),
+            "estimated_amount": int(summary.get("estimated_amount", 0) or 0),
+        })
+    except Exception as exc:
+        logger.error(f"[WebUI] 查询水族箱被动收益失败: {exc}", exc_info=True)
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@user_api_bp.route("/aquarium/income/claim", methods=["POST"])
+@api_login_required
+async def claim_aquarium_income():
+    """领取所有水族箱被动收益钱袋。"""
+    user_id = session.get("user_id")
+    income_service = current_app.config.get("AQUARIUM_INCOME_SERVICE")
+    if income_service is None:
+        return jsonify({"success": False, "message": "被动收益服务未启用"}), 500
+    try:
+        result = income_service.claim_all(user_id)
+        return jsonify(result)
+    except Exception as exc:
+        logger.error(f"[WebUI] 领取水族箱被动收益失败: {exc}", exc_info=True)
+        return jsonify({"success": False, "message": str(exc)}), 500
 
 
 @user_api_bp.route("/rods", methods=["GET"])

@@ -1,15 +1,439 @@
 import re
 import socket
 import os
+import json
 import platform
 import signal
 import subprocess
 import time
+from datetime import datetime
 
 import aiohttp
 import asyncio
 
 from astrbot.api import logger
+
+
+ACCOUNT_BINDING_PROVIDERS = {
+    "qq": "QQ",
+    "telegram": "Telegram",
+}
+
+WEBUI_ACCOUNT_ALIAS_PROVIDER = "webui"
+
+
+def _get_account_provider_label(provider: str) -> str:
+    if provider == WEBUI_ACCOUNT_ALIAS_PROVIDER:
+        return "WebUI登录账号"
+    return ACCOUNT_BINDING_PROVIDERS.get(provider, provider or "账号")
+
+
+def _get_alias_lookup_providers() -> tuple:
+    return tuple(ACCOUNT_BINDING_PROVIDERS.keys()) + (WEBUI_ACCOUNT_ALIAS_PROVIDER,)
+
+
+def _get_account_bindings_file() -> str:
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, "account_bindings.json")
+
+
+def _get_empty_account_bindings() -> dict:
+    return {"aliases": {}, "users": {}, "pending": {}}
+
+
+def load_account_bindings() -> dict:
+    bindings_file = _get_account_bindings_file()
+    if not os.path.exists(bindings_file):
+        return _get_empty_account_bindings()
+
+    try:
+        with open(bindings_file, "r", encoding="utf-8") as file:
+            data = json.load(file)
+        if not isinstance(data, dict):
+            return _get_empty_account_bindings()
+        aliases = data.get("aliases") if isinstance(data.get("aliases"), dict) else {}
+        users = data.get("users") if isinstance(data.get("users"), dict) else {}
+        pending = data.get("pending") if isinstance(data.get("pending"), dict) else {}
+        return {"aliases": aliases, "users": users, "pending": pending}
+    except Exception as exc:
+        logger.error(f"加载账号绑定关系失败: {exc}")
+        return _get_empty_account_bindings()
+
+
+def save_account_bindings(bindings: dict) -> None:
+    try:
+        with open(_get_account_bindings_file(), "w", encoding="utf-8") as file:
+            json.dump(bindings, file, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        logger.error(f"保存账号绑定关系失败: {exc}")
+
+
+def normalize_account_provider(provider: str) -> str:
+    provider = str(provider or "").strip().lower()
+    if provider in {"qq", "q"}:
+        return "qq"
+    if provider in {"telegram", "tg", "telegrame"}:
+        return "telegram"
+    if provider in {"webui", "linuxdo"}:
+        return WEBUI_ACCOUNT_ALIAS_PROVIDER
+    return ""
+
+
+def normalize_external_account_id(external_id: str) -> str:
+    external_id = str(external_id or "").strip()
+    external_id = re.sub(r"\s+", "", external_id)
+    if not re.fullmatch(r"\d{4,32}", external_id):
+        return ""
+    return external_id
+
+
+def build_account_alias_key(provider: str, external_id: str) -> str:
+    provider = normalize_account_provider(provider)
+    external_id = normalize_external_account_id(external_id)
+    if not provider or not external_id:
+        return ""
+    return f"{provider}:{external_id}"
+
+
+def build_pending_account_binding_key(provider: str, external_id: str, game_user_id: str) -> str:
+    alias_key = build_account_alias_key(provider, external_id)
+    game_user_id = str(game_user_id or "").strip()
+    if not alias_key or not game_user_id:
+        return ""
+    return f"{alias_key}->{game_user_id}"
+
+
+def create_pending_external_account_binding(game_user_id: str, provider: str, external_id: str) -> dict:
+    game_user_id = str(game_user_id or "").strip()
+    provider = normalize_account_provider(provider)
+    external_id = normalize_external_account_id(external_id)
+    if not game_user_id:
+        return {"success": False, "message": "当前玩家ID无效"}
+    if provider not in ACCOUNT_BINDING_PROVIDERS:
+        return {"success": False, "message": "绑定平台无效"}
+    if not external_id:
+        return {"success": False, "message": "请输入 4~32 位数字ID"}
+
+    alias_key = build_account_alias_key(provider, external_id)
+    bindings = load_account_bindings()
+    aliases = bindings.setdefault("aliases", {})
+    pending = bindings.setdefault("pending", {})
+
+    existing_alias = aliases.get(alias_key)
+    existing_user_id = ""
+    if isinstance(existing_alias, dict):
+        existing_user_id = str(existing_alias.get("game_user_id", "") or "").strip()
+    elif existing_alias:
+        existing_user_id = str(existing_alias).strip()
+    if existing_user_id and existing_user_id != game_user_id:
+        return {
+            "success": False,
+            "message": f"这个{ACCOUNT_BINDING_PROVIDERS[provider]}号已经绑定到其他玩家",
+        }
+
+    pending_key = build_pending_account_binding_key(provider, external_id, game_user_id)
+    pending[pending_key] = {
+        "game_user_id": game_user_id,
+        "provider": provider,
+        "external_id": external_id,
+        "requested_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    save_account_bindings(bindings)
+    return {
+        "success": True,
+        "message": f"绑定申请已提交。请使用{ACCOUNT_BINDING_PROVIDERS[provider]}账号在指令端输入：账号绑定 {game_user_id}",
+    }
+
+
+def _upsert_account_alias(bindings: dict, game_user_id: str, provider: str, external_id: str) -> None:
+    aliases = bindings.setdefault("aliases", {})
+    users = bindings.setdefault("users", {})
+    provider = normalize_account_provider(provider)
+    external_id = normalize_external_account_id(external_id)
+    game_user_id = str(game_user_id or "").strip()
+    if not provider or not external_id or not game_user_id:
+        return
+
+    user_bindings = users.setdefault(game_user_id, {})
+    previous_external_id = normalize_external_account_id(user_bindings.get(provider, ""))
+    previous_alias_key = build_account_alias_key(provider, previous_external_id)
+    alias_key = build_account_alias_key(provider, external_id)
+    if previous_alias_key and previous_alias_key != alias_key:
+        aliases.pop(previous_alias_key, None)
+
+    user_bindings[provider] = external_id
+    aliases[alias_key] = {
+        "game_user_id": game_user_id,
+        "provider": provider,
+        "external_id": external_id,
+        "linked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+
+def _remove_user_alias(bindings: dict, game_user_id: str, provider: str) -> None:
+    aliases = bindings.setdefault("aliases", {})
+    users = bindings.setdefault("users", {})
+    provider = normalize_account_provider(provider)
+    user_bindings = users.get(str(game_user_id or "").strip())
+    if not provider or not isinstance(user_bindings, dict):
+        return
+
+    external_id = normalize_external_account_id(user_bindings.pop(provider, ""))
+    alias_key = build_account_alias_key(provider, external_id)
+    if alias_key:
+        aliases.pop(alias_key, None)
+    if not any(normalize_external_account_id(user_bindings.get(item, "")) for item in user_bindings):
+        users.pop(str(game_user_id or "").strip(), None)
+
+
+def _parse_registration_time(value) -> float:
+    if isinstance(value, datetime):
+        parsed = value
+    elif value:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return float("inf")
+    else:
+        return float("inf")
+
+    try:
+        return parsed.timestamp()
+    except ValueError:
+        return float("inf")
+
+
+def _choose_primary_bound_user_id(user_repo, webui_user_id: str, external_id: str) -> tuple[str, bool]:
+    webui_user_id = str(webui_user_id or "").strip()
+    external_id = normalize_external_account_id(external_id)
+    webui_user = user_repo.get_by_id(webui_user_id) if user_repo and webui_user_id else None
+    external_user = user_repo.get_by_id(external_id) if user_repo and external_id else None
+
+    if not webui_user:
+        return "", False
+    if not external_user or webui_user_id == external_id:
+        return webui_user_id, False
+
+    webui_created_at = _parse_registration_time(getattr(webui_user, "created_at", None))
+    external_created_at = _parse_registration_time(getattr(external_user, "created_at", None))
+    if external_created_at < webui_created_at:
+        return external_id, True
+    return webui_user_id, True
+
+
+def confirm_pending_external_account_binding(
+    webui_user_id: str,
+    provider: str,
+    external_id: str,
+    user_repo,
+) -> dict:
+    webui_user_id = str(webui_user_id or "").strip()
+    provider = normalize_account_provider(provider)
+    external_id = normalize_external_account_id(external_id)
+    if not webui_user_id:
+        return {"success": False, "message": "请提供 WebUI 端使用的登录账号ID"}
+    if provider not in ACCOUNT_BINDING_PROVIDERS:
+        return {"success": False, "message": "无法识别当前指令平台，请在 QQ 或 Telegram 端确认绑定"}
+    if not external_id:
+        return {"success": False, "message": "当前平台账号ID无效"}
+
+    bindings = load_account_bindings()
+    aliases = bindings.setdefault("aliases", {})
+    pending = bindings.setdefault("pending", {})
+    pending_key = build_pending_account_binding_key(provider, external_id, webui_user_id)
+    request_payload = pending.get(pending_key)
+    if not isinstance(request_payload, dict):
+        return {
+            "success": False,
+            "message": f"没有找到匹配的绑定申请。请先在 WebUI 个人信息页提交{ACCOUNT_BINDING_PROVIDERS[provider]}号绑定申请。",
+        }
+
+    alias_key = build_account_alias_key(provider, external_id)
+    existing_alias = aliases.get(alias_key)
+    existing_user_id = ""
+    if isinstance(existing_alias, dict):
+        existing_user_id = str(existing_alias.get("game_user_id", "") or "").strip()
+    elif existing_alias:
+        existing_user_id = str(existing_alias).strip()
+    if existing_user_id and existing_user_id != webui_user_id:
+        return {
+            "success": False,
+            "message": f"这个{ACCOUNT_BINDING_PROVIDERS[provider]}号已经绑定到其他玩家",
+        }
+
+    primary_user_id, both_have_data = _choose_primary_bound_user_id(user_repo, webui_user_id, external_id)
+    if not primary_user_id:
+        return {"success": False, "message": f"WebUI 登录账号 {webui_user_id} 不存在，请检查后重试"}
+
+    for losing_user_id in {webui_user_id, external_id} - {primary_user_id}:
+        _remove_user_alias(bindings, losing_user_id, provider)
+        _remove_user_alias(bindings, losing_user_id, WEBUI_ACCOUNT_ALIAS_PROVIDER)
+
+    _upsert_account_alias(bindings, primary_user_id, provider, external_id)
+    if primary_user_id != webui_user_id:
+        _upsert_account_alias(bindings, primary_user_id, WEBUI_ACCOUNT_ALIAS_PROVIDER, webui_user_id)
+
+    pending.pop(pending_key, None)
+    save_account_bindings(bindings)
+
+    message = f"账号绑定完成：{ACCOUNT_BINDING_PROVIDERS[provider]} {external_id} -> 玩家 {primary_user_id}"
+    if both_have_data:
+        message += "\n检测到两边都有玩家数据，已按最早注册时间保留更早的账号作为主账号。"
+    return {
+        "success": True,
+        "message": message,
+        "primary_user_id": primary_user_id,
+    }
+
+
+def get_user_account_bindings(game_user_id: str) -> dict:
+    game_user_id = str(game_user_id or "").strip()
+    result = {provider: "" for provider in ACCOUNT_BINDING_PROVIDERS}
+    if not game_user_id:
+        return result
+
+    bindings = load_account_bindings()
+    user_bindings = bindings.get("users", {}).get(game_user_id)
+    if isinstance(user_bindings, dict):
+        for provider in ACCOUNT_BINDING_PROVIDERS:
+            result[provider] = normalize_external_account_id(user_bindings.get(provider, ""))
+    return result
+
+
+def bind_external_account(game_user_id: str, provider: str, external_id: str) -> dict:
+    game_user_id = str(game_user_id or "").strip()
+    provider = normalize_account_provider(provider)
+    external_id = normalize_external_account_id(external_id)
+    if not game_user_id:
+        return {"success": False, "message": "当前玩家ID无效"}
+    if provider not in ACCOUNT_BINDING_PROVIDERS:
+        return {"success": False, "message": "绑定平台无效"}
+    if not external_id:
+        return {"success": False, "message": "请输入 4~32 位数字ID"}
+
+    alias_key = build_account_alias_key(provider, external_id)
+    bindings = load_account_bindings()
+    aliases = bindings.setdefault("aliases", {})
+    users = bindings.setdefault("users", {})
+
+    existing_alias = aliases.get(alias_key)
+    existing_user_id = ""
+    if isinstance(existing_alias, dict):
+        existing_user_id = str(existing_alias.get("game_user_id", "") or "").strip()
+    elif existing_alias:
+        existing_user_id = str(existing_alias).strip()
+
+    if existing_user_id and existing_user_id != game_user_id:
+        return {
+            "success": False,
+            "message": f"这个{_get_account_provider_label(provider)}已经绑定到其他玩家",
+        }
+
+    _upsert_account_alias(bindings, game_user_id, provider, external_id)
+    save_account_bindings(bindings)
+    return {
+        "success": True,
+        "message": f"{_get_account_provider_label(provider)}已绑定",
+        "bindings": get_user_account_bindings(game_user_id),
+    }
+
+
+def unbind_external_account(game_user_id: str, provider: str) -> dict:
+    game_user_id = str(game_user_id or "").strip()
+    provider = normalize_account_provider(provider)
+    if not game_user_id:
+        return {"success": False, "message": "当前玩家ID无效"}
+    if provider not in ACCOUNT_BINDING_PROVIDERS:
+        return {"success": False, "message": "绑定平台无效"}
+
+    bindings = load_account_bindings()
+    users = bindings.setdefault("users", {})
+    user_bindings = users.get(game_user_id)
+    if not isinstance(user_bindings, dict):
+        return {"success": False, "message": "没有可解绑的账号"}
+
+    _remove_user_alias(bindings, game_user_id, provider)
+    refreshed_user_bindings = bindings.get("users", {}).get(game_user_id, {})
+    if isinstance(refreshed_user_bindings, dict) and not any(
+        normalize_external_account_id(refreshed_user_bindings.get(item, ""))
+        for item in ACCOUNT_BINDING_PROVIDERS
+    ):
+        _remove_user_alias(bindings, game_user_id, WEBUI_ACCOUNT_ALIAS_PROVIDER)
+
+    save_account_bindings(bindings)
+    return {
+        "success": True,
+        "message": f"{_get_account_provider_label(provider)}已解绑",
+        "bindings": get_user_account_bindings(game_user_id),
+    }
+
+
+def resolve_bound_game_user_id(raw_user_id: str, provider: str = "") -> str:
+    raw_user_id = str(raw_user_id or "").strip()
+    if not raw_user_id:
+        return raw_user_id
+
+    normalized_provider = normalize_account_provider(provider)
+    normalized_external_id = normalize_external_account_id(raw_user_id)
+    if not normalized_external_id:
+        return raw_user_id
+
+    bindings = load_account_bindings()
+    aliases = bindings.get("aliases", {})
+
+    def read_alias(alias_key: str) -> str:
+        alias = aliases.get(alias_key)
+        if isinstance(alias, dict):
+            return str(alias.get("game_user_id", "") or "").strip()
+        if alias:
+            return str(alias).strip()
+        return ""
+
+    if normalized_provider:
+        return read_alias(build_account_alias_key(normalized_provider, normalized_external_id)) or raw_user_id
+
+    matched_user_ids = {
+        user_id
+        for provider_name in _get_alias_lookup_providers()
+        for user_id in [read_alias(build_account_alias_key(provider_name, normalized_external_id))]
+        if user_id
+    }
+    if len(matched_user_ids) == 1:
+        return next(iter(matched_user_ids))
+    return raw_user_id
+
+
+def detect_event_account_provider(event) -> str:
+    candidates = []
+    for method_name in ("get_platform_name", "get_platform", "get_adapter_name"):
+        method = getattr(event, method_name, None)
+        if callable(method):
+            try:
+                candidates.append(str(method() or ""))
+            except Exception:
+                pass
+
+    message_obj = getattr(event, "message_obj", None)
+    for attr in ("platform", "platform_name", "adapter", "adapter_name", "type", "message_type"):
+        value = getattr(message_obj, attr, None)
+        if value:
+            candidates.append(str(value))
+
+    joined = " ".join(candidates).lower()
+    if any(token in joined for token in ("telegram", "tg")):
+        return "telegram"
+    if any(token in joined for token in ("qq", "onebot", "aiocq", "napcat")):
+        return "qq"
+    if hasattr(message_obj, "self_id"):
+        return "qq"
+    return ""
+
+
+def resolve_event_user_id(event) -> str:
+    raw_user_id = str(event.get_sender_id())
+    provider = detect_event_account_provider(event)
+    return resolve_bound_game_user_id(raw_user_id, provider)
 
 async def get_local_ip():
     """异步获取内网IPv4地址"""
@@ -409,13 +833,13 @@ def parse_target_user_id(event, args: list, arg_index: int = 1) -> Tuple[Optiona
     
     # 如果从@中获取到了用户ID，直接返回
     if target_id is not None:
-        return str(target_id), None
+        return resolve_bound_game_user_id(str(target_id), "qq"), None
     
     # 如果没有@，尝试从参数中获取
     if len(args) > arg_index:
         target_user_id = args[arg_index]
         # 接受任意字符串格式的 user_id（支持 QQ 纯数字和钉钉复杂字符串等各种平台）
-        return target_user_id, None
+        return resolve_bound_game_user_id(target_user_id), None
     
     # 如果既没有@也没有参数，返回错误
     return None, f"❌ 请指定目标用户（用户ID或@用户），例如：/命令 <用户ID> 或 /命令 @用户"

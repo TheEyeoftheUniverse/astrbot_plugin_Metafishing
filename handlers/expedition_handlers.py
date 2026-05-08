@@ -48,9 +48,9 @@ class ExpeditionHandlers:
                     if isinstance(comp, At):
                         # 排除机器人本身的id
                         if hasattr(message_obj, 'self_id') and comp.qq != message_obj.self_id:
-                            invited_user_ids.append(str(comp.qq))
+                            invited_user_ids.append(plugin._resolve_external_user_id(str(comp.qq), "qq"))
                         elif not hasattr(message_obj, 'self_id'):
-                            invited_user_ids.append(str(comp.qq))
+                            invited_user_ids.append(plugin._resolve_external_user_id(str(comp.qq), "qq"))
             
             # 如果没有获取到，尝试从原始消息中用正则提取（备用方案）
             if not invited_user_ids:
@@ -59,13 +59,13 @@ class ExpeditionHandlers:
                 at_pattern = r'\[CQ:at,qq=(\d+)\]'
                 matches = re.findall(at_pattern, raw_message)
                 if matches:
-                    invited_user_ids = matches
+                    invited_user_ids = [plugin._resolve_external_user_id(match, "qq") for match in matches]
             
             if invited_user_ids:
                 logger.info(f"从消息中提取到被邀请用户: {invited_user_ids}")
             
             # 创建科考
-            user_id = event.get_sender_id()
+            user_id = plugin._get_effective_user_id(event)
             result = self.expedition_service.create_expedition(
                 creator_id=user_id,
                 expedition_type=exp_type,
@@ -94,7 +94,7 @@ class ExpeditionHandlers:
                 }
             
             expedition_id = parts[1].strip()
-            user_id = event.get_sender_id()
+            user_id = plugin._get_effective_user_id(event)
             
             result = self.expedition_service.join_expedition(user_id, expedition_id)
             return result
@@ -109,7 +109,7 @@ class ExpeditionHandlers:
         命令：/退出科考
         """
         try:
-            user_id = event.get_sender_id()
+            user_id = plugin._get_effective_user_id(event)
             result = self.expedition_service.leave_expedition(user_id)
             return result
             
@@ -123,7 +123,7 @@ class ExpeditionHandlers:
         命令：/科考状态
         """
         try:
-            user_id = event.get_sender_id()
+            user_id = plugin._get_effective_user_id(event)
             
             # 先更新当前科考的进度数据
             current_exp = self.expedition_service.get_user_expedition(user_id)
@@ -148,7 +148,7 @@ class ExpeditionHandlers:
         命令：/结束科考
         """
         try:
-            user_id = event.get_sender_id()
+            user_id = plugin._get_effective_user_id(event)
             result = self.expedition_service.end_expedition(user_id)
             return result
             
@@ -225,6 +225,6 @@ class ExpeditionHandlers:
         测试命令：强制将当前科考设置为100%完成
         命令：/测试科考
         """
-        user_id = event.get_sender_id()
+        user_id = plugin._get_effective_user_id(event)
         result = self.expedition_service.test_complete_expedition(user_id)
         return result

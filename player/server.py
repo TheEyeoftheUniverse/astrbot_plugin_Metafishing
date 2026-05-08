@@ -22,6 +22,15 @@ from ..manager.unity_api import (
     register_unity_user_api_routes,
     unity_api_bp,
 )
+from ..utils import (
+    ACCOUNT_BINDING_PROVIDERS,
+    create_pending_external_account_binding,
+    get_user_account_bindings,
+    normalize_account_provider,
+    normalize_external_account_id,
+    resolve_bound_game_user_id,
+    unbind_external_account,
+)
 
 
 player_bp = Blueprint(
@@ -896,6 +905,12 @@ def login_required(f):
     async def decorated_function(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("player_bp.login"))
+        resolved_user_id = resolve_bound_game_user_id(session.get("user_id", ""))
+        if resolved_user_id and resolved_user_id != session.get("user_id"):
+            user_repo = current_app.config.get("USER_REPO")
+            resolved_user = user_repo.get_by_id(resolved_user_id) if user_repo else None
+            if resolved_user:
+                _login_player_session(resolved_user, auth_provider=session.get("auth_provider", "password"))
         return await f(*args, **kwargs)
     return decorated_function
 
@@ -926,24 +941,25 @@ async def login():
 
         # 检查用户是否存在
         user_repo = current_app.config.get("USER_REPO")
-        user = user_repo.get_by_id(user_id)
+        login_user_id = resolve_bound_game_user_id(user_id)
+        user = user_repo.get_by_id(login_user_id)
         
         if not user:
             await flash("🎣 你不是我们的钓鱼佬，去别处钓鱼吧！", "warning")
             logger.warning(f"未注册用户 {user_id} 尝试登录")
             return await _render_login_page()
 
-        ensure_initial_password(user_id)
+        ensure_initial_password(login_user_id)
 
         # 验证密钥，兼容旧登录密钥与自动生成的初始密码
-        if not verify_user_password(user_id, password):
+        if not verify_user_password(login_user_id, password):
             await flash("密钥错误", "danger")
             return await _render_login_page()
         
         # 登录成功
         _login_player_session(user)
-        await flash(f"欢迎回来，{user.nickname or user_id}！", "success")
-        logger.info(f"用户 {user_id} 登录成功")
+        await flash(f"欢迎回来，{user.nickname or login_user_id}！", "success")
+        logger.info(f"用户 {user_id} 登录成功，实际账号 {login_user_id}")
         return redirect(url_for("player_bp.index"))
     
     # GET请求，显示登录页面
@@ -1238,6 +1254,41 @@ async def api_add_to_aquarium():
         logger.error(f"添加到水族箱失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+@player_bp.route("/api/aquarium/income/pending", methods=["GET"])
+@login_required
+async def api_aquarium_income_pending():
+    """查看水族箱被动收益的当前待领取列表（自动补齐当日窗口）。"""
+    user_id = session.get("user_id")
+    income_service = current_app.config.get("AQUARIUM_INCOME_SERVICE")
+    if income_service is None:
+        return jsonify({"success": False, "message": "被动收益服务未启用"}), 500
+    try:
+        summary = income_service.get_pending_summary(user_id)
+        return jsonify({
+            "success": True,
+            "pending_count": int(summary.get("pending_count", 0) or 0),
+            "estimated_amount": int(summary.get("estimated_amount", 0) or 0),
+        })
+    except Exception as exc:
+        logger.error(f"查询水族箱被动收益失败: {exc}", exc_info=True)
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@player_bp.route("/api/aquarium/income/claim", methods=["POST"])
+@login_required
+async def api_aquarium_income_claim():
+    """领取所有水族箱被动收益钱袋。返回钱袋明细 + 叙事文本。"""
+    user_id = session.get("user_id")
+    income_service = current_app.config.get("AQUARIUM_INCOME_SERVICE")
+    if income_service is None:
+        return jsonify({"success": False, "message": "被动收益服务未启用"}), 500
+    try:
+        result = income_service.claim_all(user_id)
+        return jsonify(result)
+    except Exception as exc:
+        logger.error(f"领取水族箱被动收益失败: {exc}", exc_info=True)
+        return jsonify({"success": False, "message": str(exc)}), 500
+
 @player_bp.route("/api/buy_shop_item", methods=["POST"])
 @login_required
 async def api_buy_shop_item():
@@ -1441,7 +1492,7 @@ async def api_remove_from_aquarium():
     """从水族箱移除鱼API"""
     user_id = session.get("user_id")
     aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
-    
+
     try:
         data = await request.get_json()
         fish_id = data.get("fish_id")
@@ -2549,12 +2600,15 @@ async def profile():
     initial_password = ensure_initial_password(user_id)
     titles_result = user_service.get_user_titles(user_id) if user_service else {"success": False, "titles": []}
     titles = titles_result.get("titles", []) if titles_result.get("success") else []
+    account_bindings = get_user_account_bindings(user_id)
 
     return await render_template(
         "profile.html",
         user=user,
         initial_password=initial_password,
         titles=titles,
+        account_bindings=account_bindings,
+        account_binding_providers=ACCOUNT_BINDING_PROVIDERS,
     )
 
 
@@ -2630,6 +2684,46 @@ async def reset_profile_password():
     user_id = session.get("user_id")
     new_initial_password = reset_user_password_to_new_initial(user_id)
     await flash(f"登录密钥已重置为新的初始密码：{new_initial_password}", "success")
+    return redirect(url_for("player_bp.profile"))
+
+
+@player_bp.route("/profile/account-binding", methods=["POST"])
+@login_required
+async def update_profile_account_binding():
+    """绑定 QQ / Telegram 数字ID到当前玩家账号。"""
+    user_id = session.get("user_id")
+    user_repo = current_app.config.get("USER_REPO")
+    form = await request.form
+    provider = normalize_account_provider(form.get("provider", ""))
+    external_id = normalize_external_account_id(form.get("external_id", ""))
+
+    if not provider:
+        await flash("请选择要绑定的平台", "danger")
+        return redirect(url_for("player_bp.profile"))
+    if not external_id:
+        await flash("请输入 4~32 位数字ID", "danger")
+        return redirect(url_for("player_bp.profile"))
+
+    existing_external_user = user_repo.get_by_id(external_id) if user_repo else None
+    result = create_pending_external_account_binding(user_id, provider, external_id)
+    await flash(result.get("message", "绑定操作完成"), "success" if result.get("success") else "danger")
+    if result.get("success") and existing_external_user and str(external_id) != str(user_id):
+        await flash(
+            "提示：该数字ID在游戏里已有独立玩家数据。完成指令端确认后，会自动选择更早注册的账号作为主账号。",
+            "warning",
+        )
+    return redirect(url_for("player_bp.profile"))
+
+
+@player_bp.route("/profile/account-binding/unbind", methods=["POST"])
+@login_required
+async def unbind_profile_account_binding():
+    """解除 QQ / Telegram 数字ID绑定。"""
+    user_id = session.get("user_id")
+    form = await request.form
+    provider = normalize_account_provider(form.get("provider", ""))
+    result = unbind_external_account(user_id, provider)
+    await flash(result.get("message", "解绑操作完成"), "success" if result.get("success") else "danger")
     return redirect(url_for("player_bp.profile"))
 
 @player_bp.route("/pokedex")

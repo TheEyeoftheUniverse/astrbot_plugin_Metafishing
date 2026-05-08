@@ -75,6 +75,7 @@ async def steal_fish(plugin: "FishingPlugin", event: AstrMessageEvent):
             "❌ 请指定偷鱼的用户！\n用法：/偷鱼 @用户 或 /偷鱼 用户ID"
         )
         return
+    target_id = plugin._resolve_external_user_id(target_id)
     if str(target_id) == str(user_id):
         yield event.plain_result("不能偷自己的鱼哦！")
         return
@@ -113,6 +114,7 @@ async def electric_fish(plugin: "FishingPlugin", event: AstrMessageEvent):
     if not target_id:
         yield event.plain_result("❌ 请指定电鱼的用户！\n用法：/电鱼 @用户 或 /电鱼 用户ID")
         return
+    target_id = plugin._resolve_external_user_id(target_id)
     if str(target_id) == str(user_id):
         yield event.plain_result("不能电自己的鱼哦！")
         return

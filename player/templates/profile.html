@@ -7,7 +7,7 @@
     <div>
         <div class="editorial-kicker"><i class="fas fa-id-card"></i> Player Notes</div>
         <h2>个人信息</h2>
-        <p class="text-muted mb-0 mt-2">管理昵称、称号和 WebUI/App 登录密钥。</p>
+        <p class="text-muted mb-0 mt-2">管理昵称、称号、账号绑定和 WebUI/App 登录密钥。</p>
     </div>
 </section>
 
@@ -67,6 +67,70 @@
                 {% else %}
                     <p class="text-muted small mb-0 mt-3">还没有可佩戴的称号。</p>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-link"></i> 外部账号绑定</h5>
+                <p class="text-muted small mb-3">
+                    先提交 QQ 号或 Telegram 数字 ID，再用对应平台账号到指令端输入“账号绑定 {{ user.user_id }}”完成确认。
+                </p>
+
+                <div class="vstack gap-3">
+                    {% for provider, provider_label in account_binding_providers.items() %}
+                    {% set bound_id = account_bindings.get(provider, '') %}
+                    <div class="border-top pt-3">
+                        <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
+                            <div>
+                                <div class="fw-bold">
+                                    {% if provider == 'qq' %}
+                                        <i class="fab fa-qq"></i>
+                                    {% else %}
+                                        <i class="fab fa-telegram"></i>
+                                    {% endif %}
+                                    绑定{{ provider_label }}
+                                </div>
+                                <div class="text-muted small">
+                                    当前：{% if bound_id %}<span class="fw-semibold">{{ bound_id }}</span>{% else %}未绑定{% endif %}
+                                </div>
+                            </div>
+                            {% if bound_id %}
+                            <form method="post" action="{{ url_for('player_bp.unbind_profile_account_binding') }}">
+                                <input type="hidden" name="provider" value="{{ provider }}">
+                                <button class="btn btn-outline-danger btn-sm" type="submit">
+                                    <i class="fas fa-unlink"></i> 解绑
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        <form method="post" action="{{ url_for('player_bp.update_profile_account_binding') }}">
+                            <input type="hidden" name="provider" value="{{ provider }}">
+                            <div class="input-group">
+                                <input
+                                    class="form-control"
+                                    name="external_id"
+                                    inputmode="numeric"
+                                    pattern="[0-9]{4,32}"
+                                    maxlength="32"
+                                    placeholder="输入{{ provider_label }}数字ID"
+                                    value="{{ bound_id }}"
+                                    required
+                                >
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-check"></i> 提交申请
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <p class="text-muted small mb-0 mt-3">
+                    不改数据库结构：绑定关系保存在本地 JSON 映射中。若两边原本都有玩家数据，确认时会保留更早注册的账号作为主账号。
+                </p>
             </div>
         </div>
     </div>

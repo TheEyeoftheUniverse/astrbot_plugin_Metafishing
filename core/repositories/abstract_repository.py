@@ -770,3 +770,61 @@ class AbstractShopRepository(ABC):
     def get_offer_by_id(self, offer_id: int) -> Optional[Dict[str, Any]]:
         """根据ID获取商品（兼容旧接口）"""
         pass
+
+
+class AbstractAquariumIncomeRepository(ABC):
+    """水族箱被动收益（待领取记录）仓储接口。"""
+
+    @abstractmethod
+    def upsert_pending(
+        self,
+        user_id: str,
+        window_date: str,
+        window_time: str,
+        raw_score: int,
+        equipment_multiplier: float,
+        randomness: float,
+        computed_amount: int,
+        capped_amount: int,
+        fish_snapshot_json: str,
+        created_at: str,
+    ) -> bool:
+        """幂等写入一条待领取记录。冲突时不覆盖（同一玩家同一窗口最多一条）。
+
+        返回 True 表示新建成功，False 表示已存在（不动）。
+        """
+        pass
+
+    @abstractmethod
+    def get_pending(self, user_id: str) -> List[Dict[str, Any]]:
+        """返回该用户所有未领取记录（claimed_at IS NULL），按时间正序。"""
+        pass
+
+    @abstractmethod
+    def has_window(self, user_id: str, window_date: str, window_time: str) -> bool:
+        """检查某个窗口是否已生成过记录（无论是否领取）。用于补发判定。"""
+        pass
+
+    @abstractmethod
+    def get_daily_claimed_total(self, user_id: str, window_date: str) -> int:
+        """该日已领取的 capped_amount 总和（用于软上限累计）。"""
+        pass
+
+    @abstractmethod
+    def mark_claimed(
+        self,
+        record_keys: List[tuple],
+        claimed_at: str,
+    ) -> int:
+        """批量标记领取。record_keys 元素为 (user_id, window_date, window_time)。返回受影响行数。"""
+        pass
+
+    @abstractmethod
+    def cleanup_old(self, before_date: str) -> int:
+        """删除 window_date < before_date 且已领取的记录。返回删除行数。"""
+        pass
+
+    @abstractmethod
+    def get_distinct_active_aquarium_fish_ids(self, min_rarity: int) -> List[int]:
+        """获取全服 user_aquarium 中实际存在（quantity>0）且 rarity>=min_rarity 的 fish_id 列表。"""
+        pass

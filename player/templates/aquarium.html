@@ -56,6 +56,18 @@
     </div>
 </div>
 
+<!-- 被动收益领取栏 -->
+<div class="compact-toolbar mb-3 d-flex flex-wrap align-items-center gap-2" id="aquariumIncomeBar" style="background:#fffaf0;border:1px solid #f1e3c4;border-radius:6px;padding:0.6rem 0.8rem;">
+    <i class="fas fa-coins text-warning"></i>
+    <span class="fw-semibold">水族箱被动收益</span>
+    <span class="text-muted small" id="aquariumIncomeSummary">加载中…</span>
+    <div class="ms-auto">
+        <button type="button" class="btn btn-warning btn-sm" id="aquariumIncomeClaimBtn" onclick="claimAquariumIncome()" disabled>
+            <i class="fas fa-gift"></i> 领取
+        </button>
+    </div>
+</div>
+
 <!-- 批量操作 -->
 <div class="compact-toolbar mb-3">
     <button class="btn btn-outline-secondary btn-sm" onclick="sellSelectedAquariumFish()">
