@@ -1,8 +1,8 @@
-"""水族箱稀有鱼被动收益服务。
+"""水族箱稀有鱼展览收益服务。
 
 核心职责：
-- 按 K=0.30 公式计算每个时间窗口的金币等价收益。
-- 将收益映射为对应档位的"钱袋"道具发到玩家背包。
+- 按 K=0.30 公式计算每个时间窗口的「吸引力」（金币内部值）。
+- 将吸引力映射为对应档位的"钱袋"道具发到玩家背包。
 - 与交易所价格刷新窗口（ExchangePriceService.get_update_schedule）保持一致。
 - 提供 evaluate_pending（懒补发）和 claim_all（玩家主动领取）两个核心入口。
 
@@ -66,7 +66,10 @@ POUCH_TIERS: List[Tuple[int, int, str, int]] = [
     (10_000, 2, "中号钱袋", 10_000),
     (500, 1, "小钱袋", 1_000),
 ]
-NO_DROP_THRESHOLD = 500
+
+# 当玩家水族箱有 4★+ 鱼但收益数值未达成最低档位（小钱袋下限 500）时，
+# 仍发放 1 个"小钱袋"作为保底，保证每次结算都有钱袋落袋（用户体感不受随机扰动惩罚）。
+FALLBACK_MIN_POUCH = ("小钱袋", 1, 1)  # (item_name, item_id, quantity)
 
 
 @dataclass
@@ -82,7 +85,7 @@ class PouchPayout:
 
 
 class AquariumIncomeService:
-    """水族箱被动收益服务。"""
+    """水族箱展览收益服务。"""
 
     def __init__(
         self,
@@ -267,7 +270,7 @@ class AquariumIncomeService:
                 "total_amount": 0,
                 "pouches": [],
                 "narrations": [],
-                "message": "暂无可领取的水族箱被动收益",
+                "message": "暂无可领取的水族箱展览收益",
             }
 
         today_marker = get_current_daily_marker(self.daily_reset_hour)
@@ -291,7 +294,14 @@ class AquariumIncomeService:
                 today_already_claimed += amount
 
             total_amount += amount
-            pouch = self._pick_pouch(amount)
+            # 判定是否有鱼参与（来源：写入 pending 时的 fish_snapshot）
+            try:
+                snapshot_for_check = json.loads(pending.get("fish_snapshot") or "[]")
+            except (TypeError, ValueError):
+                snapshot_for_check = []
+            has_fish = bool(snapshot_for_check)
+
+            pouch = self._pick_pouch(amount, has_fish=has_fish)
             if pouch:
                 self.inventory_repo.add_item_to_user(user_id, pouch.item_id, pouch.quantity)
                 merged = pouches_summary.get(pouch.item_id)
@@ -324,7 +334,7 @@ class AquariumIncomeService:
                 for p in pouches_summary.values()
             ],
             "narrations": narrations,
-            "message": f"成功领取 {len(pendings)} 次被动收益",
+            "message": f"成功领取 {len(pendings)} 次展览收益",
         }
 
     @staticmethod
@@ -340,14 +350,21 @@ class AquariumIncomeService:
         return int(within + overflow * DAILY_OVERFLOW_DECAY)
 
     @staticmethod
-    def _pick_pouch(amount: int) -> Optional[PouchPayout]:
-        """根据收益金额映射钱袋档位与数量。"""
-        if amount < NO_DROP_THRESHOLD:
+    def _pick_pouch(amount: int, has_fish: bool = False) -> Optional[PouchPayout]:
+        """根据收益金额映射钱袋档位与数量。
+
+        amount 命中任一区间档 → 返回对应档位 ×N
+        amount 低于最低档（500）但 has_fish=True → 保底返回 小钱袋 ×1
+        amount <= 0 且无鱼参与判定 → 返回 None
+        """
+        if amount <= 0 and not has_fish:
             return None
         for lower_bound, item_id, item_name, divisor in POUCH_TIERS:
             if amount >= lower_bound:
                 qty = max(1, math.ceil(amount / divisor))
                 return PouchPayout(item_id=item_id, item_name=item_name, quantity=qty)
+        if has_fish:
+            return PouchPayout(item_id=1, item_name="小钱袋", quantity=1)
         return None
 
     # ---- Narration（叙事拼装） -----------------------------------------
@@ -424,13 +441,13 @@ class AquariumIncomeService:
         pouch: Optional[PouchPayout],
         ctx: Dict[str, Any],
     ) -> Optional[str]:
-        """根据当前 pending 的水族箱快照拼装一条叙事文本。"""
+        """根据当前 pending 的水族箱快照拼装一条叙事文本（填空式）。"""
         try:
             snapshot = json.loads(snapshot_json) if snapshot_json else []
         except (TypeError, ValueError):
             snapshot = []
 
-        if not snapshot:
+        if not snapshot or pouch is None:
             return None
 
         fish = self._weighted_pick_fish(snapshot)
@@ -445,14 +462,14 @@ class AquariumIncomeService:
                 logger.warning(f"获取鱼短评失败 fish_id={fish.get('fish_id')}: {exc}")
                 quip = ""
         if not quip:
-            quip = "看起来很不寻常"
+            quip = "在缸里慢慢氧化的样子"
+        # 防御：再剥一次末尾标点，避免拼接时出现"…，"双逗号
+        quip = quip.rstrip("。！？.!?…~～，,、 \t")
 
         neighbor = self._pick_neighbor_name(ctx)
         verb = random.choice(ctx.get("verb_pool") or ["觉得"])
         fish_name = str(fish.get("name") or "这条鱼")
 
-        if pouch is None:
-            return f"{neighbor}{verb}{fish_name}{quip}，但只是默默看了看就走了。"
         return f"{neighbor}{verb}{fish_name}{quip}，留下了{pouch.item_name} ×{pouch.quantity}！"
 
     @staticmethod

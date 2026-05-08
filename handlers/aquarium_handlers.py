@@ -63,7 +63,7 @@ async def aquarium(self: "FishingPlugin", event: AstrMessageEvent):
     message += f"💰 总价值：{stats['total_value']} 金币\n"
     message += f"📦 剩余空间：{stats['available_space']} 条\n"
 
-    # 被动收益提示（如已启用 income service）
+    # 展览收益提示（如已启用 income service）
     income_service = getattr(self, "aquarium_income_service", None)
     if income_service is not None:
         try:
@@ -72,11 +72,11 @@ async def aquarium(self: "FishingPlugin", event: AstrMessageEvent):
             if pending_count > 0:
                 est = int(summary.get("estimated_amount", 0) or 0)
                 message += (
-                    f"\n💼 待领取被动收益：{pending_count} 次"
-                    f"（约 {est} 金币等价，发送「水族箱领取」结算）"
+                    f"\n💼 待领取展览收益：{pending_count} 次"
+                    f"（吸引力 {est}，发送「水族箱领取」结算）"
                 )
         except Exception:
-            # 容错：被动收益异常不影响主命令
+            # 容错：展览收益异常不影响主命令
             pass
 
     yield event.plain_result(message)
@@ -189,7 +189,7 @@ async def aquarium_help(self: "FishingPlugin", event: AstrMessageEvent):
 🔹 默认容量50条，可以通过升级增加容量
 🔹 从市场购买的鱼默认放入水族箱
 🔹 可以正常上架和购买
-🔹 ✨展出 4★ 及以上稀有鱼可被动产生收益（每日三次结算，与交易所同步）
+🔹 ✨展出 4★ 及以上稀有鱼可获得每日三次展览收益（钱袋形式）
 
 📋 可用命令：
 • /水族箱 - 查看水族箱中的鱼
@@ -198,7 +198,7 @@ async def aquarium_help(self: "FishingPlugin", event: AstrMessageEvent):
 • /放入稀有度 <稀有度> - 将指定稀有度的所有鱼放入水族箱
 • /移出稀有度 <稀有度> - 将指定稀有度的所有鱼移回鱼塘
 • /升级水族箱 - 升级水族箱容量
-• /水族箱领取 - 领取被动收益钱袋
+• /水族箱领取 - 领取展览收益钱袋
 • /水族箱 帮助 - 显示此帮助信息
 
 💡 提示：使用「水族箱」命令查看鱼ID
@@ -336,11 +336,11 @@ async def remove_rarity_from_aquarium(self: "FishingPlugin", event: AstrMessageE
 
 
 async def claim_aquarium_income(self: "FishingPlugin", event: AstrMessageEvent):
-    """领取水族箱被动收益钱袋。"""
+    """领取水族箱展览收益钱袋。"""
     user_id = self._get_effective_user_id(event)
     income_service = getattr(self, "aquarium_income_service", None)
     if income_service is None:
-        yield event.plain_result("❌ 被动收益服务未启用")
+        yield event.plain_result("❌ 展览收益服务未启用")
         return
 
     try:
@@ -356,14 +356,14 @@ async def claim_aquarium_income(self: "FishingPlugin", event: AstrMessageEvent):
 
     claimed_count = int(result.get("claimed_count", 0) or 0)
     if claimed_count == 0:
-        yield event.plain_result("💼 当前没有可领取的水族箱被动收益（每日三次窗口与交易所同步刷新）")
+        yield event.plain_result("💼 当前没有可领取的水族箱展览收益")
         return
 
     pouches = result.get("pouches", []) or []
     narrations = result.get("narrations", []) or []
     total_amount = int(result.get("total_amount", 0) or 0)
 
-    lines = [f"💼 领取了 {claimed_count} 次水族箱被动收益（约 {total_amount} 金币等价）"]
+    lines = [f"💼 领取了 {claimed_count} 次水族箱展览收益（吸引力 {total_amount}）"]
     if narrations:
         lines.append("")
         for narr in narrations:
@@ -375,9 +375,6 @@ async def claim_aquarium_income(self: "FishingPlugin", event: AstrMessageEvent):
             item_name = p.get("item_name", "钱袋")
             qty = p.get("quantity", 0)
             lines.append(f"  · {item_name} ×{qty}")
-    else:
-        lines.append("")
-        lines.append("（本次未达成钱袋发放区间，故事属实但口袋空空）")
 
     yield event.plain_result("\n".join(lines))
 

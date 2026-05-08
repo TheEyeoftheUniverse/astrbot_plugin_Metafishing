@@ -1,4 +1,4 @@
-"""水族箱被动收益（待领取记录）仓储 — SQLite 实现。"""
+"""水族箱展览收益（待领取记录）仓储 — SQLite 实现。"""
 
 from __future__ import annotations
 

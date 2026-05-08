@@ -34,22 +34,24 @@ from ..utils import get_now, get_current_daily_marker
 _STATE_LOCK = threading.Lock()
 
 
-# 预置兜底短评池（至少 12 条）
+# 预置兜底短评池（至少 12 条；填空式：可直接接在「{人}觉得/凝视着 {鱼名} ___」之后）
 FALLBACK_QUIP_POOL: List[str] = [
-    "看上去很贵的样子",
-    "在水里慢慢游来游去",
-    "没有想到真的能见到这种鱼",
-    "有种说不出的气质",
-    "似乎一直在悄悄观察着什么",
-    "鳞片闪烁着熟悉又陌生的光",
-    "气场强得让人下意识屏住呼吸",
-    "总觉得它在听人说话",
-    "仿佛和这片水域已经认识很久了",
-    "见过它一眼，回家就梦到了",
-    "看一眼就觉得自己今天会走运",
-    "明明没动，却像在游过你的记忆",
-    "好像下一秒就要从缸里跳出来",
-    "盯它太久会忘了自己是谁",
+    "在缸里晃来晃去活像周一早晨的我",
+    "一脸不知道自己为啥还活着的样子",
+    "鳞片闪得让人想起没结的工资",
+    "看上去比甲方还难懂",
+    "和缸里的水草达成了奇怪的默契",
+    "用很哲学的方式发着呆",
+    "摆出一副劝你别再加班的眼神",
+    "游得像在敷衍工作",
+    "活得比退休金还佛系",
+    "看起来随时准备申请劳动仲裁",
+    "打着哈欠跟现实拉扯",
+    "在缸里慢慢氧化的样子",
+    "明显比上礼拜的菜单还新鲜",
+    "摆出一副已经看破红尘的造型",
+    "用游泳的方式表达拒绝营业",
+    "看着比 KPI 还让人心累",
 ]
 
 VERB_POOL_DEFAULT: List[str] = [
@@ -61,7 +63,7 @@ _BATCH_SIZE = 50
 _BATCH_TIMEOUT_SECONDS = 60
 _BATCH_RETRY = 1
 _MIN_QUIP_LEN = 6
-_MAX_QUIP_LEN = 60
+_MAX_QUIP_LEN = 30
 
 
 class AquariumQuipsService:
@@ -325,12 +327,25 @@ class AquariumQuipsService:
     @staticmethod
     def _build_prompt(batch: List[Any]) -> str:
         lines = [
-            "你是一位为奇幻世界水族箱写打卡短评的旅人。下面给你若干鱼的「名字」与「描述」，",
-            "请为每一条生成 3 条 各 15-28 个汉字 的中文短评。短评应像旁人路过看到鱼时的",
-            "即兴感叹（如惊叹、好奇、害怕、调侃、文艺均可），避免描述过于平铺直叙。",
-            "禁止包含具体数值/价格/任何 emoji。",
+            "你是一名为奇幻钓鱼世界水族箱写打卡留言的旅人。我会给你若干鱼的「名字」与「描述」，",
+            "请为每条鱼生成 3 条 中文短句，每条 12-22 个汉字，作为别人游客留下的「填空式」评语。",
             "",
-            "输入：",
+            "【格式硬要求】",
+            "  · 每条短句必须能直接接在以下任一开头后面读起来通顺：",
+            "      「{某人}觉得{鱼名}____」",
+            "      「{某人}惊叹于{鱼名}____」",
+            "      「{某人}凝视着{鱼名}____」",
+            "      「{某人}端详了一会儿{鱼名}____」",
+            "    可以是「在……的样子」「像……一样」「一脸……的表情」「在……着」「活脱脱就是……」等结构。",
+            "  · 不要句号、感叹号、问号、省略号；不要 emoji；不要数值/价格/具体金额。",
+            "  · 不要重复鱼的名字或描述里的原句；要原创、口语化的玩笑。",
+            "",
+            "【风格硬要求】",
+            "  搞笑、轻松、调侃；像在吐槽周一上班、调侃菜单、拿大事开小玩笑那种感觉。",
+            "  允许偶尔黑色幽默（房贷、KPI、退休金、劳动仲裁、甲方等都可以拿来调侃），",
+            "  但避免严肃、抒情、过度文艺，避免空泛的「神秘」「珍贵」「价值不菲」之类陈词。",
+            "",
+            "【输入】每行格式：fish_id|name|description",
         ]
         for fish in batch:
             name = getattr(fish, "name", "") or ""
@@ -339,9 +354,9 @@ class AquariumQuipsService:
             lines.append(f"{int(fish.fish_id)}|{name}|{desc}")
         lines.extend([
             "",
-            "以 JSON 输出，键是 fish_id 字符串，值是 3 条短评的字符串数组。例如：",
-            '{"103": ["...", "...", "..."], "203": ["...", "...", "..."]}',
-            "只输出 JSON 对象本身，不要任何解释或前后缀。",
+            "【输出】严格 JSON：键是 fish_id 字符串，值是 3 条短句字符串数组。例：",
+            '{"103": ["在缸里晃来晃去活像周一早晨的我", "一脸不知道自己为啥还活着的样子", "和缸里的水草达成了奇怪的默契"]}',
+            "只输出 JSON 对象本身，不要任何解释、前后缀或代码块标记。",
         ])
         return "\n".join(lines)
 
@@ -403,6 +418,18 @@ class AquariumQuipsService:
         return ""
 
     @staticmethod
+    def _normalize_quip(raw: str) -> str:
+        """剥去填空式短句尾部的标点（句号/感叹号/问号/省略号等），保证拼接通顺。"""
+        if not raw:
+            return ""
+        s = raw.strip()
+        # 反复剥末尾的中英文句末符号
+        terminal_chars = {"。", "！", "？", ".", "!", "?", "…", "～", "~", "，", ",", "、"}
+        while s and s[-1] in terminal_chars:
+            s = s[:-1].rstrip()
+        return s
+
+    @staticmethod
     def _parse_completion(text: str, expected_ids: set) -> Dict[int, List[str]]:
         if not text:
             return {}
@@ -429,9 +456,9 @@ class AquariumQuipsService:
             for item in value:
                 if not isinstance(item, str):
                     continue
-                stripped = item.strip()
-                if _MIN_QUIP_LEN <= len(stripped) <= _MAX_QUIP_LEN:
-                    cleaned.append(stripped)
+                normalized = AquariumQuipsService._normalize_quip(item)
+                if _MIN_QUIP_LEN <= len(normalized) <= _MAX_QUIP_LEN:
+                    cleaned.append(normalized)
             if cleaned:
                 result[fish_id] = cleaned[:3]
         return result

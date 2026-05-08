@@ -644,10 +644,140 @@ async def create_title(plugin: "FishingPlugin", event: AstrMessageEvent):
     title_name = args[1]
     description = " ".join(args[2:-1]) if len(args) > 3 and args[-1].startswith("{") else " ".join(args[2:])
     display_format = args[-1] if len(args) > 3 and args[-1].startswith("{") else "{name}"
-    
+
     # 如果描述为空，使用默认值
     if not description:
         description = f"自定义称号：{title_name}"
-    
+
     result = plugin.user_service.create_custom_title(title_name, description, display_format)
     yield event.plain_result(result["message"])
+
+
+async def simulate_aquarium_income(plugin: "FishingPlugin", event: AstrMessageEvent):
+    """[管理员] 模拟计算水族箱展览收益。
+
+    用法：
+        /计算水族箱奖励              对自己当前阵容做一次模拟（不写 DB / 不发钱袋）
+        /计算水族箱奖励 @用户        对指定玩家
+        /计算水族箱奖励 用户ID       对指定玩家
+    """
+    income_service = getattr(plugin, "aquarium_income_service", None)
+    if income_service is None:
+        yield event.plain_result("❌ 水族箱展览收益服务未启用")
+        return
+
+    args = event.message_str.split(" ")
+    if len(args) >= 2 and args[1].strip():
+        target_user_id, error_msg = parse_target_user_id(event, args, 1)
+        if error_msg:
+            yield event.plain_result(error_msg)
+            return
+    else:
+        target_user_id = event.get_sender_id()
+
+    if not plugin.user_repo.check_exists(target_user_id):
+        yield event.plain_result(f"❌ 玩家 {target_user_id} 未注册")
+        return
+
+    try:
+        result = income_service.compute_window_income(target_user_id)
+    except Exception as exc:
+        yield event.plain_result(f"❌ 模拟计算失败：{exc}")
+        return
+
+    raw = int(result.get("raw_score", 0) or 0)
+    mult = float(result.get("equipment_multiplier", 1.0) or 1.0)
+    randomness = float(result.get("randomness", 1.0) or 1.0)
+    computed = int(result.get("computed_amount", 0) or 0)
+    capped = int(result.get("capped_amount", 0) or 0)
+    snapshot = result.get("fish_snapshot", []) or []
+
+    rarity_summary = {}
+    high_quality_count = 0
+    for entry in snapshot:
+        r = int(entry.get("rarity", 0) or 0)
+        q = int(entry.get("quantity", 0) or 0)
+        rarity_summary[r] = rarity_summary.get(r, 0) + q
+        if int(entry.get("quality_level", 0) or 0) == 1:
+            high_quality_count += q
+
+    accessory_factor = 1.0
+    rod_factor = 1.0
+    try:
+        equipped_acc = plugin.inventory_repo.get_user_equipped_accessory(target_user_id)
+        if equipped_acc:
+            acc_template = plugin.item_template_repo.get_accessory_by_id(equipped_acc.accessory_id)
+            if acc_template and acc_template.bonus_coin_modifier:
+                from ..core.utils import calculate_after_refine
+                refined = calculate_after_refine(
+                    float(acc_template.bonus_coin_modifier),
+                    refine_level=int(equipped_acc.refine_level or 1),
+                    rarity=int(acc_template.rarity or 0),
+                )
+                accessory_factor = 1.0 + max(0.0, refined - 1.0)
+    except Exception:
+        pass
+    try:
+        equipped_rod = plugin.inventory_repo.get_user_equipped_rod(target_user_id)
+        if equipped_rod:
+            rod_template = plugin.item_template_repo.get_rod_by_id(equipped_rod.rod_id)
+            if rod_template and rod_template.bonus_rare_fish_chance:
+                from ..core.utils import calculate_after_refine
+                refined = calculate_after_refine(
+                    float(rod_template.bonus_rare_fish_chance),
+                    refine_level=int(equipped_rod.refine_level or 1),
+                    rarity=int(rod_template.rarity or 0),
+                )
+                rod_factor = 1.0 + max(0.0, refined) * 0.5
+    except Exception:
+        pass
+
+    pouch = income_service._pick_pouch(capped, has_fish=bool(snapshot))
+
+    from ..core.utils import get_current_daily_marker
+    today_marker = get_current_daily_marker(income_service.daily_reset_hour)
+    today_str = today_marker.isoformat()
+    today_claimed = income_service.income_repo.get_daily_claimed_total(target_user_id, today_str)
+    DAILY_SOFT_CAP = 15_000_000
+
+    lines = [
+        f"🧪 【水族箱展览收益模拟】 user_id={target_user_id}",
+        "",
+        "📦 参与判定阵容（4★ 及以上）：",
+    ]
+    if rarity_summary:
+        for r in sorted(rarity_summary.keys(), reverse=True):
+            lines.append(f"  · {r}★ × {rarity_summary[r]} 条")
+        if high_quality_count:
+            lines.append(f"  · 其中 ✨高品质 共 {high_quality_count} 条（系数 ×2）")
+    else:
+        lines.append("  · 无 4★ 及以上鱼，原始积分=0")
+
+    lines.extend([
+        "",
+        "🧮 公式分解：",
+        f"  原始积分        = {raw}",
+        f"  装备倍率        = {mult:.4f}（饰品 ×{accessory_factor:.3f} × 鱼竿 ×{rod_factor:.3f}）",
+        f"  随机扰动        = {randomness:.4f}（本次模拟值，每窗口独立 [0.8, 1.2]）",
+        f"  K 闸值          = 0.30",
+        f"  原始 × 倍率 × 扰动 × K = {computed}",
+        f"  单次硬上限 200 万 → 截顶 = {capped}",
+    ])
+
+    lines.append("")
+    if pouch is None:
+        lines.append("📉 钱袋预测：水族箱无 4★ 及以上鱼，不会触发结算")
+    elif capped < 500:
+        lines.append(f"💰 钱袋预测：保底 {pouch.item_name}（item_id={pouch.item_id}） × {pouch.quantity}（金额低于 500 兜底档位）")
+    else:
+        lines.append(f"💰 钱袋预测：{pouch.item_name}（item_id={pouch.item_id}） × {pouch.quantity}")
+
+    lines.extend([
+        "",
+        f"📊 今日已领取吸引力累计：{today_claimed} / 软上限 {DAILY_SOFT_CAP}",
+        f"  · 软上限剩余空间：{max(0, DAILY_SOFT_CAP - today_claimed)}",
+        "",
+        "💡 本指令仅模拟；不写入 pending、不发钱袋、不消耗任何窗口配额。",
+    ])
+
+    yield event.plain_result("\n".join(lines))

@@ -328,7 +328,7 @@ class FishingPlugin(Star):
         # 初始化交易所处理器
         self.exchange_handlers = ExchangeHandlers(self)
 
-        # 初始化水族箱被动收益与 LLM 短评服务
+        # 初始化水族箱展览收益与 LLM 短评服务
         self.aquarium_quips_service = AquariumQuipsService(
             income_repo=self.aquarium_income_repo,
             item_template_repo=self.item_template_repo,
@@ -595,7 +595,7 @@ class FishingPlugin(Star):
 
     @filter.command("水族箱领取", alias={"领取水族箱", "水族箱收益"})
     async def claim_aquarium_income(self, event: AstrMessageEvent):
-        """领取水族箱被动收益钱袋（每日三次窗口与交易所同步刷新）"""
+        """领取水族箱展览收益钱袋（每日三次窗口）"""
         async for r in aquarium_handlers.claim_aquarium_income(self, event):
             yield r
 
@@ -1139,6 +1139,13 @@ class FishingPlugin(Star):
     async def create_title(self, event: AstrMessageEvent):
         """[管理员] 创建自定义称号。用法：创建称号 称号名称 描述 [显示格式]"""
         async for r in admin_handlers.create_title(self, event):
+            yield r
+
+    @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("计算水族箱奖励", alias={"模拟水族箱奖励", "测试水族箱奖励"})
+    async def simulate_aquarium_income(self, event: AstrMessageEvent):
+        """[管理员] 模拟当前阵容的水族箱展览收益（不写库、不发钱袋）。用法：计算水族箱奖励 [@用户|用户ID]"""
+        async for r in admin_handlers.simulate_aquarium_income(self, event):
             yield r
 
     @filter.permission_type(PermissionType.ADMIN)

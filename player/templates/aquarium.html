@@ -15,7 +15,7 @@
 
 <!-- 统计信息 -->
 <div class="row g-0 metric-strip">
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
         <div class="editorial-metric h-100">
             <h5><i class="fas fa-layer-group"></i> 容量</h5>
             <div class="metric-value">{{ capacity_info.current_quantity or 0 }} / {{ capacity_info.current_capacity or 0 }}</div>
@@ -40,46 +40,49 @@
             {% endif %}
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
         <div class="editorial-metric h-100">
             <h5><i class="fas fa-fish"></i> 鱼类总数</h5>
             <div class="metric-value">{{ stats.total_count or 0 }}</div>
             <span class="metric-note">条鱼</span>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-lg-3">
         <div class="editorial-metric h-100">
             <h5><i class="fas fa-coins"></i> 总价值</h5>
             <div class="metric-value">{{ stats.total_value or 0 }}</div>
             <span class="metric-note">金币</span>
         </div>
     </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="editorial-metric h-100">
+            <h5><i class="fas fa-hand-holding-usd"></i> 批量操作</h5>
+            <div class="compact-actions justify-content-start mt-2">
+                <button class="btn btn-outline-secondary btn-sm" onclick="sellSelectedAquariumFish()">
+                    <i class="fas fa-check-square"></i> 卖出选中
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="moveSelectedToFishpond()">
+                    <i class="fas fa-arrow-left"></i> 移回选中
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="clearFishSelection()">
+                    <i class="fas fa-xmark"></i> 清除选择
+                </button>
+            </div>
+            <span class="metric-note" id="fishSelectionSummary">已选择 0 种鱼</span>
+        </div>
+    </div>
 </div>
 
-<!-- 被动收益领取栏 -->
+<!-- 展览收益领取栏 -->
 <div class="compact-toolbar mb-3 d-flex flex-wrap align-items-center gap-2" id="aquariumIncomeBar" style="background:#fffaf0;border:1px solid #f1e3c4;border-radius:6px;padding:0.6rem 0.8rem;">
     <i class="fas fa-coins text-warning"></i>
-    <span class="fw-semibold">水族箱被动收益</span>
+    <span class="fw-semibold">水族箱展览收益</span>
     <span class="text-muted small" id="aquariumIncomeSummary">加载中…</span>
     <div class="ms-auto">
         <button type="button" class="btn btn-warning btn-sm" id="aquariumIncomeClaimBtn" onclick="claimAquariumIncome()" disabled>
             <i class="fas fa-gift"></i> 领取
         </button>
     </div>
-</div>
-
-<!-- 批量操作 -->
-<div class="compact-toolbar mb-3">
-    <button class="btn btn-outline-secondary btn-sm" onclick="sellSelectedAquariumFish()">
-        <i class="fas fa-check-square"></i> 卖出选中
-    </button>
-    <button class="btn btn-outline-secondary btn-sm" onclick="moveSelectedToFishpond()">
-        <i class="fas fa-arrow-left"></i> 移回选中
-    </button>
-    <button class="btn btn-outline-secondary btn-sm" onclick="clearFishSelection()">
-        <i class="fas fa-xmark"></i> 清除选择
-    </button>
-    <span class="text-muted small ms-2" id="fishSelectionSummary">已选择 0 种鱼</span>
 </div>
 
 <!-- 稀有度筛选 -->
@@ -547,5 +550,89 @@ async function deleteExhibitionCommentFromAquarium(fishKey, commentId) {
         showToast('网络错误，请稍后重试', 'error');
     }
 }
+
+async function refreshAquariumIncomeSummary() {
+    const summaryEl = document.getElementById('aquariumIncomeSummary');
+    const btnEl = document.getElementById('aquariumIncomeClaimBtn');
+    if (!summaryEl || !btnEl) return;
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_aquarium_income_pending") }}');
+        const data = await response.json();
+        if (data && data.success) {
+            const count = data.pending_count || 0;
+            const est = data.estimated_amount || 0;
+            if (count > 0) {
+                summaryEl.textContent = `待领取 ${count} 次（吸引力 ${est.toLocaleString()}）`;
+                btnEl.disabled = false;
+            } else {
+                summaryEl.textContent = '暂无可领取';
+                btnEl.disabled = true;
+            }
+        } else {
+            summaryEl.textContent = data && data.message ? data.message : '查询失败';
+            btnEl.disabled = true;
+        }
+    } catch (err) {
+        summaryEl.textContent = '查询失败';
+        btnEl.disabled = true;
+    }
+}
+
+async function claimAquariumIncome() {
+    const btnEl = document.getElementById('aquariumIncomeClaimBtn');
+    if (btnEl) btnEl.disabled = true;
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_aquarium_income_claim") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const data = await response.json();
+        if (!data || !data.success) {
+            showToast(data && data.message ? data.message : '领取失败', 'error');
+            await refreshAquariumIncomeSummary();
+            return;
+        }
+        const claimed = data.claimed_count || 0;
+        if (claimed === 0) {
+            await showToast('暂无可领取的水族箱展览收益', 'info');
+            await refreshAquariumIncomeSummary();
+            return;
+        }
+        const lines = [];
+        lines.push(`领取了 ${claimed} 次水族箱展览收益（吸引力 ${(data.total_amount || 0).toLocaleString()}）`);
+        const narrations = data.narrations || [];
+        if (narrations.length) {
+            lines.push('');
+            for (const narr of narrations) {
+                lines.push(`· ${narr}`);
+            }
+        }
+        const pouches = data.pouches || [];
+        if (pouches.length) {
+            lines.push('');
+            lines.push('入袋钱袋：');
+            for (const p of pouches) {
+                lines.push(`· ${p.item_name} ×${p.quantity}`);
+            }
+        } else {
+            lines.push('');
+            lines.push('（本次未达成钱袋发放区间，故事属实但口袋空空）');
+        }
+        await webuiConfirm(lines.join('\n'), {
+            title: '🐟 水族箱展览收益',
+            confirmText: '关闭',
+            hideCancel: true
+        });
+        await refreshAquariumIncomeSummary();
+    } catch (err) {
+        showToast('网络错误，请稍后重试', 'error');
+    } finally {
+        if (btnEl) btnEl.disabled = false;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    refreshAquariumIncomeSummary();
+});
 </script>
 {% endblock %}

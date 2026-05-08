@@ -773,7 +773,7 @@ class AbstractShopRepository(ABC):
 
 
 class AbstractAquariumIncomeRepository(ABC):
-    """水族箱被动收益（待领取记录）仓储接口。"""
+    """水族箱展览收益（待领取记录）仓储接口。"""
 
     @abstractmethod
     def upsert_pending(

@@ -1257,11 +1257,11 @@ async def api_add_to_aquarium():
 @player_bp.route("/api/aquarium/income/pending", methods=["GET"])
 @login_required
 async def api_aquarium_income_pending():
-    """查看水族箱被动收益的当前待领取列表（自动补齐当日窗口）。"""
+    """查看水族箱展览收益的当前待领取列表（自动补齐当日窗口）。"""
     user_id = session.get("user_id")
     income_service = current_app.config.get("AQUARIUM_INCOME_SERVICE")
     if income_service is None:
-        return jsonify({"success": False, "message": "被动收益服务未启用"}), 500
+        return jsonify({"success": False, "message": "展览收益服务未启用"}), 500
     try:
         summary = income_service.get_pending_summary(user_id)
         return jsonify({
@@ -1270,23 +1270,23 @@ async def api_aquarium_income_pending():
             "estimated_amount": int(summary.get("estimated_amount", 0) or 0),
         })
     except Exception as exc:
-        logger.error(f"查询水族箱被动收益失败: {exc}", exc_info=True)
+        logger.error(f"查询水族箱展览收益失败: {exc}", exc_info=True)
         return jsonify({"success": False, "message": str(exc)}), 500
 
 
 @player_bp.route("/api/aquarium/income/claim", methods=["POST"])
 @login_required
 async def api_aquarium_income_claim():
-    """领取所有水族箱被动收益钱袋。返回钱袋明细 + 叙事文本。"""
+    """领取所有水族箱展览收益钱袋。返回钱袋明细 + 叙事文本。"""
     user_id = session.get("user_id")
     income_service = current_app.config.get("AQUARIUM_INCOME_SERVICE")
     if income_service is None:
-        return jsonify({"success": False, "message": "被动收益服务未启用"}), 500
+        return jsonify({"success": False, "message": "展览收益服务未启用"}), 500
     try:
         result = income_service.claim_all(user_id)
         return jsonify(result)
     except Exception as exc:
-        logger.error(f"领取水族箱被动收益失败: {exc}", exc_info=True)
+        logger.error(f"领取水族箱展览收益失败: {exc}", exc_info=True)
         return jsonify({"success": False, "message": str(exc)}), 500
 
 @player_bp.route("/api/buy_shop_item", methods=["POST"])
