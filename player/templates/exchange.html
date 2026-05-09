@@ -72,13 +72,16 @@
         <div class="card text-center">
             <div class="card-body">
                 <h6 class="text-muted mb-2">市场情绪</h6>
+                {% set market_sentiment = market_status.market_sentiment or '中性观望' %}
                 <h3 class="mb-0">
-                    {% if market_status.market_sentiment == 'bullish' %}
-                    <span class="text-success"><i class="fas fa-arrow-up"></i> 看涨</span>
-                    {% elif market_status.market_sentiment == 'bearish' %}
-                    <span class="text-danger"><i class="fas fa-arrow-down"></i> 看跌</span>
+                    {% if market_sentiment in ['市场乐观', '偏乐观'] %}
+                    <span class="text-success"><i class="fas fa-arrow-up"></i> {{ market_sentiment }}</span>
+                    {% elif market_sentiment in ['市场悲观', '偏悲观'] %}
+                    <span class="text-danger"><i class="fas fa-arrow-down"></i> {{ market_sentiment }}</span>
+                    {% elif market_sentiment == '分歧加剧' %}
+                    <span class="text-warning"><i class="fas fa-arrows-left-right"></i> {{ market_sentiment }}</span>
                     {% else %}
-                    <span class="text-secondary"><i class="fas fa-minus"></i> 中性</span>
+                    <span class="text-secondary"><i class="fas fa-minus"></i> {{ market_sentiment }}</span>
                     {% endif %}
                 </h3>
             </div>
@@ -96,13 +99,14 @@
         <div class="card text-center">
             <div class="card-body">
                 <h6 class="text-muted mb-2">价格走势</h6>
+                {% set price_trend = market_status.price_trend or '稳定' %}
                 <h3 class="mb-0">
-                    {% if market_status.price_trend == 'rising' %}
-                    <span class="text-success"><i class="fas fa-arrow-trend-up"></i> 上涨</span>
-                    {% elif market_status.price_trend == 'falling' %}
-                    <span class="text-danger"><i class="fas fa-arrow-trend-down"></i> 下跌</span>
+                    {% if '上涨' in price_trend %}
+                    <span class="text-success"><i class="fas fa-arrow-trend-up"></i> {{ price_trend }}</span>
+                    {% elif '下跌' in price_trend %}
+                    <span class="text-danger"><i class="fas fa-arrow-trend-down"></i> {{ price_trend }}</span>
                     {% else %}
-                    <span class="text-secondary"><i class="fas fa-equals"></i> 稳定</span>
+                    <span class="text-secondary"><i class="fas fa-equals"></i> {{ price_trend }}</span>
                     {% endif %}
                 </h3>
             </div>
