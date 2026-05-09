@@ -1440,22 +1440,15 @@ async def get_baits():
     user_id = session.get("user_id")
     
     try:
-        inventory_repo = current_app.config["INVENTORY_REPO"]
-        logger.info(f"[WebUI] /baits获取INVENTORY_REPO: {type(inventory_repo).__name__}")
+        inventory_service = current_app.config["INVENTORY_SERVICE"]
+        logger.info(f"[WebUI] /baits获取INVENTORY_SERVICE: {type(inventory_service).__name__}")
     except KeyError as e:
-        logger.error(f"[WebUI] 配置错误: INVENTORY_REPO未找到 - {e}")
+        logger.error(f"[WebUI] 配置错误: INVENTORY_SERVICE未找到 - {e}")
         return jsonify({"success": False, "message": "系统配置错误"}), 500
     
     try:
-        baits = inventory_repo.get_user_bait_inventory(user_id)
-        
-        bait_list = []
-        if baits:
-            for b in baits:
-                bait_list.append({
-                    "bait_id": b.bait_id,
-                    "quantity": b.quantity,
-                })
+        result = inventory_service.get_user_bait_inventory(user_id)
+        bait_list = result.get("baits", []) if isinstance(result, dict) else []
         
         logger.info(f"[WebUI] 鱼饵列表查询成功: {len(bait_list)}种鱼饵")
         
@@ -1466,6 +1459,56 @@ async def get_baits():
     except Exception as e:
         logger.error(f"获取鱼饵列表失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": f"获取失败: {str(e)}"}), 500
+
+
+@user_api_bp.route("/baits/use", methods=["POST"])
+@api_login_required
+async def use_bait():
+    """使用或停用鱼饵。Unity 会镜像为 /api/unity/baits/use。"""
+    user_id = session.get("user_id")
+
+    try:
+        inventory_service = current_app.config["INVENTORY_SERVICE"]
+        user_repo = current_app.config["USER_REPO"]
+        item_template_repo = current_app.config["ITEM_TEMPLATE_REPO"]
+    except KeyError as e:
+        logger.error(f"[WebUI] 配置错误: 鱼饵服务依赖缺失 - {e}")
+        return jsonify({"success": False, "message": "系统配置错误"}), 500
+
+    try:
+        payload = await _read_request_payload()
+        bait_id = int(payload.get("bait_id", 0) or 0)
+        if bait_id <= 0:
+            return jsonify({"success": False, "message": "缺少有效的鱼饵ID"}), 400
+
+        if payload.get("deactivate"):
+            user = user_repo.get_by_id(user_id)
+            if not user:
+                return jsonify({"success": False, "message": "用户不存在"}), 404
+            if getattr(user, "current_bait_id", None) == bait_id:
+                user.current_bait_id = None
+                user.bait_start_time = None
+                user_repo.update(user)
+            bait_template = item_template_repo.get_bait_by_id(bait_id)
+            if bait_template and inventory_service._supports_bait_armed_state(bait_template):
+                inventory_service.set_template_armed_state(user_id, "bait", bait_id, False)
+            return jsonify({"success": True, "message": "已停用鱼饵", "data": {"current_bait_id": None}})
+
+        result = inventory_service.use_bait(user_id, bait_id)
+        status_code = 200 if result.get("success", False) else 400
+        user = user_repo.get_by_id(user_id)
+        return jsonify({
+            "success": result.get("success", False),
+            "message": result.get("message", "使用鱼饵失败"),
+            "data": {
+                "current_bait_id": getattr(user, "current_bait_id", None) if user else None,
+            },
+        }), status_code
+    except ValueError:
+        return jsonify({"success": False, "message": "鱼饵ID必须是数字"}), 400
+    except Exception as e:
+        logger.error(f"使用鱼饵失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"使用失败: {str(e)}"}), 500
 
 
 @user_api_bp.route("/accessories", methods=["GET"])

@@ -1,4 +1,3 @@
-import json
 import math
 import random
 import threading
@@ -16,7 +15,7 @@ from ..repositories.abstract_repository import (
     AbstractLogRepository,
     AbstractUserBuffRepository,
 )
-from ..domain.models import FishingRecord, TaxRecord, FishingZone, UserBuff
+from ..domain.models import FishingRecord, TaxRecord, FishingZone
 from ..services.fishing_zone_service import FishingZoneService
 from ..services.wipe_bomb_daily_service import add_wipe_bomb_jackpot
 from ..utils import get_now, get_fish_template, get_today, get_last_reset_time, calculate_after_refine
@@ -98,80 +97,6 @@ class FishingService:
         # 通知目标可配置，默认群聊。可由 config['notifications']['relocation_target'] 覆盖
         notifications_cfg = self.config.get("notifications", {}) if isinstance(self.config, dict) else {}
         self._notification_target = notifications_cfg.get("relocation_target", "group")
-
-    def _get_armed_state_settings(self) -> Dict[str, Any]:
-        return (self.config or {}).get("armed_state", {}) or {}
-
-    def _supports_bait_armed_state(self, bait_template) -> bool:
-        if not bait_template:
-            return False
-        configured_ids = {
-            int(x) for x in (self._get_armed_state_settings().get("bait_ids") or []) if str(x).isdigit()
-        }
-        return int(getattr(bait_template, "bait_id", 0) or 0) in configured_ids
-
-    def _is_bait_armed(self, user_id: str, bait_id: int) -> bool:
-        try:
-            buff = self.buff_repo.get_active_by_user_and_type(user_id, "ARMED_TEMPLATE_STATES")
-        except Exception:
-            buff = None
-        default_armed = bool(self._get_armed_state_settings().get("default_armed_for_baits", True))
-        if not buff or not getattr(buff, "payload", None):
-            return default_armed
-        try:
-            payload = json.loads(buff.payload or "{}")
-        except Exception:
-            payload = {}
-        bait_map = payload.get("bait") if isinstance(payload.get("bait"), dict) else {}
-        if str(bait_id) in bait_map:
-            return bool(bait_map[str(bait_id)])
-        return default_armed
-
-    def _set_bait_armed(self, user_id: str, bait_id: int, armed: bool) -> None:
-        try:
-            buff = self.buff_repo.get_active_by_user_and_type(user_id, "ARMED_TEMPLATE_STATES")
-        except Exception:
-            buff = None
-        payload = {"item": {}, "bait": {}}
-        if buff and getattr(buff, "payload", None):
-            try:
-                existing = json.loads(buff.payload or "{}")
-                payload["item"] = existing.get("item") if isinstance(existing.get("item"), dict) else {}
-                payload["bait"] = existing.get("bait") if isinstance(existing.get("bait"), dict) else {}
-            except Exception:
-                pass
-        payload.setdefault("bait", {})[str(bait_id)] = bool(armed)
-        if buff:
-            buff.payload = json.dumps(payload, ensure_ascii=False)
-            buff.expires_at = None
-            self.buff_repo.update(buff)
-        else:
-            self.buff_repo.add(
-                UserBuff(
-                    id=0,
-                    user_id=user_id,
-                    buff_type="ARMED_TEMPLATE_STATES",
-                    payload=json.dumps(payload, ensure_ascii=False),
-                    started_at=get_now(),
-                    expires_at=None,
-                )
-            )
-
-    def _get_random_auto_usable_bait_id(self, user_id: str) -> Optional[int]:
-        bait_inventory = self.inventory_repo.get_user_bait_inventory(user_id) or {}
-        candidates = []
-        for bait_id, quantity in bait_inventory.items():
-            if quantity <= 0:
-                continue
-            bait_template = self.item_template_repo.get_bait_by_id(bait_id)
-            if bait_template and self._supports_bait_armed_state(bait_template):
-                if not self._is_bait_armed(user_id, bait_id):
-                    continue
-            candidates.append(bait_id)
-        if not candidates:
-            return None
-        return random.choice(candidates)
-        
 
     def register_notifier(self, notifier, default_target: Optional[str] = None):
         """
@@ -367,32 +292,8 @@ class FishingService:
                     self.user_repo.update(user)
                     logger.warning(f"用户 {user_id} 的当前鱼饵已被清除，因为鱼饵模板不存在。")
 
-        if user.current_bait_id is None:
-            # 随机获取一个库存鱼饵，但需要验证鱼竿星级要求
-            random_bait_id = self._get_random_auto_usable_bait_id(user.user_id)
-            if random_bait_id:
-                # 验证鱼饵是否满足鱼竿星级要求
-                bait_template = self.item_template_repo.get_bait_by_id(random_bait_id)
-                if bait_template and bait_template.required_rod_rarity > 0:
-                    # 需要检查鱼竿星级
-                    equipped_rod_instance = self.inventory_repo.get_user_equipped_rod(user_id)
-                    if equipped_rod_instance:
-                        rod_template = self.item_template_repo.get_rod_by_id(equipped_rod_instance.rod_id)
-                        if rod_template and rod_template.rarity >= bait_template.required_rod_rarity:
-                            # 鱼竿星级满足要求，可以使用
-                            user.current_bait_id = random_bait_id
-                        else:
-                            # 鱼竿星级不足，不自动使用此鱼饵，并将其移出自动使用队列，避免后台持续刷日志
-                            if self._supports_bait_armed_state(bait_template):
-                                self._set_bait_armed(user_id, random_bait_id, False)
-                            logger.info(f"用户 {user_id} 的鱼竿星级不足以使用鱼饵 {random_bait_id}（需要 {bait_template.required_rod_rarity} 星），已移出自动使用队列")
-                    else:
-                        # 没有装备鱼竿，不能使用有星级要求的鱼饵，并将其移出自动使用队列
-                        if self._supports_bait_armed_state(bait_template):
-                            self._set_bait_armed(user_id, random_bait_id, False)
-                else:
-                    # 没有星级要求，直接使用
-                    user.current_bait_id = random_bait_id
+        # 不再在当前鱼饵为空时从库存自动补鱼饵。
+        # 鱼饵队列只由玩家主动使用鱼饵建立；队列耗尽后保持空，直到玩家下一次使用鱼饵。
 
         if user.current_bait_id is not None:
             bait_template = self.item_template_repo.get_bait_by_id(user.current_bait_id)

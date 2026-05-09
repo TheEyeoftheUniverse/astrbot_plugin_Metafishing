@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 from typing import Optional, List, Dict, Any, Set
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import json
 
 from astrbot.api import logger
@@ -9,6 +9,27 @@ from astrbot.api import logger
 from .abstract_repository import AbstractInventoryRepository
 from ..domain.models import UserFishInventoryItem, UserAquariumItem, UserRodInstance, UserAccessoryInstance, FishingZone, AquariumUpgrade
 from ..database.connection_manager import DatabaseConnectionManager
+
+LOCAL_TIMEZONE = timezone(timedelta(hours=8))
+
+
+def _to_local_naive_datetime(value) -> Optional[datetime]:
+    """Return a UTC+8 naive datetime for values compared with core.utils.get_now()."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(LOCAL_TIMEZONE).replace(tzinfo=None)
+    return dt
 
 
 class InsufficientFishQuantityError(Exception):
@@ -550,15 +571,7 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
             return None
         data = dict(row)
         expires_at = data.get("expires_at")
-        if isinstance(expires_at, str) and expires_at.strip():
-            try:
-                dt = datetime.fromisoformat(expires_at)
-                if dt.tzinfo is None:
-                    from datetime import timezone, timedelta
-                    dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
-                data["expires_at"] = dt
-            except ValueError:
-                data["expires_at"] = None
+        data["expires_at"] = _to_local_naive_datetime(expires_at)
         return data
 
     def get_user_zone_stay(self, user_id: str, zone_id: int) -> Optional[Dict[str, Any]]:
@@ -571,8 +584,11 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
             return self._row_to_zone_stay(cursor.fetchone())
 
     def upsert_user_zone_stay(self, user_id: str, zone_id: int, pass_item_id: int, expires_at: datetime) -> None:
-        now = datetime.now().isoformat()
-        expires_at_text = expires_at.isoformat()
+        now = datetime.now(LOCAL_TIMEZONE).replace(tzinfo=None).isoformat()
+        normalized_expires_at = _to_local_naive_datetime(expires_at)
+        if normalized_expires_at is None:
+            raise ValueError("expires_at must be a valid datetime")
+        expires_at_text = normalized_expires_at.isoformat()
         with self._connection_manager.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -598,11 +614,14 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
             conn.commit()
 
     def get_expired_zone_stays(self, now: datetime) -> List[Dict[str, Any]]:
+        normalized_now = _to_local_naive_datetime(now)
+        if normalized_now is None:
+            normalized_now = datetime.now(LOCAL_TIMEZONE).replace(tzinfo=None)
         with self._connection_manager.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT * FROM user_zone_stays WHERE expires_at <= ?",
-                (now.isoformat(),),
+                (normalized_now.isoformat(),),
             )
             return [self._row_to_zone_stay(row) for row in cursor.fetchall()]
 
@@ -689,19 +708,7 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
                     row_dict['configs'] = json.loads(row_dict['configs'])
                 for key in ('available_from', 'available_until'):
                     val = row_dict.get(key)
-                    if isinstance(val, str) and val.strip():  # 检查非空字符串
-                        try:
-                            # 解析时间并添加UTC+8时区信息，与get_now()保持一致
-                            dt = datetime.fromisoformat(val)
-                            if dt.tzinfo is None:
-                                from datetime import timezone, timedelta
-                                dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
-                            row_dict[key] = dt
-                        except Exception:
-                            row_dict[key] = None
-                    else:
-                        # 空字符串或None都设为None
-                        row_dict[key] = None
+                    row_dict[key] = _to_local_naive_datetime(val)
                 zone = FishingZone(**row_dict)
                 zone.specific_fish_ids = self.get_specific_fish_ids_for_zone(zone.id)
                 return zone
@@ -732,19 +739,7 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
                 # 解析时间字段
                 for key in ('available_from', 'available_until'):
                     val = row_dict.get(key)
-                    if isinstance(val, str) and val.strip():  # 检查非空字符串
-                        try:
-                            # 解析时间并添加UTC+8时区信息，与get_now()保持一致
-                            dt = datetime.fromisoformat(val)
-                            if dt.tzinfo is None:
-                                from datetime import timezone, timedelta
-                                dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
-                            row_dict[key] = dt
-                        except Exception:
-                            row_dict[key] = None
-                    else:
-                        # 空字符串或None都设为None
-                        row_dict[key] = None
+                    row_dict[key] = _to_local_naive_datetime(val)
                 zone = FishingZone(**row_dict)
                 # 加载限定鱼
                 zone.specific_fish_ids = self.get_specific_fish_ids_for_zone(zone.id)
