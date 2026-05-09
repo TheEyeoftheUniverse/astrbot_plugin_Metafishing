@@ -2528,6 +2528,7 @@ async def index():
     """玩家主页 - 仪表板"""
     user_id = session.get("user_id")
     user_repo = current_app.config.get("USER_REPO")
+    inventory_service = current_app.config.get("INVENTORY_SERVICE")
     inventory_repo = current_app.config.get("INVENTORY_REPO")
     item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
     log_repo = current_app.config.get("LOG_REPO")
@@ -2574,12 +2575,20 @@ async def index():
         "consecutive_login_days": user.consecutive_login_days,
         "has_checked_in_today": has_checked_in_today,
     }
+
+    rods_result = inventory_service.get_user_rod_inventory(user_id) if inventory_service else {"rods": []}
+    accessories_result = inventory_service.get_user_accessory_inventory(user_id) if inventory_service else {"accessories": []}
+    baits_result = inventory_service.get_user_bait_inventory(user_id) if inventory_service else {"baits": []}
     
     return await render_template(
         "index.html",
         user=user,
         stats=stats,
         user_state=user_state,
+        rods=rods_result.get("rods", []),
+        accessories=accessories_result.get("accessories", []),
+        baits=baits_result.get("baits", []),
+        current_bait_id=user.current_bait_id,
     )
 
 # ==================== 功能页面（占位符） ====================

@@ -409,8 +409,9 @@ async def draw_state_image(user_data: Dict[str, Any], data_dir: str) -> Image.Im
         badge_text = '此区域无稀有鱼'
         badge_color = paper_soft
     else:
-        badge_text = f'稀有鱼 {caught}/{quota}'
-        badge_color = danger if caught >= quota else gold
+        remaining = max(0, quota - caught)
+        badge_text = f'剩余稀有鱼 {remaining}/{quota}'
+        badge_color = danger if remaining <= 0 else gold
     badge_w, _ = measure(badge_text, small_font)
     zone_name = ellipsize(str(fishing_zone.get('name', '未知区域')),
                           inner_right - inner_left - badge_w - 18, content_font)

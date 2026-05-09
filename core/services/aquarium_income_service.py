@@ -379,10 +379,11 @@ class AquariumIncomeService:
 
         return {
             "neighbors": neighbors,
-            "verb_pool": [
-                "觉得", "惊叹于", "震惊于", "流连于",
-                "凝视着", "端详了一会儿", "驻足看了看", "凝神望着",
+            "view_action_pool": [
+                "凝视着", "端详着", "驻足看着", "凝神望着",
+                "隔着玻璃看着", "认真打量着", "静静欣赏着",
             ],
+            "thought_pool": ["觉得", "感觉", "寻思"],
             "npc_pool": ["路过的渔夫", "迷途的旅人", "某位老钓友", "邻塘的小孩"],
             "used_neighbors": set(),
         }
@@ -465,12 +466,28 @@ class AquariumIncomeService:
             quip = "在缸里慢慢氧化的样子"
         # 防御：再剥一次末尾标点，避免拼接时出现"…，"双逗号
         quip = quip.rstrip("。！？.!?…~～，,、 \t")
+        quip = self._normalize_quip_clause(quip)
 
         neighbor = self._pick_neighbor_name(ctx)
-        verb = random.choice(ctx.get("verb_pool") or ["觉得"])
+        view_action = random.choice(ctx.get("view_action_pool") or ["凝视着"])
+        thought = random.choice(ctx.get("thought_pool") or ["觉得"])
         fish_name = str(fish.get("name") or "这条鱼")
 
-        return f"{neighbor}{verb}{fish_name}{quip}，留下了{pouch.item_name} ×{pouch.quantity}！"
+        return f"{neighbor}{view_action}{fish_name}，{thought}{quip}，留下了{pouch.item_name} ×{pouch.quantity}！"
+
+    @staticmethod
+    def _normalize_quip_clause(quip: str) -> str:
+        """把旧式短评修正为能接在“觉得/感觉/寻思”后面的判断从句。"""
+        quip = (quip or "").strip()
+        if not quip:
+            return "它在缸里慢慢氧化的样子"
+
+        pronoun_prefixes = ("它", "这鱼", "这条鱼", "那鱼", "那条鱼")
+        judgment_prefixes = ("像", "仿佛", "好像", "似乎")
+        if quip.startswith(pronoun_prefixes) or quip.startswith(judgment_prefixes):
+            return quip
+
+        return f"它{quip}"
 
     @staticmethod
     def _weighted_pick_fish(snapshot: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:

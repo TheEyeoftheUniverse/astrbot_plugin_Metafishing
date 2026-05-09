@@ -124,6 +124,7 @@
                      data-fish-id="{{ fish.fish_id }}"
                      data-quality-level="{{ fish.quality_level }}"
                      data-quantity="{{ fish.quantity }}"
+                     data-value="{{ fish.actual_value }}"
                      data-name="{{ fish.name }}"
                      onclick="toggleFishSelection(event, this)">
                     <div class="card-body d-flex flex-column">
@@ -140,7 +141,7 @@
                             <div>总值 {{ fish.actual_value * fish.quantity }}</div>
                         </div>
                         <div class="d-flex gap-2 mt-auto flex-wrap">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); sellFish({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
+                            <button class="btn btn-outline-secondary btn-sm" onclick='event.stopPropagation(); sellFish({{ fish.fish_id }}, {{ fish.quality_level }}, {{ fish.name|tojson }}, {{ fish.quantity }}, {{ fish.actual_value }})'>
                                 <i class="fas fa-hand-holding-usd"></i> 出售
                             </button>
                             <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); moveToAquarium({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
@@ -190,6 +191,7 @@ function getSelectedFishPayload() {
         fish_id: parseInt(card.dataset.fishId),
         quality_level: parseInt(card.dataset.qualityLevel || '0'),
         quantity: parseInt(card.dataset.quantity || '0'),
+        actual_value: parseInt(card.dataset.value || '0'),
         name: card.dataset.name || ''
     })).filter(item => item.fish_id > 0 && item.quantity > 0);
 }
@@ -269,7 +271,11 @@ async function submitSelectedFishBatch(action, confirmMessage, loadingMessage) {
 async function sellSelectedFish() {
     await submitSelectedFishBatch(
         'sell',
-        fishes => `确认卖出选中的 ${fishes.length} 种鱼，共 ${fishes.reduce((sum, item) => sum + item.quantity, 0)} 条吗？`,
+        fishes => {
+            const totalCount = fishes.reduce((sum, item) => sum + item.quantity, 0);
+            const totalValue = fishes.reduce((sum, item) => sum + item.quantity * item.actual_value, 0);
+            return `确认卖出选中的 ${fishes.length} 种鱼，共 ${totalCount} 条吗？\n卖出价格：${totalValue.toLocaleString('zh-CN')} 金币`;
+        },
         '正在卖出选中鱼类...'
     );
 }
@@ -332,6 +338,14 @@ async function upgradeFishpondCapacity() {
 
 // 全部卖出功能
 async function sellAllFish() {
+    if (!await webuiConfirm('确认卖出鱼塘中的全部鱼吗？\n卖出价格：{{ "{:,}".format(stats.total_value or 0) }} 金币', {
+        title: '全部卖出',
+        confirmText: '全部卖出',
+        confirmClass: 'btn-danger'
+    })) {
+        return;
+    }
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_sell_all_fish") }}', {
             method: 'POST',
@@ -351,7 +365,7 @@ async function sellAllFish() {
     }
 }
 
-async function sellFish(fishId, qualityLevel, fishName, maxQuantity) {
+async function sellFish(fishId, qualityLevel, fishName, maxQuantity, unitPrice) {
     const quantity = await webuiPrompt(`请输入要出售的【${fishName}】数量。\n最多 ${maxQuantity} 条。`, {
         title: '出售鱼类',
         defaultValue: '1',
@@ -366,6 +380,14 @@ async function sellFish(fishId, qualityLevel, fishName, maxQuantity) {
     const qty = parseInt(quantity);
     if (isNaN(qty) || qty <= 0 || qty > maxQuantity) {
         showToast('数量无效', 'error');
+        return;
+    }
+
+    if (!await webuiConfirm(`确认卖出【${fishName}】x${qty} 吗？\n卖出价格：${(unitPrice * qty).toLocaleString('zh-CN')} 金币`, {
+        title: '确认卖出',
+        confirmText: '卖出',
+        confirmClass: 'btn-danger'
+    })) {
         return;
     }
 

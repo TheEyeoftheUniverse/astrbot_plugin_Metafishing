@@ -577,6 +577,37 @@ a:hover {
     border-right: 1px solid var(--hairline);
 }
 
+.equipment-selector-trigger {
+    display: block;
+    min-height: 7.1rem;
+    border-top: 0;
+    border-bottom: 0;
+    border-left: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.equipment-selector-trigger:hover,
+.equipment-selector-trigger:focus-visible {
+    background: rgba(21, 166, 166, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(21, 166, 166, 0.22);
+    outline: 0;
+}
+
+.equipment-selector-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    margin-top: 0.45rem;
+    color: #127f82;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
 .equipment-summary-heading {
     display: flex;
     align-items: flex-start;
@@ -1008,6 +1039,23 @@ a:hover {
     font-size: 1.35rem;
     font-weight: 800;
     line-height: 1;
+}
+
+.equipment-selector-modal .modal-body {
+    background: rgba(255, 248, 236, 0.38);
+}
+
+.equipment-selector-modal .modal-footer {
+    border-top: 1px solid var(--hairline);
+}
+
+.equipment-picker-card {
+    min-height: 100%;
+}
+
+.equipment-picker-card.is-equipped {
+    border-color: rgba(78, 155, 95, 0.58) !important;
+    background: rgba(78, 155, 95, 0.08);
 }
 
 .metric-action {

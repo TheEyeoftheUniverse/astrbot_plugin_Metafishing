@@ -288,6 +288,13 @@ class InventoryService:
                     "current_durability": rod_instance.current_durability,
                     "max_durability": refined_max_durability,
                     "can_refine": can_refine,
+                    "refine_cost": self._get_next_refine_cost(rod_template.rarity, rod_instance.refine_level),
+                    "refine_success_rate": self._get_next_refine_success_rate(rod_template.rarity, rod_instance.refine_level),
+                    "sell_price": self.game_mechanics_service.calculate_sell_price(
+                        item_type="rod",
+                        rarity=rod_template.rarity,
+                        refine_level=rod_instance.refine_level,
+                    ) if rod_template.rarity < 6 else 0,
                 })
         # 排序：装备的鱼竿优先显示，然后按稀有度降序，最后按精炼等级降序
         enriched_rods.sort(key=lambda x: (
@@ -327,6 +334,7 @@ class InventoryService:
                     "rare_fish_chance_bonus": getattr(bait_template, "rare_chance_modifier", 0.0),
                     "supports_armed_state": supports_armed_state,
                     "is_armed": self.is_template_armed(user_id, "bait", bait_id) if supports_armed_state else False,
+                    "sell_unit_price": self._get_stack_item_sell_unit_price(bait_template),
                 })
 
         return {
@@ -359,6 +367,13 @@ class InventoryService:
                     "bonus_coin_modifier": calculate_after_refine(accessory_template.bonus_coin_modifier, refine_level=accessory_instance.refine_level, rarity=accessory_template.rarity),
                     "refine_level": accessory_instance.refine_level,
                     "can_refine": can_refine,
+                    "refine_cost": self._get_next_refine_cost(accessory_template.rarity, accessory_instance.refine_level),
+                    "refine_success_rate": self._get_next_refine_success_rate(accessory_template.rarity, accessory_instance.refine_level),
+                    "sell_price": self.game_mechanics_service.calculate_sell_price(
+                        item_type="accessory",
+                        rarity=accessory_template.rarity,
+                        refine_level=accessory_instance.refine_level,
+                    ) if accessory_template.rarity < 6 else 0,
                 })
 
         # 排序：装备的饰品优先显示，然后按稀有度降序，最后按精炼等级降序
@@ -399,6 +414,7 @@ class InventoryService:
                     "is_consumable": getattr(item_template, "is_consumable", False),
                     "supports_armed_state": supports_armed_state,
                     "is_armed": self.is_template_armed(user_id, "item", item_id) if supports_armed_state else False,
+                    "sell_unit_price": self._get_stack_item_sell_unit_price(item_template),
                 })
 
         return {
@@ -422,6 +438,38 @@ class InventoryService:
             return True
 
         return False
+
+    def _get_base_refine_costs(self) -> Dict[int, int]:
+        return {
+            1: 10000, 2: 30000, 3: 50000, 4: 100000,
+            5: 200000, 6: 500000, 7: 1000000, 8: 2000000,
+            9: 5000000, 10: 10000000
+        }
+
+    def _get_next_refine_terms(self, rarity: int, refine_level: int) -> Dict[str, Any]:
+        if refine_level >= 10:
+            return {"cost": 0, "success_rate": 0.0, "target_level": 10}
+
+        refine_costs, success_rates = self._get_refine_config_by_rarity(
+            rarity,
+            self._get_base_refine_costs(),
+        )
+        target_level = min(refine_level + 1, 10)
+        total_cost = sum(refine_costs.get(level, 0) for level in range(refine_level, target_level))
+        return {
+            "cost": total_cost,
+            "success_rate": success_rates.get(target_level, 1.0),
+            "target_level": target_level,
+        }
+
+    def _get_next_refine_cost(self, rarity: int, refine_level: int) -> int:
+        return int(self._get_next_refine_terms(rarity, refine_level).get("cost", 0) or 0)
+
+    def _get_next_refine_success_rate(self, rarity: int, refine_level: int) -> float:
+        return float(self._get_next_refine_terms(rarity, refine_level).get("success_rate", 0.0) or 0.0)
+
+    def _get_stack_item_sell_unit_price(self, template) -> int:
+        return max(1, int((getattr(template, "cost", 0) or 0) * 0.5))
 
     def _can_refine_accessory_instance(self, target_instance, all_instances) -> bool:
         if target_instance.refine_level >= 10:
@@ -1278,11 +1326,7 @@ class InventoryService:
             return {"success": False, "message": "用户不存在"}
 
         # 精炼费用表 (1-10级)
-        refine_costs = {
-            1: 10000, 2: 30000, 3: 50000, 4: 100000,
-            5: 200000, 6: 500000, 7: 1000000, 8: 2000000,
-            9: 5000000, 10: 10000000
-        }
+        refine_costs = self._get_base_refine_costs()
 
         # 根据物品类型设置相关配置
         if item_type not in ["rod", "accessory"]:

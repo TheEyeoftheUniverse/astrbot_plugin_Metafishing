@@ -134,6 +134,7 @@
                      data-fish-id="{{ fish.fish_id }}"
                      data-quality-level="{{ fish.quality_level }}"
                      data-quantity="{{ fish.quantity }}"
+                     data-value="{{ fish.actual_value }}"
                      data-name="{{ fish.name }}"
                      onclick="toggleFishSelection(event, this)">
                     <div class="card-body d-flex flex-column">
@@ -197,7 +198,7 @@
             <ul class="mb-0">
                 <li>水族箱用于收藏珍贵的鱼类，不会被出售</li>
                 <li>可以通过升级扩大水族箱容量</li>
-                <li>高品质的鱼在水族箱中会有特殊效果</li>
+                <li>稀有鱼在水族箱中会有展览收益</li>
             </ul>
         </div>
     </div>
@@ -215,6 +216,7 @@ function getSelectedFishPayload() {
         fish_id: parseInt(card.dataset.fishId),
         quality_level: parseInt(card.dataset.qualityLevel || '0'),
         quantity: parseInt(card.dataset.quantity || '0'),
+        actual_value: parseInt(card.dataset.value || '0'),
         name: card.dataset.name || ''
     })).filter(item => item.fish_id > 0 && item.quantity > 0);
 }
@@ -294,7 +296,11 @@ async function submitSelectedAquariumBatch(action, confirmMessage, loadingMessag
 async function sellSelectedAquariumFish() {
     await submitSelectedAquariumBatch(
         'sell',
-        fishes => `确认卖出水族箱中选中的 ${fishes.length} 种鱼，共 ${fishes.reduce((sum, item) => sum + item.quantity, 0)} 条吗？`,
+        fishes => {
+            const totalCount = fishes.reduce((sum, item) => sum + item.quantity, 0);
+            const totalValue = fishes.reduce((sum, item) => sum + item.quantity * item.actual_value, 0);
+            return `确认卖出水族箱中选中的 ${fishes.length} 种鱼，共 ${totalCount} 条吗？\n卖出价格：${totalValue.toLocaleString('zh-CN')} 金币`;
+        },
         '正在卖出选中鱼类...'
     );
 }

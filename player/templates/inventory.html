@@ -63,7 +63,7 @@
                                 </button>
                                 {% endif %}
                                 {% if rod.can_refine %}
-                                <button class="btn btn-sm btn-outline-secondary" title="精炼" onclick="refineRod('{{ rod.display_code }}', '{{ rod.name }}', {{ rod.refine_level }})">
+                                <button class="btn btn-sm btn-outline-secondary" title="精炼" onclick='refineRod({{ rod.display_code|tojson }}, {{ rod.name|tojson }}, {{ rod.refine_level }}, {{ rod.refine_cost or 0 }}, {{ rod.refine_success_rate or 0 }})'>
                                     <i class="fas fa-hammer"></i>
                                 </button>
                                 {% else %}
@@ -72,7 +72,7 @@
                                 </button>
                                 {% endif %}
                                 {% if not rod.is_equipped and not rod.is_locked and rod.rarity < 6 %}
-                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellRod('{{ rod.display_code }}', '{{ rod.name }}')">
+                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick='sellRod({{ rod.display_code|tojson }}, {{ rod.name|tojson }}, {{ rod.sell_price or 0 }})'>
                                     <i class="fas fa-coins"></i>
                                 </button>
                                 {% elif not rod.is_equipped and not rod.is_locked %}
@@ -136,7 +136,7 @@
                                 </button>
                                 {% endif %}
                                 {% if acc.can_refine %}
-                                <button class="btn btn-sm btn-outline-secondary" title="精炼" onclick="refineAccessory('{{ acc.display_code }}', '{{ acc.name }}', {{ acc.refine_level }})">
+                                <button class="btn btn-sm btn-outline-secondary" title="精炼" onclick='refineAccessory({{ acc.display_code|tojson }}, {{ acc.name|tojson }}, {{ acc.refine_level }}, {{ acc.refine_cost or 0 }}, {{ acc.refine_success_rate or 0 }})'>
                                     <i class="fas fa-hammer"></i>
                                 </button>
                                 {% else %}
@@ -145,7 +145,7 @@
                                 </button>
                                 {% endif %}
                                 {% if not acc.is_equipped and not acc.is_locked and acc.rarity < 6 %}
-                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick="sellAccessory('{{ acc.display_code }}', '{{ acc.name }}')">
+                                <button class="btn btn-sm btn-outline-danger" title="卖出" onclick='sellAccessory({{ acc.display_code|tojson }}, {{ acc.name|tojson }}, {{ acc.sell_price or 0 }})'>
                                     <i class="fas fa-coins"></i>
                                 </button>
                                 {% elif not acc.is_equipped and not acc.is_locked %}
@@ -207,7 +207,7 @@
                                         <i class="fas fa-hand-sparkles"></i>
                                     </button>
                                 {% endif %}
-                                <button class="btn btn-sm btn-outline-danger" title="{% if item.rarity >= 6 %}6星及以上道具可兑换精炼材料，不能卖出{% else %}卖出{% endif %}" {% if item.rarity >= 6 %}disabled{% else %}onclick="sellItem({{ item.item_id }}, '{{ item.name }}', {{ item.quantity }})"{% endif %}>
+                                <button class="btn btn-sm btn-outline-danger" title="{% if item.rarity >= 6 %}6星及以上道具可兑换精炼材料，不能卖出{% else %}卖出{% endif %}" {% if item.rarity >= 6 %}disabled{% else %}onclick='sellItem({{ item.item_id }}, {{ item.name|tojson }}, {{ item.quantity }}, {{ item.sell_unit_price or 0 }})'{% endif %}>
                                     <i class="fas fa-coins"></i>
                                 </button>
                             </div>
@@ -253,7 +253,7 @@
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 {% endif %}
-                                <button class="btn btn-sm btn-outline-danger" title="{% if bait.rarity >= 6 %}6星及以上鱼饵可兑换精炼材料，不能卖出{% else %}卖出{% endif %}" {% if bait.rarity >= 6 %}disabled{% else %}onclick="sellBait({{ bait.bait_id }}, '{{ bait.name }}', {{ bait.quantity }})"{% endif %}>
+                                <button class="btn btn-sm btn-outline-danger" title="{% if bait.rarity >= 6 %}6星及以上鱼饵可兑换精炼材料，不能卖出{% else %}卖出{% endif %}" {% if bait.rarity >= 6 %}disabled{% else %}onclick='sellBait({{ bait.bait_id }}, {{ bait.name|tojson }}, {{ bait.quantity }}, {{ bait.sell_unit_price or 0 }})'{% endif %}>
                                     <i class="fas fa-coins"></i>
                                 </button>
                             </div>
@@ -297,9 +297,10 @@
         <div class="alert alert-info">
             <h5><i class="fas fa-info-circle"></i> 温馨提示</h5>
             <ul class="mb-0">
-                <li>装备更高稀有度的鱼竿和饰品可以获得更好的效果</li>
-                <li>精炼装备可以提升属性加成</li>
-                <li>某些道具可用作钓鱼区域的通行证</li>
+                <li>更高稀有度的装备往往有更高的加成</li>
+                <li>精炼装备可提升属性加成并恢复全部稀有度</li>
+                <li>★6以上无法出售给商店</li>
+                <li>鱼饵可以同时激活多组自动消耗</li>
             </ul>
         </div>
     </div>
@@ -384,7 +385,30 @@ async function unequipAccessory(name) {
     await postInventoryAction('{{ url_for("player_bp.api_unequip_accessory") }}', {});
 }
 
-async function refineRod(code, name, currentLevel) {
+function formatCoins(value) {
+    return Number(value || 0).toLocaleString('zh-CN');
+}
+
+function formatPercent(value) {
+    return `${(Number(value || 0) * 100).toFixed(0)}%`;
+}
+
+async function confirmRefine(kindName, name, currentLevel, cost, successRate) {
+    return await webuiConfirm(
+        `确认精炼${kindName}【${name}】吗？\n本次精炼：+${currentLevel} → +${currentLevel + 1}\n成功率：${formatPercent(successRate)}\n消耗金币：${formatCoins(cost)} 金币`,
+        {
+            title: `精炼${kindName}`,
+            confirmText: '确认精炼',
+            confirmClass: 'btn-primary'
+        }
+    );
+}
+
+async function refineRod(code, name, currentLevel, cost, successRate) {
+    if (!await confirmRefine('鱼竿', name, currentLevel, cost, successRate)) {
+        return;
+    }
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_refine_rod") }}', {
             method: 'POST',
@@ -404,7 +428,11 @@ async function refineRod(code, name, currentLevel) {
     }
 }
 
-async function refineAccessory(code, name, currentLevel) {
+async function refineAccessory(code, name, currentLevel, cost, successRate) {
+    if (!await confirmRefine('饰品', name, currentLevel, cost, successRate)) {
+        return;
+    }
+
     try {
         const response = await fetch('{{ url_for("player_bp.api_refine_accessory") }}', {
             method: 'POST',
@@ -496,8 +524,8 @@ async function deactivateBait(baitId, baitName) {
     await postInventoryAction('{{ url_for("player_bp.api_use_bait") }}', {bait_id: baitId, deactivate: true});
 }
 
-async function sellRod(code, name) {
-    if (!await webuiConfirm(`确认卖出鱼竿【${name}】吗？`, {
+async function sellRod(code, name, sellPrice) {
+    if (!await webuiConfirm(`确认卖出鱼竿【${name}】吗？\n卖出价格：${formatCoins(sellPrice)} 金币`, {
         title: '卖出鱼竿',
         confirmText: '卖出',
         confirmClass: 'btn-danger'
@@ -505,8 +533,8 @@ async function sellRod(code, name) {
     await postInventoryAction('{{ url_for("player_bp.api_sell_rod") }}', {rod_code: code});
 }
 
-async function sellAccessory(code, name) {
-    if (!await webuiConfirm(`确认卖出饰品【${name}】吗？`, {
+async function sellAccessory(code, name, sellPrice) {
+    if (!await webuiConfirm(`确认卖出饰品【${name}】吗？\n卖出价格：${formatCoins(sellPrice)} 金币`, {
         title: '卖出饰品',
         confirmText: '卖出',
         confirmClass: 'btn-danger'
@@ -514,7 +542,7 @@ async function sellAccessory(code, name) {
     await postInventoryAction('{{ url_for("player_bp.api_sell_accessory") }}', {accessory_code: code});
 }
 
-async function sellItem(itemId, name, quantity) {
+async function sellItem(itemId, name, quantity, unitPrice) {
     const qty = await webuiPrompt(`请输入要卖出的【${name}】数量。\n最多 ${quantity} 个。`, {
         title: '卖出道具',
         defaultValue: String(quantity),
@@ -532,7 +560,7 @@ async function sellItem(itemId, name, quantity) {
         return;
     }
 
-    if (!await webuiConfirm(`确认卖出【${name}】x${amount} 吗？`, {
+    if (!await webuiConfirm(`确认卖出【${name}】x${amount} 吗？\n卖出价格：${formatCoins(unitPrice * amount)} 金币`, {
         title: '确认卖出',
         confirmText: '卖出',
         confirmClass: 'btn-danger'
@@ -540,7 +568,7 @@ async function sellItem(itemId, name, quantity) {
     await postInventoryAction('{{ url_for("player_bp.api_sell_item") }}', {item_id: itemId, quantity: amount});
 }
 
-async function sellBait(baitId, name, quantity) {
+async function sellBait(baitId, name, quantity, unitPrice) {
     const qty = await webuiPrompt(`请输入要卖出的鱼饵【${name}】数量。\n最多 ${quantity} 个。`, {
         title: '卖出鱼饵',
         defaultValue: String(quantity),
@@ -558,7 +586,7 @@ async function sellBait(baitId, name, quantity) {
         return;
     }
 
-    if (!await webuiConfirm(`确认卖出鱼饵【${name}】x${amount} 吗？`, {
+    if (!await webuiConfirm(`确认卖出鱼饵【${name}】x${amount} 吗？\n卖出价格：${formatCoins(unitPrice * amount)} 金币`, {
         title: '确认卖出',
         confirmText: '卖出',
         confirmClass: 'btn-danger'
