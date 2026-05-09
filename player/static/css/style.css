@@ -1058,6 +1058,11 @@ a:hover {
     background: rgba(78, 155, 95, 0.08);
 }
 
+.aquarium-added-at {
+    max-width: 58%;
+    line-height: 1.35;
+}
+
 .metric-action {
     position: absolute;
     top: 0.85rem;

@@ -37,6 +37,7 @@ class AquariumService:
                     "name": fish_template.name,
                     "rarity": fish_template.rarity,
                     "base_value": fish_template.base_value,
+                    "description": fish_template.description,
                     "quantity": item.quantity,
                     "quality_level": item.quality_level,  # 添加品质等级
                     "actual_value": actual_value,  # 添加实际价值

@@ -146,13 +146,16 @@
                             </h5>
                             <span class="card-quantity">×{{ fish.quantity }}</span>
                         </div>
+                        <p class="text-muted small mb-2 inventory-description">{{ fish.description or '暂无描述' }}</p>
                         <div class="small text-muted mb-3">
                             <div><i class="fas fa-coins text-success"></i> {{ fish.actual_value }}</div>
-                            <div><i class="fas fa-clock"></i> {{ fish.added_at }}</div>
                         </div>
-                        <button class="btn btn-outline-secondary btn-sm align-self-start mt-auto" onclick="event.stopPropagation(); removeFromAquarium({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
-                            <i class="fas fa-undo"></i> 移回鱼塘
-                        </button>
+                        <div class="d-flex justify-content-between align-items-end gap-2 mt-auto">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); removeFromAquarium({{ fish.fish_id }}, {{ fish.quality_level }}, '{{ fish.name }}', {{ fish.quantity }})">
+                                <i class="fas fa-undo"></i> 移回鱼塘
+                            </button>
+                            <span class="text-muted small text-end aquarium-added-at"><i class="fas fa-clock"></i> {{ fish.added_at }}</span>
+                        </div>
 
                         {% set fish_key = fish.fish_id|string + '-' + fish.quality_level|string %}
                         {% if exhibition_comments and fish_key in exhibition_comments and exhibition_comments[fish_key]|length > 0 %}
