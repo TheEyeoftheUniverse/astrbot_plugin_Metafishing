@@ -1063,6 +1063,19 @@ a:hover {
     line-height: 1.35;
 }
 
+.aquarium-fish-description {
+    min-height: 4.65rem;
+    line-height: 1.55;
+}
+
+.aquarium-fish-description[data-expanded="true"] {
+    min-height: 0;
+}
+
+.aquarium-fish-description[data-expanded="true"] .shop-description-toggle::after {
+    content: "\f077";
+}
+
 .metric-action {
     position: absolute;
     top: 0.85rem;

@@ -146,7 +146,10 @@
                             </h5>
                             <span class="card-quantity">×{{ fish.quantity }}</span>
                         </div>
-                        <p class="text-muted small mb-2 inventory-description">{{ fish.description or '暂无描述' }}</p>
+                        <p class="text-muted small mb-2 aquarium-fish-description" data-full-text="{{ (fish.description or '暂无描述')|e }}">
+                            <span class="aquarium-description-text"></span>
+                            <button type="button" class="shop-description-toggle d-none" onclick="event.stopPropagation(); toggleAquariumDescription(this)">展开</button>
+                        </p>
                         <div class="small text-muted mb-3">
                             <div><i class="fas fa-coins text-success"></i> {{ fish.actual_value }}</div>
                         </div>
@@ -257,6 +260,107 @@ function syncFishSelectionFromCheckbox(checkbox) {
 function clearFishSelection() {
     document.querySelectorAll('.selectable-fish-card.is-selected').forEach(card => setFishCardSelected(card, false));
 }
+
+function initializeAquariumDescriptionToggles() {
+    document.querySelectorAll('.aquarium-fish-description').forEach(description => {
+        const textEl = description.querySelector('.aquarium-description-text');
+        const toggle = description.querySelector('.shop-description-toggle');
+        if (!textEl || !toggle) return;
+
+        description.dataset.fullText = description.dataset.fullText || '';
+        description.dataset.expanded = description.dataset.expanded || 'false';
+        renderAquariumDescription(description);
+    });
+}
+
+function createAquariumDescriptionMeasurer(description) {
+    const measurer = description.cloneNode(false);
+    measurer.classList.add('shop-description-measurer');
+    measurer.removeAttribute('data-expanded');
+    measurer.style.width = `${description.clientWidth || 260}px`;
+
+    const textEl = document.createElement('span');
+    textEl.className = 'aquarium-description-text';
+    const toggle = description.querySelector('.shop-description-toggle').cloneNode(true);
+    toggle.classList.remove('d-none');
+
+    measurer.appendChild(textEl);
+    measurer.appendChild(toggle);
+    document.body.appendChild(measurer);
+
+    return {measurer, textEl};
+}
+
+function getCollapsedAquariumDescriptionText(description, fullText) {
+    const width = description.clientWidth || description.parentElement?.clientWidth || 260;
+    if (width <= 0) return fullText;
+
+    const {measurer, textEl} = createAquariumDescriptionMeasurer(description);
+    const computedStyle = window.getComputedStyle(description);
+    const lineHeight = parseFloat(computedStyle.lineHeight) || 20;
+    const maxHeight = lineHeight * 3 + 1;
+
+    let low = 0;
+    let high = fullText.length;
+    let best = fullText;
+
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const candidate = fullText.slice(0, mid).trimEnd();
+        textEl.textContent = `${candidate}... `;
+        if (measurer.offsetHeight <= maxHeight) {
+            best = candidate;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+
+    document.body.removeChild(measurer);
+    return best;
+}
+
+function renderAquariumDescription(description) {
+    const textEl = description.querySelector('.aquarium-description-text');
+    const toggle = description.querySelector('.shop-description-toggle');
+    if (!textEl || !toggle) return;
+
+    const fullText = description.dataset.fullText || '';
+    const expanded = description.dataset.expanded === 'true';
+    const collapsedText = getCollapsedAquariumDescriptionText(description, fullText);
+    const shouldCollapse = collapsedText.length < fullText.length;
+
+    if (!shouldCollapse) {
+        textEl.textContent = fullText;
+        toggle.classList.add('d-none');
+        description.dataset.expanded = 'false';
+        description.removeAttribute('data-expanded');
+        return;
+    }
+
+    toggle.classList.remove('d-none');
+    if (expanded) {
+        textEl.textContent = fullText + ' ';
+        toggle.textContent = '收起';
+        toggle.setAttribute('aria-expanded', 'true');
+        description.setAttribute('data-expanded', 'true');
+    } else {
+        textEl.textContent = collapsedText + '... ';
+        toggle.textContent = '展开';
+        toggle.setAttribute('aria-expanded', 'false');
+        description.setAttribute('data-expanded', 'false');
+    }
+}
+
+function toggleAquariumDescription(button) {
+    const description = button.closest('.aquarium-fish-description');
+    if (!description) return;
+    description.dataset.expanded = description.dataset.expanded === 'true' ? 'false' : 'true';
+    renderAquariumDescription(description);
+}
+
+document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(initializeAquariumDescriptionToggles));
+window.addEventListener('resize', () => requestAnimationFrame(initializeAquariumDescriptionToggles));
 
 async function submitSelectedAquariumBatch(action, confirmMessage, loadingMessage) {
     const fishes = getSelectedFishPayload();
