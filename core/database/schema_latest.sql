@@ -701,3 +701,82 @@ CREATE INDEX idx_tribulation_participants_event ON tribulation_participants(even
 
 -- index: idx_tribulation_participants_user
 CREATE INDEX idx_tribulation_participants_user ON tribulation_participants(user_id);
+
+-- ============================================================
+-- 魔幻团战 V2 (migration 007)
+-- ============================================================
+
+-- table: team_battle_boss
+CREATE TABLE team_battle_boss (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    region_key          TEXT NOT NULL,
+    boss_name           TEXT NOT NULL,
+    fish_id             INTEGER NOT NULL,
+    boss_star           INTEGER NOT NULL,
+    max_hp              INTEGER NOT NULL,
+    current_hp          INTEGER NOT NULL,
+    image_path          TEXT,
+    intro_story         TEXT,
+    intro_quote         TEXT,
+    stages_triggered    TEXT NOT NULL DEFAULT '[]',
+    spawned_at          TEXT NOT NULL,
+    killed_at           TEXT,
+    is_active           INTEGER NOT NULL DEFAULT 1
+);
+
+-- index: idx_team_battle_boss_active
+CREATE INDEX idx_team_battle_boss_active ON team_battle_boss(is_active, spawned_at DESC);
+
+-- table: team_battle_damage
+CREATE TABLE team_battle_damage (
+    boss_id                     INTEGER NOT NULL,
+    user_id                     TEXT NOT NULL,
+    total_damage                INTEGER NOT NULL DEFAULT 0,
+    last_settled_at             TEXT,
+    is_leader_at_last_settle    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (boss_id, user_id)
+);
+
+-- index: idx_team_battle_damage_rank
+CREATE INDEX idx_team_battle_damage_rank ON team_battle_damage(boss_id, total_damage DESC);
+
+-- table: team_battle_reward_inventory
+CREATE TABLE team_battle_reward_inventory (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         TEXT NOT NULL,
+    boss_id         INTEGER NOT NULL,
+    reward_type     TEXT NOT NULL,
+    item_id         INTEGER,
+    quantity        INTEGER NOT NULL DEFAULT 1,
+    source_stage    TEXT NOT NULL,
+    source_label    TEXT,
+    granted_at      TEXT NOT NULL,
+    claimed_at      TEXT,
+    expired_at      TEXT
+);
+
+-- index: idx_team_battle_reward_unclaimed
+CREATE INDEX idx_team_battle_reward_unclaimed ON team_battle_reward_inventory(user_id, claimed_at, expired_at);
+
+-- table: team_battle_history_kills
+CREATE TABLE team_battle_history_kills (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    boss_id                 INTEGER NOT NULL,
+    region_key              TEXT NOT NULL,
+    boss_name               TEXT NOT NULL,
+    boss_star               INTEGER NOT NULL,
+    finisher_user_id        TEXT,
+    final_rank_snapshot     TEXT NOT NULL,
+    killed_at               TEXT NOT NULL
+);
+
+-- index: idx_team_battle_history_killed_at
+CREATE INDEX idx_team_battle_history_killed_at ON team_battle_history_kills(killed_at DESC);
+
+-- table: team_battle_daily_settle
+CREATE TABLE team_battle_daily_settle (
+    daily_marker    TEXT PRIMARY KEY,
+    boss_id         INTEGER,
+    settled_at      TEXT NOT NULL,
+    settle_summary  TEXT
+);
