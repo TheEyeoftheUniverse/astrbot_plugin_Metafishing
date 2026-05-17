@@ -3,7 +3,7 @@ import asyncio
 
 from astrbot.api import logger, AstrBotConfig
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star
+from astrbot.api.star import Context, Star, StarTools
 from astrbot.core.star.filter.permission import PermissionType
 
 # ==========================================================
@@ -93,11 +93,11 @@ class FishingPlugin(Star):
 
         # --- 1.1. 数据与临时文件路径管理 ---
         try:
-            # 优先使用框架提供的 get_data_dir 方法
-            self.data_dir = self.context.get_data_dir(self.plugin_id)
-        except (AttributeError, TypeError):
-            # 如果方法不存在或调用失败，则回退到旧的硬编码路径
-            logger.warning(f"无法使用 self.context.get_data_dir('{self.plugin_id}'), 将回退到旧的 'data/' 目录。")
+            # AstrBot 标准 API：StarTools.get_data_dir 是类方法，返回 data/plugin_data/<plugin_id> 绝对路径
+            self.data_dir = str(StarTools.get_data_dir(self.plugin_id))
+        except Exception:
+            # 极少数情况：StarTools 未初始化或环境异常，回退到旧的硬编码路径
+            logger.warning(f"无法使用 StarTools.get_data_dir('{self.plugin_id}'), 将回退到旧的 'data/' 目录。")
             self.data_dir = "data"
         
         self.tmp_dir = os.path.join(self.data_dir, "tmp")

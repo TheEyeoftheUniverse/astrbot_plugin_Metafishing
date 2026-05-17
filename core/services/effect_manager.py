@@ -34,7 +34,8 @@ class EffectManager:
                     if (
                         isinstance(attribute, type) and
                         issubclass(attribute, AbstractItemEffect) and
-                        attribute is not AbstractItemEffect
+                        attribute is not AbstractItemEffect and
+                        not attribute_name.startswith("_")
                     ):
                         # 实例化效果类，并动态注入所有可用的依赖
                         effect_instance = attribute(**dependencies)
@@ -44,7 +45,7 @@ class EffectManager:
                             self.register(effect_type, effect_instance)
                             logger.info(f"  -> 已注册效果: '{effect_type}'")
                         else:
-                            logger.warning(f"效果类 {attribute.__name__} 未定义 effect_type 属性，已跳过。")
+                            logger.debug(f"效果类 {attribute.__name__} 未定义 effect_type 属性，已跳过。")
             except Exception as e:
                 logger.error(f"导入或注册效果模块 '{name}' 时失败: {e}", exc_info=True)
 
