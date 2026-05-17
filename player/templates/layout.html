@@ -26,10 +26,18 @@
                         <i class="fas fa-home"></i> 主页
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('player_bp.fishing') }}">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="fishingDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-fish"></i> 钓鱼
                     </a>
+                    <ul class="dropdown-menu" aria-labelledby="fishingDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('player_bp.fishing') }}"><i class="fas fa-map-marked-alt"></i> 区域</a></li>
+                        <li><a class="dropdown-item disabled" tabindex="-1" aria-disabled="true"><i class="fas fa-search"></i> 考察</a></li>
+                        <li><a class="dropdown-item disabled" tabindex="-1" aria-disabled="true"><i class="fas fa-eye"></i> 观测</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('player_bp.tribulation_page') }}"><i class="fas fa-yin-yang"></i> 问道</a></li>
+                        <li><a class="dropdown-item disabled" tabindex="-1" aria-disabled="true"><i class="fas fa-water"></i> 深潜</a></li>
+                        <li><a class="dropdown-item disabled" tabindex="-1" aria-disabled="true"><i class="fas fa-crosshairs"></i> 讨伐</a></li>
+                    </ul>
                 </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
