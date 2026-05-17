@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractItemTemplateRepository
 from ..domain.models import Fish, Rod, Bait, Accessory, Title, Item
+from ..database.sqlite_utils import connect_sqlite
 
 class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
     """物品模板仓储的SQLite实现"""
@@ -17,9 +18,10 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
         """获取一个线程安全的数据库连接。"""
         conn = getattr(self._local, "connection", None)
         if conn is None:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA synchronous = NORMAL;")
+            conn = connect_sqlite(
+                self.db_path,
+                row_factory=sqlite3.Row,
+            )
             self._local.connection = conn
         return conn
 

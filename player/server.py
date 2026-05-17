@@ -215,6 +215,46 @@ async def _read_request_payload() -> Dict[str, Any]:
     return dict(form)
 
 
+def _parse_int_field(
+    payload: Dict[str, Any],
+    key: str,
+    *,
+    minimum: int | None = None,
+    maximum: int | None = None,
+    required: bool = True,
+    default: int | None = None,
+) -> int:
+    raw_value = payload.get(key, default)
+    if raw_value is None or raw_value == "":
+        if required:
+            raise ValueError(f"missing:{key}")
+        if default is None:
+            raise ValueError(f"missing:{key}")
+        raw_value = default
+
+    value = int(raw_value)
+    if minimum is not None and value < minimum:
+        raise ValueError(f"min:{key}")
+    if maximum is not None and value > maximum:
+        raise ValueError(f"max:{key}")
+    return value
+
+
+def _parse_bool_field(payload: Dict[str, Any], key: str, default: bool = False) -> bool:
+    raw_value = payload.get(key, default)
+    if isinstance(raw_value, bool):
+        return raw_value
+    if isinstance(raw_value, (int, float)):
+        return bool(raw_value)
+    if isinstance(raw_value, str):
+        normalized = raw_value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+    return bool(raw_value)
+
+
 def _get_linuxdo_links_file():
     """获取 Linux.do OAuth 绑定文件路径"""
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
@@ -1194,16 +1234,15 @@ async def api_sell_fish():
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
     
     try:
-        data = await request.get_json() or {}
-        fish_id = data.get("fish_id")
-        quality_level = data.get("quality_level", 0)
-        quantity = data.get("quantity", 1)
-        
-        if not fish_id or quantity <= 0:
-            return jsonify({"success": False, "message": "参数无效"}), 400
+        data = await _read_request_payload()
+        fish_id = _parse_int_field(data, "fish_id", minimum=1)
+        quality_level = _parse_int_field(data, "quality_level", minimum=0, required=False, default=0)
+        quantity = _parse_int_field(data, "quantity", minimum=1, required=False, default=1)
         
         result = inventory_service.sell_fish(user_id, fish_id, quantity, quality_level)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"出售鱼类失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1231,8 +1270,8 @@ async def api_sell_all_fish():
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
     
     try:
-        data = await request.get_json()
-        keep_one = data.get("keep_one", False)
+        data = await _read_request_payload()
+        keep_one = _parse_bool_field(data, "keep_one", False)
         
         result = inventory_service.sell_all_fish(user_id, keep_one)
         return jsonify(result)
@@ -1248,16 +1287,15 @@ async def api_add_to_aquarium():
     aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
     
     try:
-        data = await request.get_json()
-        fish_id = data.get("fish_id")
-        quality_level = data.get("quality_level", 0)
-        quantity = data.get("quantity", 1)
-        
-        if not fish_id or quantity <= 0:
-            return jsonify({"success": False, "message": "参数无效"}), 400
+        data = await _read_request_payload()
+        fish_id = _parse_int_field(data, "fish_id", minimum=1)
+        quality_level = _parse_int_field(data, "quality_level", minimum=0, required=False, default=0)
+        quantity = _parse_int_field(data, "quantity", minimum=1, required=False, default=1)
         
         result = aquarium_service.add_fish_to_aquarium(user_id, fish_id, quantity, quality_level)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"添加到水族箱失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1331,15 +1369,15 @@ async def api_list_item():
     market_service = current_app.config.get("MARKET_SERVICE")
     
     try:
-        data = await request.get_json()
-        item_type = data.get("item_type")
-        item_instance_id = data.get("item_instance_id")
-        price = data.get("price")
-        is_anonymous = data.get("is_anonymous", False)
-        quantity = data.get("quantity", 1)
-        quality_level = data.get("quality_level", 0)
+        data = await _read_request_payload()
+        item_type = str(data.get("item_type", "") or "").strip()
+        item_instance_id = _parse_int_field(data, "item_instance_id", minimum=1)
+        price = _parse_int_field(data, "price", minimum=1)
+        is_anonymous = _parse_bool_field(data, "is_anonymous", False)
+        quantity = _parse_int_field(data, "quantity", minimum=1, required=False, default=1)
+        quality_level = _parse_int_field(data, "quality_level", minimum=0, required=False, default=0)
         
-        if not item_type or not item_instance_id or not price:
+        if not item_type:
             return jsonify({"success": False, "message": "参数无效"}), 400
         
         result = market_service.put_item_on_sale(
@@ -1347,6 +1385,8 @@ async def api_list_item():
             is_anonymous, quantity, quality_level
         )
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"上架物品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1359,14 +1399,13 @@ async def api_buy_market_item():
     market_service = current_app.config.get("MARKET_SERVICE")
     
     try:
-        data = await request.get_json()
-        market_id = data.get("market_id")
-        
-        if not market_id:
-            return jsonify({"success": False, "message": "参数无效"}), 400
+        data = await _read_request_payload()
+        market_id = _parse_int_field(data, "market_id", minimum=1)
         
         result = market_service.buy_market_item(user_id, market_id)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"购买市场商品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1379,14 +1418,13 @@ async def api_delist_item():
     market_service = current_app.config.get("MARKET_SERVICE")
     
     try:
-        data = await request.get_json()
-        market_id = data.get("market_id")
-        
-        if not market_id:
-            return jsonify({"success": False, "message": "参数无效"}), 400
+        data = await _read_request_payload()
+        market_id = _parse_int_field(data, "market_id", minimum=1)
         
         result = market_service.delist_item(user_id, market_id)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"下架物品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1458,16 +1496,17 @@ async def api_buy_commodity():
     exchange_service = current_app.config.get("EXCHANGE_SERVICE")
     
     try:
-        data = await request.get_json()
-        commodity_id = data.get("commodity_id")
-        quantity = data.get("quantity")
-        current_price = data.get("current_price")
+        data = await _read_request_payload()
+        commodity_id = str(data.get("commodity_id", "") or "").strip()
+        quantity = _parse_int_field(data, "quantity", minimum=1)
         
-        if not commodity_id or not quantity or not current_price:
+        if not commodity_id:
             return jsonify({"success": False, "message": "参数无效"}), 400
         
-        result = exchange_service.purchase_commodity(user_id, commodity_id, quantity, current_price)
-        return jsonify(result)
+        result = exchange_service.purchase_commodity(user_id, commodity_id, quantity)
+        return jsonify(result), (200 if result.get("success") else 400)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"购买商品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1480,16 +1519,17 @@ async def api_sell_commodity():
     exchange_service = current_app.config.get("EXCHANGE_SERVICE")
     
     try:
-        data = await request.get_json()
-        commodity_id = data.get("commodity_id")
-        quantity = data.get("quantity")
-        current_price = data.get("current_price")
+        data = await _read_request_payload()
+        commodity_id = str(data.get("commodity_id", "") or "").strip()
+        quantity = _parse_int_field(data, "quantity", minimum=1)
         
-        if not commodity_id or not quantity or not current_price:
+        if not commodity_id:
             return jsonify({"success": False, "message": "参数无效"}), 400
         
-        result = exchange_service.sell_commodity(user_id, commodity_id, quantity, current_price)
-        return jsonify(result)
+        result = exchange_service.sell_commodity(user_id, commodity_id, quantity)
+        return jsonify(result), (200 if result.get("success") else 400)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"卖出商品失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -1502,16 +1542,15 @@ async def api_remove_from_aquarium():
     aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
 
     try:
-        data = await request.get_json()
-        fish_id = data.get("fish_id")
-        quality_level = data.get("quality_level", 0)
-        quantity = data.get("quantity", 1)
-        
-        if not fish_id or quantity <= 0:
-            return jsonify({"success": False, "message": "参数无效"}), 400
+        data = await _read_request_payload()
+        fish_id = _parse_int_field(data, "fish_id", minimum=1)
+        quality_level = _parse_int_field(data, "quality_level", minimum=0, required=False, default=0)
+        quantity = _parse_int_field(data, "quantity", minimum=1, required=False, default=1)
         
         result = aquarium_service.remove_fish_from_aquarium(user_id, fish_id, quantity, quality_level)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"从水族箱移除失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -2061,15 +2100,14 @@ async def api_use_item():
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
     
     try:
-        data = await request.get_json()
-        item_id = data.get("item_id")
-        quantity = data.get("quantity", 1)
-        
-        if not item_id or quantity <= 0:
-            return jsonify({"success": False, "message": "参数无效"}), 400
+        data = await _read_request_payload()
+        item_id = _parse_int_field(data, "item_id", minimum=1)
+        quantity = _parse_int_field(data, "quantity", minimum=1, required=False, default=1)
         
         result = inventory_service.use_item(user_id, item_id, quantity)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"使用道具失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -2082,14 +2120,9 @@ async def api_use_bait():
     inventory_service = current_app.config.get("INVENTORY_SERVICE")
     
     try:
-        data = await request.get_json()
-        bait_id = data.get("bait_id")
-        
-        if not bait_id:
-            return jsonify({"success": False, "message": "参数无效"}), 400
-
-        bait_id = int(bait_id)
-        if data.get("deactivate"):
+        data = await _read_request_payload()
+        bait_id = _parse_int_field(data, "bait_id", minimum=1)
+        if _parse_bool_field(data, "deactivate", False):
             user_repo = current_app.config.get("USER_REPO")
             item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
             user = user_repo.get_by_id(user_id)
@@ -2107,6 +2140,8 @@ async def api_use_bait():
         # use_bait方法只使用一个鱼饵并设置为当前使用的鱼饵
         result = inventory_service.use_bait(user_id, bait_id)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"使用鱼饵失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -2136,15 +2171,14 @@ async def api_perform_draw():
     gacha_service = current_app.config.get("GACHA_SERVICE")
     
     try:
-        data = await request.get_json()
-        pool_id = data.get("pool_id")
-        num_draws = data.get("num_draws", 1)
-        
-        if not pool_id or num_draws <= 0:
-            return jsonify({"success": False, "message": "参数无效"}), 400
+        data = await _read_request_payload()
+        pool_id = _parse_int_field(data, "pool_id", minimum=1)
+        num_draws = _parse_int_field(data, "num_draws", minimum=1, required=False, default=1)
         
         result = gacha_service.perform_draw(user_id, pool_id, num_draws)
         return jsonify(result)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效"}), 400
     except Exception as e:
         logger.error(f"抽卡失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
@@ -2157,11 +2191,11 @@ async def api_perform_multi_draw():
     gacha_service = current_app.config.get("GACHA_SERVICE")
     
     try:
-        data = await request.get_json()
-        pool_id = data.get("pool_id")
-        times = data.get("times", 1)
+        data = await _read_request_payload()
+        pool_id = _parse_int_field(data, "pool_id", minimum=1)
+        times = _parse_int_field(data, "times", minimum=1, maximum=100, required=False, default=1)
         
-        if not pool_id or times <= 0 or times > 100:
+        if times <= 0 or times > 100:
             return jsonify({"success": False, "message": "参数无效，次数必须在1-100之间"}), 400
         
         # 获取卡池信息
@@ -2221,6 +2255,8 @@ async def api_perform_multi_draw():
             "item_counts": item_counts,
             "coin_total": coin_total
         })
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "参数无效，次数必须在1-100之间"}), 400
     except Exception as e:
         logger.error(f"多次十连失败: {e}")
         return jsonify({"success": False, "message": str(e)}), 500

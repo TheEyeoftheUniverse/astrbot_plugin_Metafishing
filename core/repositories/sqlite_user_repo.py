@@ -8,9 +8,28 @@ from astrbot.api import logger
 
 from ..domain.models import User, TaxRecord
 from .abstract_repository import AbstractUserRepository
+from ..database.sqlite_utils import connect_sqlite, clamp_sqlite_int
 
 class SqliteUserRepository(AbstractUserRepository):
     """用户数据仓储的SQLite实现"""
+
+    _SQLITE_INT_FIELDS = {
+        "coins",
+        "premium_currency",
+        "total_fishing_count",
+        "total_coins_earned",
+        "max_coins",
+        "consecutive_login_days",
+        "fish_pond_capacity",
+        "aquarium_capacity",
+        "exchange_capacity",
+        "equipped_rod_instance_id",
+        "equipped_accessory_instance_id",
+        "current_title_id",
+        "current_bait_id",
+        "fishing_zone_id",
+        "wipe_bomb_attempts_today",
+    }
 
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -19,12 +38,28 @@ class SqliteUserRepository(AbstractUserRepository):
     def _get_connection(self) -> sqlite3.Connection:
         conn = getattr(self._local, "connection", None)
         if conn is None:
-            conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA foreign_keys = ON;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
+            conn = connect_sqlite(
+                self.db_path,
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+                row_factory=sqlite3.Row,
+            )
             self._local.connection = conn
         return conn
+
+    def _normalize_user_for_storage(self, user: User) -> None:
+        for field_name in self._SQLITE_INT_FIELDS:
+            value = getattr(user, field_name, None)
+            if value is None:
+                continue
+            normalized = clamp_sqlite_int(value)
+            if normalized != value:
+                logger.warning(
+                    "用户 %s 的字段 %s 超出 SQLite INTEGER 范围，已截断为 %s",
+                    user.user_id,
+                    field_name,
+                    normalized,
+                )
+                setattr(user, field_name, normalized)
 
     def _row_to_user(self, row: sqlite3.Row) -> Optional[User]:
         """
@@ -109,6 +144,7 @@ class SqliteUserRepository(AbstractUserRepository):
 
     def add(self, user: User) -> None:
         # 使用与 update 相同的动态方法，确保 add 也是完整的
+        self._normalize_user_for_storage(user)
         fields = [f.name for f in dataclasses.fields(User)]
         columns_clause = ", ".join(fields)
         placeholders_clause = ", ".join(["?"] * len(fields))
@@ -130,6 +166,7 @@ class SqliteUserRepository(AbstractUserRepository):
         # 自动更新历史最高金币数
         if user.coins > user.max_coins:
             user.max_coins = user.coins
+        self._normalize_user_for_storage(user)
         
         fields = [f.name for f in dataclasses.fields(User) if f.name != 'user_id']
         set_clause = ", ".join([f"{field} = ?" for field in fields])

@@ -10,6 +10,7 @@ from ..domain.models import (
     UserFishStat,
     PokedexRewardClaim,
 )
+from ..database.sqlite_utils import connect_sqlite, clamp_sqlite_int
 
 class SqliteLogRepository(AbstractLogRepository):
     """日志类数据仓储的SQLite实现"""
@@ -24,10 +25,11 @@ class SqliteLogRepository(AbstractLogRepository):
         """获取一个线程安全的数据库连接。"""
         conn = getattr(self._local, "connection", None)
         if conn is None:
-            conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA foreign_keys = ON;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
+            conn = connect_sqlite(
+                self.db_path,
+                detect_types=sqlite3.PARSE_DECLTYPES,
+                row_factory=sqlite3.Row,
+            )
             self._local.connection = conn
         return conn
 
@@ -174,6 +176,22 @@ class SqliteLogRepository(AbstractLogRepository):
 
     # --- Tax Log Methods ---
     def add_tax_record(self, record: TaxRecord) -> None:
+        tax_amount = clamp_sqlite_int(record.tax_amount)
+        original_amount = clamp_sqlite_int(record.original_amount)
+        balance_after = clamp_sqlite_int(record.balance_after)
+        if (
+            tax_amount != record.tax_amount
+            or original_amount != record.original_amount
+            or balance_after != record.balance_after
+        ):
+            logger.warning(
+                "税收记录超出 SQLite INTEGER 范围，已截断 user_id=%s tax=%s original=%s balance=%s",
+                record.user_id,
+                tax_amount,
+                original_amount,
+                balance_after,
+            )
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             # 1) 写入税收记录
@@ -185,10 +203,10 @@ class SqliteLogRepository(AbstractLogRepository):
                 """,
                 (
                     record.user_id,
-                    record.tax_amount,
+                    tax_amount,
                     record.tax_rate,
-                    record.original_amount,
-                    record.balance_after,
+                    original_amount,
+                    balance_after,
                     record.tax_type,
                     record.timestamp or datetime.now(self.UTC8),
                 ),

@@ -100,9 +100,13 @@ class UserService:
 
         return {
             "coins": self.STARTER_COINS,
+            "rod_id": rod_template.rod_id,
             "rod_name": rod_template.name,
+            "accessory_id": accessory_template.accessory_id,
             "accessory_name": accessory_template.name,
+            "bait_id": bait_template.bait_id,
             "bait_name": bait_template.name,
+            "bait_quantity": self.STARTER_BAIT_QUANTITY,
         }
 
     def register(self, user_id: str, nickname: str) -> Dict[str, Any]:
@@ -128,15 +132,17 @@ class UserService:
         )
         self.user_repo.add(new_user)
         onboarding_gift = self._grant_onboarding_gift(user_id, templates)
+        message = self._build_onboarding_message(
+            onboarding_gift["rod_name"],
+            onboarding_gift["accessory_name"],
+            onboarding_gift["bait_name"],
+        )
         return {
             "success": True,
-            "message": self._build_onboarding_message(
-                onboarding_gift["rod_name"],
-                onboarding_gift["accessory_name"],
-                onboarding_gift["bait_name"],
-            ),
+            "message": message,
             "is_new_user": True,
             "show_popup": True,
+            "onboarding_gift": onboarding_gift,
         }
 
     def create_user_for_admin(self, data: Dict[str, Any]) -> Dict[str, Any]:

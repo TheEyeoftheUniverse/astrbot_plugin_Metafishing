@@ -917,7 +917,7 @@ class ExchangeHandlers:
             return
 
         result = self.exchange_service.purchase_commodity(
-            user_id, commodity_id, quantity, current_price
+            user_id, commodity_id, quantity
         )
         yield event.plain_result(
             f"✅ {result['message']}"
@@ -968,7 +968,7 @@ class ExchangeHandlers:
                 total_quantity = sum(item.quantity for item in commodity_items)
 
                 result = self.exchange_service.sell_commodity(
-                    user_id, commodity_id, total_quantity, current_price
+                    user_id, commodity_id, total_quantity
                 )
                 yield event.plain_result(
                     f"✅ {result['message']}"
@@ -1008,7 +1008,7 @@ class ExchangeHandlers:
                     return
 
                 result = self.exchange_service.sell_commodity_by_instance(
-                    user_id, instance_id, quantity, current_price
+                    user_id, instance_id, quantity
                 )
                 yield event.plain_result(
                     f"✅ {result['message']}"

@@ -2034,7 +2034,7 @@ async def buy_exchange_commodity():
         if current_price <= 0:
             return jsonify({"success": False, "message": "当前价格不可用"}), 400
 
-        result = exchange_service.purchase_commodity(user_id, commodity_id, quantity, current_price)
+        result = exchange_service.purchase_commodity(user_id, commodity_id, quantity)
         status_code = 200 if result.get("success", False) else 400
         return jsonify({
             "success": result.get("success", False),
@@ -2077,7 +2077,7 @@ async def sell_exchange_commodity():
         if current_price <= 0:
             return jsonify({"success": False, "message": "当前价格不可用"}), 400
 
-        result = exchange_service.sell_commodity(user_id, commodity_id, quantity, current_price)
+        result = exchange_service.sell_commodity(user_id, commodity_id, quantity)
         status_code = 200 if result.get("success", False) else 400
         return jsonify({
             "success": result.get("success", False),

@@ -85,17 +85,17 @@ class ExchangeService:
         """自动卖出到期持仓"""
         return self.inventory_service.auto_sell_expired_commodities(user_id)
 
-    def purchase_commodity(self, user_id: str, commodity_id: str, quantity: int, current_price: int) -> Dict[str, Any]:
+    def purchase_commodity(self, user_id: str, commodity_id: str, quantity: int) -> Dict[str, Any]:
         """购买大宗商品"""
-        return self.inventory_service.purchase_commodity(user_id, commodity_id, quantity, current_price)
+        return self.inventory_service.purchase_commodity(user_id, commodity_id, quantity)
 
-    def sell_commodity(self, user_id: str, commodity_id: str, quantity: int, current_price: int) -> Dict[str, Any]:
+    def sell_commodity(self, user_id: str, commodity_id: str, quantity: int) -> Dict[str, Any]:
         """卖出大宗商品"""
-        return self.inventory_service.sell_commodity(user_id, commodity_id, quantity, current_price)
+        return self.inventory_service.sell_commodity(user_id, commodity_id, quantity)
 
-    def sell_commodity_by_instance(self, user_id: str, instance_id: int, quantity: int, current_price: int) -> Dict[str, Any]:
+    def sell_commodity_by_instance(self, user_id: str, instance_id: int, quantity: int) -> Dict[str, Any]:
         """通过实例ID卖出大宗商品"""
-        return self.inventory_service.sell_commodity_by_instance(user_id, instance_id, quantity, current_price)
+        return self.inventory_service.sell_commodity_by_instance(user_id, instance_id, quantity)
 
     def clear_all_inventory(self, user_id: str) -> Dict[str, Any]:
         """清空用户所有大宗商品库存"""

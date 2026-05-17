@@ -7,6 +7,7 @@ from datetime import datetime
 from ..domain.models import UserBuff
 from .abstract_repository import AbstractUserBuffRepository
 from ..utils import get_now
+from ..database.sqlite_utils import connect_sqlite
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -20,10 +21,11 @@ class SqliteUserBuffRepository(AbstractUserBuffRepository):
         """获取一个线程安全的数据库连接。"""
         conn = getattr(self._local, "connection", None)
         if conn is None:
-            conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA foreign_keys = ON;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
+            conn = connect_sqlite(
+                self.db_path,
+                detect_types=sqlite3.PARSE_DECLTYPES,
+                row_factory=sqlite3.Row,
+            )
             self._local.connection = conn
         return conn
 

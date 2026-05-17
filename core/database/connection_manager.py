@@ -1,10 +1,9 @@
 import sqlite3
 import threading
-import time
-from typing import Optional
 from contextlib import contextmanager
 
 from astrbot.api import logger
+from .sqlite_utils import connect_sqlite
 
 
 class DatabaseConnectionManager:
@@ -27,15 +26,12 @@ class DatabaseConnectionManager:
     
     def _create_connection(self) -> sqlite3.Connection:
         """创建新的数据库连接"""
-        conn = sqlite3.connect(
+        conn = connect_sqlite(
             self.db_path, 
             detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-            timeout=self.timeout
+            row_factory=sqlite3.Row,
+            timeout=self.timeout,
         )
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON;")
-        conn.execute("PRAGMA journal_mode = WAL;")  # 使用WAL模式提高并发性能
-        conn.execute("PRAGMA synchronous = NORMAL;")  # 平衡性能和安全
         return conn
     
     @contextmanager

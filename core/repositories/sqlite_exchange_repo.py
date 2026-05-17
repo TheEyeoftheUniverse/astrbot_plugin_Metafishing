@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from ..domain.models import Commodity, Exchange, UserCommodity
 from .abstract_repository import AbstractExchangeRepository
+from ..database.sqlite_utils import connect_sqlite
 
 
 class SqliteExchangeRepository(AbstractExchangeRepository):
@@ -15,8 +16,7 @@ class SqliteExchangeRepository(AbstractExchangeRepository):
     def _get_connection(self):
         """获取数据库连接"""
         if not hasattr(self._local, 'connection'):
-            self._local.connection = sqlite3.connect(self.db_path)
-            self._local.connection.execute("PRAGMA synchronous = NORMAL;")
+            self._local.connection = connect_sqlite(self.db_path)
         return self._local.connection
 
     def get_all_commodities(self) -> List[Commodity]:

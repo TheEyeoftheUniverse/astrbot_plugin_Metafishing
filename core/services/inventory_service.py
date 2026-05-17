@@ -271,6 +271,11 @@ class InventoryService:
                     refined_max_durability = int(rod_template.durability * refine_bonus_multiplier)
                 else:
                     refined_max_durability = None
+
+                # +10 高星鱼竿会进入无限耐久状态，此时前端应按“永久耐久”处理，
+                # 不能再保留数值上限，否则模板里的百分比计算会对 None 做除法。
+                if rod_instance.current_durability is None:
+                    refined_max_durability = None
                 
                 enriched_rods.append({
                     "name": rod_template.name,
@@ -847,6 +852,7 @@ class InventoryService:
 
         # 2. 卖出所有未锁定、未装备且低于6星的鱼竿
         rod_instances = self.inventory_repo.get_user_rod_instances(user_id)
+        rod_instance_ids_to_delete = []
         for rod_instance in rod_instances:
             if not rod_instance.is_locked and not rod_instance.is_equipped:
                 rod_template = self.item_template_repo.get_rod_by_id(rod_instance.rod_id)
@@ -859,12 +865,14 @@ class InventoryService:
                     total_value += rod_price
                     sold_items["rod_count"] += 1
                     sold_items["rod_value"] += rod_price
-                    
-                    # 删除鱼竿实例
-                    self.inventory_repo.delete_rod_instance(rod_instance.rod_instance_id)
+                    rod_instance_ids_to_delete.append(rod_instance.rod_instance_id)
+
+        if rod_instance_ids_to_delete:
+            self.inventory_repo.delete_rod_instances(rod_instance_ids_to_delete)
 
         # 3. 卖出所有未锁定、未装备且低于6星的饰品
         accessory_instances = self.inventory_repo.get_user_accessory_instances(user_id)
+        accessory_instance_ids_to_delete = []
         for accessory_instance in accessory_instances:
             if not accessory_instance.is_locked and not accessory_instance.is_equipped:
                 accessory_template = self.item_template_repo.get_accessory_by_id(accessory_instance.accessory_id)
@@ -877,9 +885,10 @@ class InventoryService:
                     total_value += accessory_price
                     sold_items["accessory_count"] += 1
                     sold_items["accessory_value"] += accessory_price
-                    
-                    # 删除饰品实例
-                    self.inventory_repo.delete_accessory_instance(accessory_instance.accessory_instance_id)
+                    accessory_instance_ids_to_delete.append(accessory_instance.accessory_instance_id)
+
+        if accessory_instance_ids_to_delete:
+            self.inventory_repo.delete_accessory_instances(accessory_instance_ids_to_delete)
 
         # 更新用户金币（出售所得）
         user.coins += total_value

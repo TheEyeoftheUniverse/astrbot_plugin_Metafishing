@@ -654,6 +654,18 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
             cursor.execute("DELETE FROM user_rods WHERE rod_instance_id = ?", (rod_instance_id,))
             conn.commit()
 
+    def delete_rod_instances(self, rod_instance_ids: List[int]) -> None:
+        if not rod_instance_ids:
+            return
+        placeholders = ", ".join(["?"] * len(rod_instance_ids))
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM user_rods WHERE rod_instance_id IN ({placeholders})",
+                tuple(rod_instance_ids),
+            )
+            conn.commit()
+
     # --- Accessory Inventory Methods ---
     def get_user_accessory_instances(self, user_id: str) -> List[UserAccessoryInstance]:
         with self._connection_manager.get_connection() as conn:
@@ -681,6 +693,18 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
         with self._connection_manager.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM user_accessories WHERE accessory_instance_id = ?", (accessory_instance_id,))
+            conn.commit()
+
+    def delete_accessory_instances(self, accessory_instance_ids: List[int]) -> None:
+        if not accessory_instance_ids:
+            return
+        placeholders = ", ".join(["?"] * len(accessory_instance_ids))
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"DELETE FROM user_accessories WHERE accessory_instance_id IN ({placeholders})",
+                tuple(accessory_instance_ids),
+            )
             conn.commit()
             
     def update_fish_quantity(self, user_id: str, fish_id: int, delta: int, quality_level: int = 0) -> None:

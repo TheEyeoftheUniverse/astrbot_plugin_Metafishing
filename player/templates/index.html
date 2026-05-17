@@ -81,7 +81,9 @@
                                     <p class="mb-1"><i class="fas fa-arrow-up text-success"></i> 品质: +{{ "%.1f" | format((rod.bonus_fish_quality_modifier - 1) * 100) }}%</p>
                                     <p class="mb-1"><i class="fas fa-layer-group text-primary"></i> 数量: +{{ "%.1f" | format((rod.bonus_fish_quantity_modifier - 1) * 100) }}%</p>
                                     <p class="mb-1"><i class="fas fa-star text-warning"></i> 稀有: +{{ "%.1f" | format(rod.bonus_rare_fish_chance * 100) }}%</p>
-                                    {% if rod.max_durability %}
+                                    {% if rod.current_durability is none %}
+                                    <p class="mb-1"><i class="fas fa-heart text-success"></i> 耐久: 永久耐久</p>
+                                    {% elif rod.max_durability %}
                                     <div class="mb-1">
                                         <i class="fas fa-heart"></i> 耐久: {{ rod.current_durability }} / {{ rod.max_durability }}
                                         <div class="progress" style="height: 5px;">

@@ -9,6 +9,7 @@ from astrbot.api import logger
 from .abstract_repository import AbstractMarketRepository
 from ..domain.models import MarketListing
 from ..database.connection_manager import DatabaseConnectionManager
+from ..database.sqlite_utils import connect_sqlite
 
 
 class SqliteMarketRepository(AbstractMarketRepository):
@@ -23,13 +24,11 @@ class SqliteMarketRepository(AbstractMarketRepository):
         """获取一个线程安全的数据库连接。"""
         conn = getattr(self._local, "connection", None)
         if conn is None:
-            conn = sqlite3.connect(
+            conn = connect_sqlite(
                 self.db_path, 
-                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+                row_factory=sqlite3.Row,
             )
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA foreign_keys = ON;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
             self._local.connection = conn
         return conn
 

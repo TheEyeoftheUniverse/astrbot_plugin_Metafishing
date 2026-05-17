@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
 from .abstract_repository import AbstractShopRepository
+from ..database.sqlite_utils import connect_sqlite
 
 
 class SqliteShopRepository(AbstractShopRepository):
@@ -16,13 +17,11 @@ class SqliteShopRepository(AbstractShopRepository):
     def _get_connection(self) -> sqlite3.Connection:
         conn = getattr(self._local, "connection", None)
         if conn is None:
-            conn = sqlite3.connect(
+            conn = connect_sqlite(
                 self.db_path,
                 detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+                row_factory=sqlite3.Row,
             )
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA foreign_keys = ON;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
             self._local.connection = conn
         return conn
 

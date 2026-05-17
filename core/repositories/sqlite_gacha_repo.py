@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractGachaRepository
 from ..domain.models import GachaPool, GachaPoolItem
+from ..database.sqlite_utils import connect_sqlite
 
 class SqliteGachaRepository(AbstractGachaRepository):
     """抽卡仓储的SQLite实现"""
@@ -17,11 +18,10 @@ class SqliteGachaRepository(AbstractGachaRepository):
         """获取一个线程安全的数据库连接。"""
         conn = getattr(self._local, "connection", None)
         if conn is None:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            # 开启外键约束，确保奖池删除时，其下的物品也被删除
-            conn.execute("PRAGMA foreign_keys = ON;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
+            conn = connect_sqlite(
+                self.db_path,
+                row_factory=sqlite3.Row,
+            )
             self._local.connection = conn
         return conn
 

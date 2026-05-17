@@ -603,8 +603,7 @@ async function buyCommodity(commodityId, commodityName, currentPrice) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 commodity_id: commodityId,
-                quantity: quantity,
-                current_price: currentPrice
+                quantity: quantity
             })
         });
 
@@ -658,8 +657,7 @@ async function sellCommodity(commodityId, commodityName, currentPrice, maxQty) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 commodity_id: commodityId,
-                quantity: quantity,
-                current_price: currentPrice
+                quantity: quantity
             })
         });
 

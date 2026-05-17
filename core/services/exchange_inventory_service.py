@@ -77,6 +77,14 @@ class ExchangeInventoryService:
 
         return price_map
 
+    def _get_current_price(self, commodity_id: str) -> int:
+        """获取单个商品的服务器当前结算价格。"""
+        prices = self._get_current_prices()
+        current_price = int(prices.get(commodity_id, 0) or 0)
+        if current_price <= 0:
+            raise RuntimeError(f"商品 {commodity_id} 当前价格不可用")
+        return current_price
+
     def _attach_auto_sell_message(
         self,
         result: Dict[str, Any],
@@ -315,10 +323,12 @@ class ExchangeInventoryService:
             logger.error(f"获取用户库存失败: {e}")
             return {"success": False, "message": f"获取库存失败: {str(e)}"}
 
-    def purchase_commodity(self, user_id: str, commodity_id: str, quantity: int, current_price: int) -> Dict[str, Any]:
+    def purchase_commodity(self, user_id: str, commodity_id: str, quantity: int) -> Dict[str, Any]:
         """购买大宗商品"""
         try:
             auto_sell_result = self.auto_sell_expired_commodities(user_id)
+            if int(quantity) <= 0:
+                return {"success": False, "message": "购买数量必须大于0"}
             # 检查用户是否存在
             user = self.user_repo.get_by_id(user_id)
             if not user:
@@ -327,6 +337,8 @@ class ExchangeInventoryService:
             # 检查商品是否存在
             if commodity_id not in self.commodities:
                 return {"success": False, "message": "商品不存在"}
+
+            current_price = self._get_current_price(commodity_id)
             
             # 计算总价格
             total_cost = current_price * quantity
@@ -399,10 +411,12 @@ class ExchangeInventoryService:
             logger.error(f"购买大宗商品失败: {e}")
             return {"success": False, "message": f"购买失败: {str(e)}"}
 
-    def sell_commodity(self, user_id: str, commodity_id: str, quantity: int, current_price: int) -> Dict[str, Any]:
+    def sell_commodity(self, user_id: str, commodity_id: str, quantity: int) -> Dict[str, Any]:
         """卖出大宗商品"""
         try:
             auto_sell_result = self.auto_sell_expired_commodities(user_id)
+            if int(quantity) <= 0:
+                return {"success": False, "message": "卖出数量必须大于0"}
             # 检查用户是否存在
             user = self.user_repo.get_by_id(user_id)
             if not user:
@@ -411,6 +425,8 @@ class ExchangeInventoryService:
             # 检查商品是否存在
             if commodity_id not in self.commodities:
                 return {"success": False, "message": "商品不存在"}
+
+            current_price = self._get_current_price(commodity_id)
             
             # 获取用户库存
             inventory = self.exchange_repo.get_user_commodities(user_id)
@@ -548,7 +564,7 @@ class ExchangeInventoryService:
             logger.error(f"卖出大宗商品失败: {e}")
             return {"success": False, "message": f"卖出失败: {str(e)}"}
 
-    def sell_commodity_by_instance(self, user_id: str, instance_id: int, quantity: int, current_price: int) -> Dict[str, Any]:
+    def sell_commodity_by_instance(self, user_id: str, instance_id: int, quantity: int) -> Dict[str, Any]:
         """通过实例ID卖出大宗商品"""
         try:
             # 获取商品实例
@@ -561,7 +577,7 @@ class ExchangeInventoryService:
                 return {"success": False, "message": f"库存不足，只有 {commodity_item.quantity} 个"}
             
             # 调用通用卖出方法
-            return self.sell_commodity(user_id, commodity_item.commodity_id, quantity, current_price)
+            return self.sell_commodity(user_id, commodity_item.commodity_id, quantity)
         except Exception as e:
             logger.error(f"卖出大宗商品失败: {e}")
             return {"success": False, "message": f"卖出失败: {str(e)}"}
