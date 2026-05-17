@@ -55,15 +55,16 @@ from .utils import (
 # 导入所有指令函数
 # ==========================================================
 from .handlers import (
-    admin_handlers, 
-    common_handlers, 
-    inventory_handlers, 
+    admin_handlers,
+    common_handlers,
+    inventory_handlers,
     fishing_handlers,
     market_handlers,
     social_handlers,
     gacha_handlers,
     aquarium_handlers,
     tribulation_handlers,
+    team_battle_handlers,
 )
 from .handlers.fishing_handlers import FishingHandlers
 from .handlers.exchange_handlers import ExchangeHandlers
@@ -256,6 +257,7 @@ class FishingPlugin(Star):
                 ),
             },
             "gacha_guarantee": gacha_guarantee_config,
+            "team_battle": config.get("team_battle", {}),
         }
         
         # 初始化数据库模式
@@ -279,6 +281,10 @@ class FishingPlugin(Star):
         # 玄幻渡劫 V2 仓储
         from .core.repositories.sqlite_tribulation_repo import SqliteTribulationRepository
         self.tribulation_repo = SqliteTribulationRepository(db_path)
+
+        # 魔幻团战 V2 仓储
+        from .core.repositories.sqlite_team_battle_repo import SqliteTeamBattleRepository
+        self.team_battle_repo = SqliteTeamBattleRepository(db_path)
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
         # 3.1 核心服务必须在效果管理器之前实例化，以解决依赖问题
@@ -361,7 +367,24 @@ class FishingPlugin(Star):
         )
         # 注入到 fishing_service 以便心跳调用 tick
         self.fishing_service.tribulation_service = self.tribulation_service
-        
+
+        # 魔幻团战 V2：图片 Provider（本期 NullProvider 占位）
+        from .core.services.boss_image_provider import NullBossImageProvider
+        self.boss_image_provider = NullBossImageProvider()
+
+        # 魔幻团战 V2：核心服务
+        from .core.services.team_battle_service import TeamBattleService
+        self.team_battle_service = TeamBattleService(
+            team_battle_repo=self.team_battle_repo,
+            user_repo=self.user_repo,
+            inventory_repo=self.inventory_repo,
+            item_template_repo=self.item_template_repo,
+            log_repo=self.log_repo,
+            game_config=self.game_config,
+            context=self.context,
+            image_provider=self.boss_image_provider,
+        )
+
         # 导入并初始化水族箱服务
         from .core.services.aquarium_service import AquariumService
         self.aquarium_service = AquariumService(
@@ -435,7 +458,14 @@ class FishingPlugin(Star):
             self.tribulation_service.scan_overdue_on_startup()
         except Exception as exc:
             logger.warning(f"[tribulation] 启动扫描失败: {exc}")
-        
+
+        # 魔幻团战 V2：启动后台日次结算线程 + 漏结算扫描
+        self.team_battle_service.start_daily_settle_task()
+        try:
+            self.team_battle_service.scan_overdue_on_startup()
+        except Exception as exc:
+            logger.warning(f"[team_battle] 启动扫描失败: {exc}")
+
         # --- 5. 初始化核心游戏数据 ---
         data_setup_service = DataSetupService(
             self.item_template_repo, self.gacha_repo, self.shop_repo, db_path
@@ -1298,6 +1328,41 @@ class FishingPlugin(Star):
         async for r in tribulation_handlers.tribulation_help(self, event):
             yield r
 
+    # =========== 魔幻团战 V2 ==========
+
+    @filter.command("团战", alias={"魔幻团战"})
+    async def team_battle(self, event: AstrMessageEvent):
+        """查看魔幻团战战报图，并自动领取所有未领奖励"""
+        async for r in team_battle_handlers.team_battle(self, event):
+            yield r
+
+    @filter.command("团战历史", alias={"团战名册", "10星击杀"})
+    async def team_battle_history(self, event: AstrMessageEvent):
+        """查看历史 10 星 Boss 击杀名册"""
+        async for r in team_battle_handlers.team_battle_history(self, event):
+            yield r
+
+    @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("管理团战刷新")
+    async def admin_team_battle_refresh(self, event: AstrMessageEvent):
+        """[管理员] 强制刷新一只新 Boss。用法：管理团战刷新 [region:sci_fi/xianhuan/cthulhu/magic] [star:7-10]"""
+        async for r in team_battle_handlers.admin_team_battle_refresh(self, event):
+            yield r
+
+    @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("管理团战结算")
+    async def admin_team_battle_settle(self, event: AstrMessageEvent):
+        """[管理员] 立即触发当日团战结算（绕过 daily_reset_hour）"""
+        async for r in team_battle_handlers.admin_team_battle_settle(self, event):
+            yield r
+
+    @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("管理团战重置")
+    async def admin_team_battle_reset(self, event: AstrMessageEvent):
+        """[管理员] 清空当前 Boss + 伤害排行，过期所有未领奖励"""
+        async for r in team_battle_handlers.admin_team_battle_reset(self, event):
+            yield r
+
     async def _check_port_active(self):
         """验证端口是否实际已激活"""
         try:
@@ -1317,6 +1382,10 @@ class FishingPlugin(Star):
         self.fishing_service.stop_daily_tax_task()  # 终止独立的税收线程
         self.achievement_service.stop_achievement_check_task()
         self.exchange_service.stop_daily_price_update_task() # 终止交易所后台任务
+        try:
+            self.team_battle_service.stop_daily_settle_task()
+        except Exception as exc:
+            logger.warning(f"[team_battle] 停止 daily settle task 失败: {exc}")
 
         await self._shutdown_server_task(
             "web_player_task",
@@ -1352,6 +1421,8 @@ class FishingPlugin(Star):
             "buff_repo",
             "exchange_repo",
             "aquarium_income_repo",
+            "tribulation_repo",
+            "team_battle_repo",
         )
 
         for attr_name in repo_attrs:
@@ -1586,6 +1657,7 @@ class FishingPlugin(Star):
                 "expedition_service": self.expedition_service,
                 "cultivation_service": self.cultivation_service,
                 "tribulation_service": self.tribulation_service,
+                "team_battle_service": self.team_battle_service,
             }
 
             app = create_player_app(

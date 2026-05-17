@@ -4264,3 +4264,52 @@ async def tribulation_api_reset_realm():
     if not tribulation_service:
         return jsonify({"success": False, "message": "service unavailable"}), 503
     return jsonify(tribulation_service.reset_realm(user_id))
+
+
+# ==================== 魔幻团战 V2 ====================
+
+@player_bp.route("/team_battle")
+@login_required
+async def team_battle_page():
+    """魔幻团战页：Boss 卡 / 进度 / 排行 / 待领奖励。"""
+    user_id = session["user_id"]
+    team_battle_service = current_app.config.get("TEAM_BATTLE_SERVICE")
+    if not team_battle_service:
+        return "魔幻团战服务未启用。", 503
+
+    view = team_battle_service.get_player_view(user_id)
+    return await render_template("team_battle.html", view=view)
+
+
+@player_bp.route("/api/team_battle/state")
+@login_required
+async def team_battle_api_state():
+    user_id = session["user_id"]
+    team_battle_service = current_app.config.get("TEAM_BATTLE_SERVICE")
+    if not team_battle_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify({"success": True, "view": team_battle_service.get_player_view(user_id)})
+
+
+@player_bp.route("/api/team_battle/claim_all", methods=["POST"])
+@login_required
+async def team_battle_api_claim_all():
+    user_id = session["user_id"]
+    team_battle_service = current_app.config.get("TEAM_BATTLE_SERVICE")
+    if not team_battle_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    granted = team_battle_service.claim_all_unclaimed(user_id)
+    return jsonify({
+        "success": True,
+        "granted_count": len(granted),
+        "granted": granted,
+    })
+
+
+@player_bp.route("/api/team_battle/history")
+@login_required
+async def team_battle_api_history():
+    team_battle_service = current_app.config.get("TEAM_BATTLE_SERVICE")
+    if not team_battle_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify({"success": True, "history": team_battle_service.get_history_kills(limit=50)})
