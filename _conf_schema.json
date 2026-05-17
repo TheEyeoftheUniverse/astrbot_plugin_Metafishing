@@ -282,7 +282,7 @@
         "description": "用户初始金币",
         "type": "int",
         "hint": "新用户注册时的初始金币数量",
-        "default": 200
+        "default": 1000
       }
     }
   },

@@ -184,7 +184,7 @@ class FishingPlugin(Star):
             },
             "daily_reset_hour": game_global_config.get("daily_reset_hour", 0),
             "user": {
-                "initial_coins": user_config.get("initial_coins", 200)
+                "initial_coins": user_config.get("initial_coins", 1000)
             },
             "market": {
                 "listing_tax_rate": market_config.get("listing_tax_rate", 0.05)

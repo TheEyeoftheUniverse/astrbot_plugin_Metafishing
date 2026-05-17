@@ -325,8 +325,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelectorAll('.webui-flash-message').forEach(item => {
         const category = item.dataset.flashCategory || 'info';
+        const message = item.dataset.flashMessage || item.textContent.trim();
+        if (category === 'registration_success_popup') {
+            showToast(message, 'success', {
+                popup: true,
+                title: '鱼光临企业入职礼物',
+                confirmText: '收下礼物',
+                confirmClass: 'btn-success'
+            });
+            return;
+        }
         const type = category === 'danger' ? 'error' : (category === 'success' ? 'success' : (category === 'warning' ? 'warning' : 'info'));
-        showToast(item.dataset.flashMessage || item.textContent.trim(), type);
+        showToast(message, type);
     });
 });
 

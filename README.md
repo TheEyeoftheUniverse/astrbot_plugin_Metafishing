@@ -380,7 +380,7 @@
     "wipe_bomb_attempts": 3
   },
   "user": {
-    "initial_coins": 200
+    "initial_coins": 1000
   },
   "market": {
     "listing_tax_rate": 0.05

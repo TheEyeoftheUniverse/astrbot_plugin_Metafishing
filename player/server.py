@@ -603,42 +603,42 @@ async def _fetch_linuxdo_user_profile(access_token: str, oauth_config: Dict[str,
 def _resolve_linuxdo_user(profile: Dict[str, Any], user_repo, user_service, oauth_config: Dict[str, Any]):
     provider_key = _get_linuxdo_provider_key(profile)
     if not provider_key:
-        return None, "Linux.do 用户资料中缺少可用于绑定的唯一标识"
+        return None, "Linux.do 用户资料中缺少可用于绑定的唯一标识", None
 
     linked_user_id = _get_linked_game_user_id(provider_key)
     if linked_user_id:
         linked_user = user_repo.get_by_id(linked_user_id)
         if linked_user:
-            return linked_user, None
+            return linked_user, None, None
         logger.warning(f"Linux.do 绑定存在失效用户: {provider_key} -> {linked_user_id}")
 
     candidate_user_id = _get_linuxdo_candidate_user_id(profile, oauth_config)
     if not candidate_user_id:
         field_name = oauth_config.get("user_id_field", "id")
-        return None, f"Linux.do 用户资料缺少字段 {field_name}，无法映射到游戏账号"
+        return None, f"Linux.do 用户资料缺少字段 {field_name}，无法映射到游戏账号", None
 
     user = user_repo.get_by_id(candidate_user_id)
     if user:
         _bind_linuxdo_account(profile, candidate_user_id)
-        return user, None
+        return user, None, None
 
     if not oauth_config.get("auto_register", True):
         return None, (
             f"论坛账号已验证，但未找到游戏账号 {candidate_user_id}。"
             "请先在游戏内注册，或调整 user_id_field/绑定表配置。"
-        )
+        ), None
 
     nickname = _get_linuxdo_display_name(profile, oauth_config)
     register_result = user_service.register(candidate_user_id, nickname)
     if not register_result.get("success"):
-        return None, register_result.get("message", "自动注册失败")
+        return None, register_result.get("message", "自动注册失败"), None
 
     user = user_repo.get_by_id(candidate_user_id)
     if not user:
-        return None, "自动注册完成后未能读取到玩家账号"
+        return None, "自动注册完成后未能读取到玩家账号", None
 
     _bind_linuxdo_account(profile, candidate_user_id)
-    return user, None
+    return user, None, register_result
 
 
 def _build_unity_linuxdo_status_response(payload: Dict[str, Any]):
@@ -1050,7 +1050,12 @@ async def linuxdo_oauth_callback():
             raise ValueError("Linux.do 未返回 access_token")
 
         profile = await _fetch_linuxdo_user_profile(access_token, effective_oauth_config)
-        user, error_message = _resolve_linuxdo_user(profile, user_repo, user_service, effective_oauth_config)
+        user, error_message, register_result = _resolve_linuxdo_user(
+            profile,
+            user_repo,
+            user_service,
+            effective_oauth_config,
+        )
         if error_message:
             if pending_device_code:
                 _mark_unity_linuxdo_oauth_error(pending_device_code, error_message)
@@ -1059,7 +1064,10 @@ async def linuxdo_oauth_callback():
 
         ensure_initial_password(user.user_id)
         _login_player_session(user, auth_provider="linuxdo")
-        await flash(f"欢迎来到钓鱼世界，{user.nickname or user.user_id}！", "success")
+        if register_result and register_result.get("success"):
+            await flash(register_result.get("message", ""), "registration_success_popup")
+        else:
+            await flash(f"欢迎来到钓鱼世界，{user.nickname or user.user_id}！", "success")
         logger.info(f"Linux.do 用户登录成功: {user.user_id}")
         return await _complete_linuxdo_login(user)
     except requests.RequestException as e:

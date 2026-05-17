@@ -18,6 +18,16 @@ from ..utils import get_now, get_current_daily_marker
 class UserService:
     """封装与用户相关的业务逻辑"""
 
+    ONBOARDING_COPY = (
+        "感谢您与鱼光临企业签订雇佣合同，成为光荣的鱼光临雇佣渔夫，"
+        "期待您今后精彩的捕鱼传说，请收下入职礼物！"
+    )
+    STARTER_COINS = 1000
+    STARTER_ROD_ID = 1
+    STARTER_ACCESSORY_ID = 1
+    STARTER_BAIT_ID = 1
+    STARTER_BAIT_QUANTITY = 100
+
     @staticmethod
     def _to_base36(n: int) -> str:
         if n < 0:
@@ -49,6 +59,52 @@ class UserService:
         self.config = config
         self.achievement_repo = achievement_repo
 
+    def _build_onboarding_message(self, rod_name: str, accessory_name: str, bait_name: str) -> str:
+        return (
+            f"{self.ONBOARDING_COPY}\n"
+            f"入职礼物：{self.STARTER_COINS}金币、"
+            f"1星鱼竿「{rod_name}」x1、"
+            f"1星饰品「{accessory_name}」x1、"
+            f"1星鱼饵「{bait_name}」x{self.STARTER_BAIT_QUANTITY}"
+        )
+
+    def _resolve_onboarding_templates(self) -> Dict[str, Any]:
+        rod_template = self.item_template_repo.get_rod_by_id(self.STARTER_ROD_ID)
+        accessory_template = self.item_template_repo.get_accessory_by_id(self.STARTER_ACCESSORY_ID)
+        bait_template = self.item_template_repo.get_bait_by_id(self.STARTER_BAIT_ID)
+
+        missing = []
+        if not rod_template:
+            missing.append(f"鱼竿#{self.STARTER_ROD_ID}")
+        if not accessory_template:
+            missing.append(f"饰品#{self.STARTER_ACCESSORY_ID}")
+        if not bait_template:
+            missing.append(f"鱼饵#{self.STARTER_BAIT_ID}")
+        if missing:
+            raise ValueError(f"新手礼包模板缺失：{'、'.join(missing)}")
+
+        return {
+            "rod": rod_template,
+            "accessory": accessory_template,
+            "bait": bait_template,
+        }
+
+    def _grant_onboarding_gift(self, user_id: str, templates: Dict[str, Any]) -> Dict[str, Any]:
+        rod_template = templates["rod"]
+        accessory_template = templates["accessory"]
+        bait_template = templates["bait"]
+
+        self.inventory_repo.add_rod_instance(user_id, rod_template.rod_id, rod_template.durability)
+        self.inventory_repo.add_accessory_instance(user_id, accessory_template.accessory_id)
+        self.inventory_repo.update_bait_quantity(user_id, bait_template.bait_id, self.STARTER_BAIT_QUANTITY)
+
+        return {
+            "coins": self.STARTER_COINS,
+            "rod_name": rod_template.name,
+            "accessory_name": accessory_template.name,
+            "bait_name": bait_template.name,
+        }
+
     def register(self, user_id: str, nickname: str) -> Dict[str, Any]:
         """
         注册新用户。
@@ -61,17 +117,26 @@ class UserService:
         if self.user_repo.check_exists(user_id):
             return {"success": False, "message": "用户已注册"}
 
-        initial_coins = self.config.get("user", {}).get("initial_coins", 200)
+        templates = self._resolve_onboarding_templates()
+        initial_coins = self.STARTER_COINS
         new_user = User(
             user_id=user_id,
             nickname=nickname,
             coins=initial_coins,
+            max_coins=initial_coins,
             created_at=get_now()
         )
         self.user_repo.add(new_user)
+        onboarding_gift = self._grant_onboarding_gift(user_id, templates)
         return {
             "success": True,
-            "message": f"注册成功！欢迎 {nickname} 🎉 你获得了 {initial_coins} 金币作为起始资金。"
+            "message": self._build_onboarding_message(
+                onboarding_gift["rod_name"],
+                onboarding_gift["accessory_name"],
+                onboarding_gift["bait_name"],
+            ),
+            "is_new_user": True,
+            "show_popup": True,
         }
 
     def create_user_for_admin(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -85,13 +150,14 @@ class UserService:
         nickname = data.get("nickname")
         initial_coins = data.get("coins")
         if not isinstance(initial_coins, int):
-            initial_coins = self.config.get("user", {}).get("initial_coins", 200)
+            initial_coins = self.config.get("user", {}).get("initial_coins", self.STARTER_COINS)
 
         # 先最小化创建用户记录
         new_user = User(
             user_id=user_id,
             nickname=nickname,
             coins=initial_coins,
+            max_coins=initial_coins,
             created_at=get_now()
         )
         self.user_repo.add(new_user)
