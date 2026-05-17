@@ -109,7 +109,14 @@ class UserService:
             "bait_quantity": self.STARTER_BAIT_QUANTITY,
         }
 
-    def register(self, user_id: str, nickname: str) -> Dict[str, Any]:
+    def register(
+        self,
+        user_id: str,
+        nickname: str,
+        *,
+        auth_source: Optional[str] = None,
+        invited_by_user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         注册新用户。
         Args:
@@ -128,7 +135,9 @@ class UserService:
             nickname=nickname,
             coins=initial_coins,
             max_coins=initial_coins,
-            created_at=get_now()
+            created_at=get_now(),
+            auth_source=auth_source,
+            invited_by_user_id=invited_by_user_id,
         )
         self.user_repo.add(new_user)
         onboarding_gift = self._grant_onboarding_gift(user_id, templates)

@@ -412,6 +412,41 @@ CREATE TABLE user_zone_stays (
             FOREIGN KEY (zone_id) REFERENCES fishing_zones(id) ON DELETE CASCADE
         );
 
+-- table: invitation_codes
+CREATE TABLE invitation_codes (
+            code TEXT PRIMARY KEY,
+            issuer_user_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER,
+            used_by_user_id TEXT,
+            used_at INTEGER,
+            FOREIGN KEY (issuer_user_id) REFERENCES users(user_id),
+            FOREIGN KEY (used_by_user_id) REFERENCES users(user_id)
+        );
+
+CREATE INDEX idx_invitation_issuer ON invitation_codes(issuer_user_id);
+CREATE INDEX idx_invitation_unused ON invitation_codes(used_by_user_id) WHERE used_by_user_id IS NULL;
+
+-- table: web_registration_success_audit
+CREATE TABLE web_registration_success_audit (
+            ip_address TEXT NOT NULL,
+            registered_user_id TEXT NOT NULL,
+            day TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (ip_address, registered_user_id),
+            FOREIGN KEY (registered_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
+CREATE INDEX idx_web_registration_success_day ON web_registration_success_audit(ip_address, day);
+
+-- table: web_registration_invite_failures
+CREATE TABLE web_registration_invite_failures (
+            ip_address TEXT PRIMARY KEY,
+            failure_count INTEGER NOT NULL DEFAULT 0,
+            last_failed_at INTEGER NOT NULL DEFAULT 0,
+            blocked_until INTEGER NOT NULL DEFAULT 0
+        );
+
 -- table: users
 CREATE TABLE users (
             user_id TEXT PRIMARY KEY, nickname TEXT, coins INTEGER DEFAULT 200,
@@ -424,7 +459,7 @@ CREATE TABLE users (
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_login_time DATETIME,
             consecutive_login_days INTEGER DEFAULT 0, fish_pond_capacity INTEGER DEFAULT 480,
             last_stolen_at DATETIME
-        , fishing_zone_id INTEGER DEFAULT 1, wipe_bomb_forecast TEXT, aquarium_capacity INTEGER DEFAULT 50, exchange_account_status INTEGER DEFAULT 0, last_electric_fish_time DATETIME, max_wipe_bomb_multiplier REAL DEFAULT 0.0, min_wipe_bomb_multiplier REAL DEFAULT NULL, wipe_bomb_attempts_today INTEGER NOT NULL DEFAULT 0, last_wipe_bomb_date TEXT DEFAULT NULL, max_coins INTEGER DEFAULT 0, exchange_capacity INTEGER DEFAULT 1000);
+        , fishing_zone_id INTEGER DEFAULT 1, wipe_bomb_forecast TEXT, aquarium_capacity INTEGER DEFAULT 50, exchange_account_status INTEGER DEFAULT 0, last_electric_fish_time DATETIME, max_wipe_bomb_multiplier REAL DEFAULT 0.0, min_wipe_bomb_multiplier REAL DEFAULT NULL, wipe_bomb_attempts_today INTEGER NOT NULL DEFAULT 0, last_wipe_bomb_date TEXT DEFAULT NULL, max_coins INTEGER DEFAULT 0, exchange_capacity INTEGER DEFAULT 1000, password_hash TEXT, auth_source TEXT, invited_by_user_id TEXT);
 
 -- table: zone_fish_mapping
 CREATE TABLE zone_fish_mapping (

@@ -34,13 +34,6 @@ def api_login_required(f):
         return await f(*args, **kwargs)
     return decorated_function
 
-
-def _get_player_credentials_state():
-    """复用 player.server 的凭证存储，避免引入第二套登录体系"""
-    from ..player import server as player_server
-    return player_server.USER_CREDENTIALS, player_server._save_credentials
-
-
 def _get_tavern_messages_file() -> str:
     plugin_root = os.path.dirname(os.path.dirname(__file__))
     data_dir = os.path.join(plugin_root, "data")
@@ -918,31 +911,34 @@ async def api_login():
         if not password:
             return jsonify({"success": False, "message": "请输入登录密钥"}), 400
 
-        user_repo = current_app.config["USER_REPO"]
+        account_service = current_app.config.get("ACCOUNT_SERVICE")
         from ..utils import resolve_bound_game_user_id
         login_user_id = resolve_bound_game_user_id(user_id)
-        user = user_repo.get_by_id(login_user_id)
-        if not user:
-            logger.warning(f"[WebUI] 未注册用户 {user_id} 尝试通过 API 登录")
-            return jsonify({"success": False, "message": "该用户不存在"}), 404
+        result = account_service.authenticate_password_login(login_user_id, password) if account_service else {
+            "success": False,
+            "message": "账号服务不可用",
+        }
+        if not result.get("success"):
+            message = result.get("message", "登录失败")
+            if "钓鱼佬" in message or "不存在" in message:
+                logger.warning(f"[WebUI] 未注册用户 {user_id} 尝试通过 API 登录")
+                return jsonify({"success": False, "message": message}), 404
+            return jsonify({"success": False, "message": message}), 401
 
         from ..player import server as player_server
 
-        player_server.ensure_initial_password(login_user_id)
-        if not player_server.verify_user_password(login_user_id, password):
-            return jsonify({"success": False, "message": "密钥错误"}), 401
-
-        player_server._login_player_session(user)
-        login_message = f"欢迎回来，{user.nickname or login_user_id}！"
+        user = result["user"]
+        player_server._login_player_session(user, auth_provider="webui")
+        login_message = result.get("message", f"欢迎回来，{user.nickname or user.user_id}！")
 
         logger.info(f"[WebUI] 用户 {user_id} 通过 API 登录成功，实际账号 {login_user_id}")
         return jsonify({
             "success": True,
             "message": login_message,
             "data": {
-                "user_id": login_user_id,
-                "nickname": user.nickname or login_user_id,
-                "first_login": False
+                "user_id": user.user_id,
+                "nickname": user.nickname or user.user_id,
+                "first_login": bool(result.get("first_login", False))
             }
         })
     except KeyError as e:

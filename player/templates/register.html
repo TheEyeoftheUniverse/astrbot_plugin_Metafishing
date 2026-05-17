@@ -1,0 +1,97 @@
+{% extends "layout.html" %}
+
+{% block title %}注册账号 - MetaFishing！{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8 col-lg-6">
+        <section class="editorial-auth-panel">
+            <div class="text-center">
+                <div class="editorial-kicker"><i class="fas fa-user-plus"></i> New Account</div>
+                <h1 class="auth-title mb-2">注册 WebUI 账号</h1>
+                <p class="text-muted mb-0">创建一个专用于 WebUI 的字母数字账号，并立即进入你的钓鱼世界。</p>
+            </div>
+            <div class="auth-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">账号</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="username"
+                            name="username"
+                            value="{{ form_data.get('username', '') }}"
+                            minlength="{{ username_min_length }}"
+                            maxlength="{{ username_max_length }}"
+                            pattern="[A-Za-z0-9]+"
+                            placeholder="5-12 位字母数字，且至少包含一个字母"
+                            required
+                        >
+                        <div class="form-text">账号长度 {{ username_min_length }}-{{ username_max_length }} 位，仅允许字母和数字，且至少包含一个英文字母。保存时会自动转成小写。</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nickname" class="form-label">昵称（可选）</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="nickname"
+                            name="nickname"
+                            value="{{ form_data.get('nickname', '') }}"
+                            maxlength="16"
+                            placeholder="留空则默认与账号同名"
+                        >
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">密码</label>
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="password"
+                            name="password"
+                            minlength="{{ password_min_length }}"
+                            maxlength="20"
+                            placeholder="{{ password_min_length }}-20 位"
+                            required
+                        >
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">确认密码</label>
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="confirm_password"
+                            name="confirm_password"
+                            minlength="{{ password_min_length }}"
+                            maxlength="20"
+                            placeholder="再次输入同样的密码"
+                            required
+                        >
+                    </div>
+                    <div class="mb-3">
+                        <label for="invitation_code" class="form-label">邀请码{% if not require_invitation %}（可选）{% endif %}</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="invitation_code"
+                            name="invitation_code"
+                            value="{{ form_data.get('invitation_code', '') }}"
+                            maxlength="8"
+                            placeholder="8 位大写字母数字邀请码"
+                            {% if require_invitation %}required{% endif %}
+                        >
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-user-plus"></i> 注册并登录
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="auth-footer text-center">
+                <small class="text-muted">已有账号？</small>
+                <a href="{{ url_for('player_bp.login') }}" class="fw-semibold text-decoration-none">返回登录</a>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

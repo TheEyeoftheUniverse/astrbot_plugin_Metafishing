@@ -109,6 +109,57 @@
             }
           }
         }
+      },
+      "registration": {
+        "description": "玩家 WebUI 注册与邀请码配置",
+        "type": "object",
+        "items": {
+          "enabled": {
+            "description": "是否启用 WebUI 直接注册",
+            "type": "bool",
+            "default": true
+          },
+          "require_invitation": {
+            "description": "注册时是否强制要求邀请码",
+            "type": "bool",
+            "default": true
+          },
+          "username_min_length": {
+            "description": "账号最小长度",
+            "type": "int",
+            "default": 5
+          },
+          "username_max_length": {
+            "description": "账号最大长度",
+            "type": "int",
+            "default": 12
+          },
+          "password_min_length": {
+            "description": "密码最小长度",
+            "type": "int",
+            "default": 6
+          },
+          "invitation_quota": {
+            "description": "每位玩家未使用邀请码上限",
+            "type": "int",
+            "default": 5
+          },
+          "invitation_cost_premium": {
+            "description": "生成一枚邀请码消耗的钻石数量",
+            "type": "int",
+            "default": 15
+          },
+          "invitation_ttl_days": {
+            "description": "邀请码有效期天数，0 表示永不过期",
+            "type": "int",
+            "default": 0
+          },
+          "ip_rate_limit_daily": {
+            "description": "同 IP 每日成功注册次数上限",
+            "type": "int",
+            "default": 3
+          }
+        }
       }
     }
   },

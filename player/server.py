@@ -73,78 +73,6 @@ DEFAULT_GITHUB_URL = "https://github.com/TheEyeoftheUniverse/astrbot_plugin_fish
 DEFAULT_APK_DOWNLOAD_URL = f"{DEFAULT_GITHUB_URL}/releases"
 DEFAULT_TAVERN_ADMIN_USER_ID = "2645956495"
 
-# 用户凭证持久化辅助函数
-def _get_credentials_file():
-    """获取凭证文件路径"""
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-    os.makedirs(data_dir, exist_ok=True)
-    return os.path.join(data_dir, "user_credentials.json")
-
-def _load_credentials():
-    """从文件加载用户凭证"""
-    credentials_file = _get_credentials_file()
-    if os.path.exists(credentials_file):
-        try:
-            with open(credentials_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"加载用户凭证失败: {e}")
-            return {}
-    return {}
-
-def _save_credentials(credentials):
-    """保存用户凭证到文件"""
-    credentials_file = _get_credentials_file()
-    try:
-        with open(credentials_file, "w", encoding="utf-8") as f:
-            json.dump(credentials, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"保存用户凭证失败: {e}")
-
-# 在启动时加载凭证
-USER_CREDENTIALS = _load_credentials()
-
-INITIAL_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-
-
-def _generate_initial_password() -> str:
-    return "".join(secrets.choice(INITIAL_PASSWORD_ALPHABET) for _ in range(5))
-
-
-def _get_credential_entry(user_id: str) -> Dict[str, str]:
-    user_id = str(user_id or "").strip()
-    raw_entry = USER_CREDENTIALS.get(user_id)
-    changed = False
-
-    if isinstance(raw_entry, dict):
-        entry = {
-            "password": str(raw_entry.get("password", "") or ""),
-            "initial_password": str(raw_entry.get("initial_password", "") or ""),
-        }
-    elif raw_entry:
-        entry = {"password": str(raw_entry), "initial_password": ""}
-        changed = True
-    else:
-        entry = {"password": "", "initial_password": ""}
-        changed = True
-
-    if not entry["initial_password"]:
-        entry["initial_password"] = _generate_initial_password()
-        changed = True
-
-    if changed:
-        USER_CREDENTIALS[user_id] = entry
-        _save_credentials(USER_CREDENTIALS)
-
-    return entry
-
-
-def ensure_initial_password(user_id: str) -> str:
-    """为玩家懒生成并返回 5 位初始密码。"""
-    if not str(user_id or "").strip():
-        return ""
-    return _get_credential_entry(user_id).get("initial_password", "")
-
 
 def _normalize_external_url(value: Any, default: str = "") -> str:
     url = str(value or "").strip()
@@ -163,33 +91,46 @@ def _get_tavern_admin_user_id() -> str:
     return configured or DEFAULT_TAVERN_ADMIN_USER_ID
 
 
+def _get_account_service():
+    return current_app.config.get("ACCOUNT_SERVICE")
+
+
+def _get_registration_config() -> Dict[str, Any]:
+    return dict(current_app.config.get("PLAYER_REGISTRATION_CONFIG", {}) or {})
+
+
+def _get_client_ip() -> str:
+    forwarded_for = str(request.headers.get("X-Forwarded-For", "") or "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    access_route = getattr(request, "access_route", None) or []
+    if access_route:
+        return str(access_route[0] or "").strip()
+    return str(request.remote_addr or "").strip()
+
+
+def ensure_initial_password(user_id: str) -> str:
+    """兼容旧调用：新版本不再生成明文初始密码。"""
+    return ""
+
+
 def verify_user_password(user_id: str, password: str) -> bool:
-    password = str(password or "")
-    if not password:
-        return False
-    entry = _get_credential_entry(user_id)
-    return password in {
-        entry.get("password", ""),
-        entry.get("initial_password", ""),
-    }
+    account_service = _get_account_service()
+    return bool(account_service and account_service.verify_user_password(user_id, password))
 
 
 def set_user_password(user_id: str, new_password: str) -> None:
-    entry = _get_credential_entry(user_id)
-    entry["password"] = str(new_password or "")
-    USER_CREDENTIALS[str(user_id)] = entry
-    _save_credentials(USER_CREDENTIALS)
+    account_service = _get_account_service()
+    if account_service:
+        account_service.set_user_password(user_id, new_password)
 
 
 def reset_user_password_to_new_initial(user_id: str) -> str:
-    """重置玩家登录密钥为新的初始密码，并废弃旧自定义密码。"""
-    entry = _get_credential_entry(user_id)
-    new_initial_password = _generate_initial_password()
-    entry["password"] = ""
-    entry["initial_password"] = new_initial_password
-    USER_CREDENTIALS[str(user_id)] = entry
-    _save_credentials(USER_CREDENTIALS)
-    return new_initial_password
+    """兼容旧调用：清空密码，等待用户下次登录时重新设置。"""
+    account_service = _get_account_service()
+    if account_service:
+        account_service.clear_user_password(user_id)
+    return ""
 
 
 def _get_next_pond_upgrade(inventory_service, current_capacity: int) -> Dict[str, Any] | None:
@@ -577,6 +518,7 @@ async def _complete_linuxdo_login(user):
 
 def _get_login_template_context(**kwargs):
     oauth_config = _get_linuxdo_oauth_config()
+    registration_config = _get_registration_config()
     context = {
         "first_login": False,
         "oauth_enabled": oauth_config.get("enabled", False),
@@ -584,6 +526,8 @@ def _get_login_template_context(**kwargs):
         "oauth_misconfigured": oauth_config.get("enabled", False) and not oauth_config.get("configured", False),
         "allow_password_login": oauth_config.get("allow_password_fallback", True) or not oauth_config.get("login_entry_enabled", False),
         "oauth_login_url": url_for("player_bp.login_with_linuxdo", flow="webui") if oauth_config.get("login_entry_enabled", False) else None,
+        "registration_enabled": bool(registration_config.get("enabled", True)),
+        "password_min_length": int(registration_config.get("password_min_length", 6) or 6),
     }
     context.update(_get_player_link_config())
     context.update(kwargs)
@@ -592,6 +536,21 @@ def _get_login_template_context(**kwargs):
 
 async def _render_login_page(**kwargs):
     return await render_template("login.html", **_get_login_template_context(**kwargs))
+
+
+async def _render_register_page(**kwargs):
+    registration_config = _get_registration_config()
+    context = {
+        "registration_enabled": bool(registration_config.get("enabled", True)),
+        "require_invitation": bool(registration_config.get("require_invitation", True)),
+        "username_min_length": int(registration_config.get("username_min_length", 5) or 5),
+        "username_max_length": int(registration_config.get("username_max_length", 12) or 12),
+        "password_min_length": int(registration_config.get("password_min_length", 6) or 6),
+        "form_data": kwargs.pop("form_data", {}),
+    }
+    context.update(_get_player_link_config())
+    context.update(kwargs)
+    return await render_template("register.html", **context)
 
 
 async def _exchange_linuxdo_access_token(code: str, oauth_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -669,7 +628,7 @@ def _resolve_linuxdo_user(profile: Dict[str, Any], user_repo, user_service, oaut
         ), None
 
     nickname = _get_linuxdo_display_name(profile, oauth_config)
-    register_result = user_service.register(candidate_user_id, nickname)
+    register_result = user_service.register(candidate_user_id, nickname, auth_source="linuxdo")
     if not register_result.get("success"):
         return None, register_result.get("message", "自动注册失败"), None
 
@@ -905,6 +864,7 @@ def create_player_app(services: Dict[str, Any], webui_options: Dict[str, Any] | 
     ).strip()
     app.config["UNITY_ALLOWED_ORIGINS"] = webui_options.get("unity_allowed_origins", [])
     app.config["LINUXDO_OAUTH_CONFIG"] = webui_options.get("linuxdo_oauth", {})
+    app.config["PLAYER_REGISTRATION_CONFIG"] = webui_options.get("registration", {})
     if public_base_url.startswith("https://"):
         app.config.setdefault("SESSION_COOKIE_SECURE", True)
         app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
@@ -963,6 +923,7 @@ async def login():
         return redirect(url_for("player_bp.index"))
 
     oauth_config = _get_linuxdo_oauth_config()
+    account_service = _get_account_service()
     if request.method == "POST":
         if oauth_config.get("login_entry_enabled") and not oauth_config.get("allow_password_fallback", True):
             await flash("当前站点仅允许使用 Linux.do 登录", "warning")
@@ -975,35 +936,85 @@ async def login():
         if not user_id:
             await flash("请输入用户ID", "danger")
             return await _render_login_page()
-        if len(password) < 5 or len(password) > 20:
-            await flash("登录密钥长度需要为 5~20 字", "danger")
+        if not password:
+            await flash("请输入登录密钥", "danger")
             return await _render_login_page()
 
-        # 检查用户是否存在
-        user_repo = current_app.config.get("USER_REPO")
         login_user_id = resolve_bound_game_user_id(user_id)
-        user = user_repo.get_by_id(login_user_id)
-        
-        if not user:
-            await flash("🎣 你不是我们的钓鱼佬，去别处钓鱼吧！", "warning")
-            logger.warning(f"未注册用户 {user_id} 尝试登录")
-            return await _render_login_page()
+        result = account_service.authenticate_password_login(login_user_id, password) if account_service else {
+            "success": False,
+            "message": "账号服务不可用",
+        }
+        if not result.get("success"):
+            message = result.get("message", "登录失败")
+            await flash(message, "warning" if "钓鱼佬" in message else "danger")
+            return await _render_login_page(
+                first_login=bool(result.get("first_login")),
+                user_id=result.get("login_user_id", login_user_id),
+            )
 
-        ensure_initial_password(login_user_id)
-
-        # 验证密钥，兼容旧登录密钥与自动生成的初始密码
-        if not verify_user_password(login_user_id, password):
-            await flash("密钥错误", "danger")
-            return await _render_login_page()
-        
-        # 登录成功
-        _login_player_session(user)
-        await flash(f"欢迎回来，{user.nickname or login_user_id}！", "success")
-        logger.info(f"用户 {user_id} 登录成功，实际账号 {login_user_id}")
+        user = result.get("user")
+        _login_player_session(user, auth_provider="webui")
+        await flash(result.get("message", f"欢迎回来，{user.nickname or user.user_id}！"), "success")
+        logger.info(f"用户 {user_id} 登录成功，实际账号 {user.user_id}")
         return redirect(url_for("player_bp.index"))
     
     # GET请求，显示登录页面
     return await _render_login_page()
+
+
+@player_bp.route("/register", methods=["GET", "POST"])
+async def register():
+    """WebUI 账号注册页面。"""
+    if session.get("user_id"):
+        return redirect(url_for("player_bp.index"))
+
+    registration_config = _get_registration_config()
+    if not registration_config.get("enabled", True):
+        from quart import abort
+        abort(404)
+
+    if request.method == "POST":
+        form = await request.form
+        username = str(form.get("username", "") or "").strip()
+        password = str(form.get("password", "") or "")
+        confirm_password = str(form.get("confirm_password", "") or "")
+        invitation_code = str(form.get("invitation_code", "") or "").strip()
+        nickname = str(form.get("nickname", "") or "").strip()
+        form_data = {
+            "username": username,
+            "invitation_code": invitation_code,
+            "nickname": nickname,
+        }
+
+        if password != confirm_password:
+            await flash("两次输入的密码不一致", "danger")
+            return await _render_register_page(form_data=form_data)
+
+        account_service = _get_account_service()
+        result = account_service.register_webui_user(
+            username=username,
+            password=password,
+            invitation_code=invitation_code,
+            nickname=nickname,
+            ip_address=_get_client_ip(),
+        ) if account_service else {"success": False, "message": "账号服务不可用"}
+        if not result.get("success"):
+            await flash(result.get("message", "注册失败"), "danger")
+            return await _render_register_page(form_data=form_data)
+
+        user_repo = current_app.config.get("USER_REPO")
+        user = user_repo.get_by_id(result.get("user_id", "")) if user_repo else None
+        if not user:
+            await flash("注册成功，但未能读取到新账号，请稍后直接登录", "warning")
+            return redirect(url_for("player_bp.login"))
+
+        _login_player_session(user, auth_provider="webui")
+        await flash(result.get("message", "注册成功"), "registration_success_popup")
+        logger.info("WebUI 注册并自动登录成功: %s", user.user_id)
+        return redirect(url_for("player_bp.index"))
+
+    return await _render_register_page()
 
 
 @player_bp.route("/login/linuxdo")
@@ -1102,7 +1113,6 @@ async def linuxdo_oauth_callback():
             await flash(error_message, "warning")
             return redirect(url_for("player_bp.login"))
 
-        ensure_initial_password(user.user_id)
         _login_player_session(user, auth_provider="linuxdo")
         if register_result and register_result.get("success"):
             await flash(register_result.get("message", ""), "registration_success_popup")
@@ -2644,24 +2654,36 @@ async def profile():
     user_id = session.get("user_id")
     user_repo = current_app.config.get("USER_REPO")
     user_service = current_app.config.get("USER_SERVICE")
+    account_service = _get_account_service()
 
     user = user_repo.get_by_id(user_id)
     if not user:
         await flash("用户数据异常", "danger")
         return redirect(url_for("player_bp.logout"))
 
-    initial_password = ensure_initial_password(user_id)
     titles_result = user_service.get_user_titles(user_id) if user_service else {"success": False, "titles": []}
     titles = titles_result.get("titles", []) if titles_result.get("success") else []
     account_bindings = get_user_account_bindings(user_id)
+    invitation_dashboard = account_service.get_invitation_dashboard(user_id) if account_service else {
+        "active_codes": [],
+        "used_codes": [],
+        "expired_codes": [],
+        "unused_count": 0,
+        "quota": 0,
+        "cost": 0,
+        "can_generate": False,
+        "disable_reason": "账号服务不可用",
+    }
 
     return await render_template(
         "profile.html",
         user=user,
-        initial_password=initial_password,
+        password_is_set=bool(getattr(user, "password_hash", None)),
         titles=titles,
         account_bindings=account_bindings,
         account_binding_providers=ACCOUNT_BINDING_PROVIDERS,
+        invitation_dashboard=invitation_dashboard,
+        password_min_length=int((account_service.get_registration_config() if account_service else {}).get("password_min_length", 6) or 6),
     )
 
 
@@ -2713,30 +2735,51 @@ async def update_profile_title():
 async def update_profile_password():
     """修改 WebUI 登录密钥"""
     user_id = session.get("user_id")
+    account_service = _get_account_service()
+    if not account_service:
+        await flash("账号服务不可用", "danger")
+        return redirect(url_for("player_bp.profile"))
     form = await request.form
     old_password = str(form.get("old_password", "") or "")
     new_password = str(form.get("new_password", "") or "")
 
-    if not verify_user_password(user_id, old_password):
-        await flash("旧密码不正确", "danger")
-        return redirect(url_for("player_bp.profile"))
-    new_password = new_password.strip()
-    if len(new_password) < 5 or len(new_password) > 20:
-        await flash("新密码长度需要为 5~20 字", "danger")
+    try:
+        if account_service and account_service.has_password(user_id):
+            if not account_service.verify_user_password(user_id, old_password):
+                await flash("旧密码不正确", "danger")
+                return redirect(url_for("player_bp.profile"))
+        account_service.set_user_password(user_id, new_password)
+    except ValueError as exc:
+        await flash(str(exc), "danger")
         return redirect(url_for("player_bp.profile"))
 
-    set_user_password(user_id, new_password)
-    await flash("登录密钥已修改", "success")
+    await flash("WebUI 密码已保存", "success")
     return redirect(url_for("player_bp.profile"))
 
 
 @player_bp.route("/profile/password/reset", methods=["POST"])
 @login_required
 async def reset_profile_password():
-    """重置 WebUI/App 登录密钥为新的初始密码"""
+    """清空当前 WebUI 密码，下次登录时重新设置。"""
     user_id = session.get("user_id")
-    new_initial_password = reset_user_password_to_new_initial(user_id)
-    await flash(f"登录密钥已重置为新的初始密码：{new_initial_password}", "success")
+    account_service = _get_account_service()
+    if account_service:
+        account_service.clear_user_password(user_id)
+    await flash("WebUI 密码已清空。下次登录时输入的新密码会被直接保存。", "success")
+    return redirect(url_for("player_bp.profile"))
+
+
+@player_bp.route("/profile/invitations/generate", methods=["POST"])
+@login_required
+async def generate_profile_invitation():
+    """在个人资料页生成新邀请码。"""
+    user_id = session.get("user_id")
+    account_service = _get_account_service()
+    result = account_service.create_invitation_code(user_id) if account_service else {
+        "success": False,
+        "message": "账号服务不可用",
+    }
+    await flash(result.get("message", "邀请码操作完成"), "success" if result.get("success") else "danger")
     return redirect(url_for("player_bp.profile"))
 
 

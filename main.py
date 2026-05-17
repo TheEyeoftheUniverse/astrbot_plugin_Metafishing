@@ -24,6 +24,7 @@ from .core.repositories.sqlite_aquarium_income_repo import SqliteAquariumIncomeR
 from .core.services.data_setup_service import DataSetupService
 from .core.services.item_template_service import ItemTemplateService
 from .core.services.user_service import UserService
+from .core.services.account_service import AccountService
 from .core.services.fishing_service import FishingService
 from .core.services.inventory_service import InventoryService
 from .core.services.shop_service import ShopService
@@ -123,6 +124,8 @@ class FishingPlugin(Star):
         sell_prices_config = config.get("sell_prices", {})
         armed_state_config = config.get("armed_state", {}) or {}
         gacha_guarantee_config = config.get("gacha_guarantee", {}) or {}
+        webui_config = config.get("webui", {}) or {}
+        webui_registration_config = webui_config.get("registration", {}) or {}
         
         # 直接从框架获取 exchange 配置（不重建）
         exchange_config = config.get("exchange", {})
@@ -191,6 +194,19 @@ class FishingPlugin(Star):
             },
             "market": {
                 "listing_tax_rate": market_config.get("listing_tax_rate", 0.05)
+            },
+            "webui": {
+                "registration": {
+                    "enabled": webui_registration_config.get("enabled", True),
+                    "require_invitation": webui_registration_config.get("require_invitation", True),
+                    "username_min_length": webui_registration_config.get("username_min_length", 5),
+                    "username_max_length": webui_registration_config.get("username_max_length", 12),
+                    "password_min_length": webui_registration_config.get("password_min_length", 6),
+                    "invitation_quota": webui_registration_config.get("invitation_quota", 5),
+                    "invitation_cost_premium": webui_registration_config.get("invitation_cost_premium", 15),
+                    "invitation_ttl_days": webui_registration_config.get("invitation_ttl_days", 0),
+                    "ip_rate_limit_daily": webui_registration_config.get("ip_rate_limit_daily", 3),
+                }
             },
             "tax": {
                 "is_tax": self.is_tax,
@@ -282,6 +298,13 @@ class FishingPlugin(Star):
         )
         # UserService 依赖 GachaService，因此在 GachaService 之后实例化
         self.user_service = UserService(self.user_repo, self.log_repo, self.inventory_repo, self.item_template_repo, self.gacha_service, self.game_config, self.achievement_repo)
+        self.account_service = AccountService(
+            db_path,
+            self.user_repo,
+            self.item_template_repo,
+            self.user_service,
+            self.game_config,
+        )
         self.inventory_service = InventoryService(
             self.inventory_repo,
             self.user_repo,
@@ -427,7 +450,6 @@ class FishingPlugin(Star):
         # --- Web后台配置 ---
         self.web_admin_task = None
         self._web_admin_shutdown_event = None
-        webui_config = config.get("webui", {})
         self.secret_key = webui_config.get("secret_key")
         if not self.secret_key:
             logger.error("安全警告：Web后台管理的'secret_key'未在配置中设置！强烈建议您设置一个长且随机的字符串以保证安全。")
@@ -723,7 +745,7 @@ class FishingPlugin(Star):
 
     @filter.command("初始密码获取", alias={"初始密码", "获取初始密码", "登录密钥", "获取密钥"})
     async def get_initial_password(self, event: AstrMessageEvent):
-        """私聊获取 WebUI/App 初始登录密码"""
+        """私聊查看新的 WebUI 密码设置方式"""
         if self._is_group_message_event(event):
             yield event.plain_result("❌ 为保护账号安全，请在私聊中使用“初始密码获取”。")
             return
@@ -731,13 +753,14 @@ class FishingPlugin(Star):
         if not self.user_repo.check_exists(user_id):
             yield event.plain_result("❌ 你还没有注册，请先使用“注册”。")
             return
-        from .player.server import ensure_initial_password
-        initial_password = ensure_initial_password(user_id)
-        yield event.plain_result(f"你的 WebUI/App 初始密码是：{initial_password}")
+        if self.account_service.has_password(user_id):
+            yield event.plain_result("你的 WebUI 密码已设置，请直接使用现有密码登录；若忘记密码，请私聊使用“重置密码”。")
+            return
+        yield event.plain_result("你当前还没有设置 WebUI 密码。请前往网页登录页，输入用户ID和你想设置的新密码，系统会在首次登录时直接完成设置。")
 
     @filter.command("重置密码", alias={"重置初始密码", "重置登录密码"})
     async def reset_player_password(self, event: AstrMessageEvent):
-        """私聊将 WebUI/App 登录密钥重置为新的初始密码"""
+        """私聊清空当前 WebUI 密码，下次登录时重新设置"""
         if self._is_group_message_event(event):
             yield event.plain_result("❌ 为保护账号安全，请在私聊中使用“重置密码”。")
             return
@@ -745,9 +768,14 @@ class FishingPlugin(Star):
         if not self.user_repo.check_exists(user_id):
             yield event.plain_result("❌ 你还没有注册，请先使用“注册”。")
             return
-        from .player.server import reset_user_password_to_new_initial
-        new_initial_password = reset_user_password_to_new_initial(user_id)
-        yield event.plain_result(f"你的 WebUI/App 登录密钥已重置。新的初始密码是：{new_initial_password}")
+        self.account_service.clear_user_password(user_id)
+        yield event.plain_result("你的 WebUI 密码已清空。下次在登录页输入用户ID和新密码时，系统会把这次输入直接保存为新的登录密码。")
+
+    @filter.command("邀请码")
+    async def invitation_code(self, event: AstrMessageEvent):
+        """生成或查看 WebUI 注册邀请码。用法：邀请码 生成 / 邀请码 列表"""
+        async for r in common_handlers.invitation_code(self, event):
+            yield r
 
     @filter.command("账号绑定")
     async def confirm_account_binding(self, event: AstrMessageEvent):
@@ -1544,6 +1572,7 @@ class FishingPlugin(Star):
                 "log_repo": self.log_repo,
                 "buff_repo": self.buff_repo,
                 "user_service": self.user_service,
+                "account_service": self.account_service,
                 "fishing_service": self.fishing_service,
                 "game_mechanics_service": self.game_mechanics_service,
                 "inventory_service": self.inventory_service,
@@ -1571,6 +1600,7 @@ class FishingPlugin(Star):
                         "https://fish.eyeoftheuniverse.top",
                     ],
                     "linuxdo_oauth": self.player_linuxdo_oauth_config,
+                    "registration": self.game_config.get("webui", {}).get("registration", {}),
                 },
             )
 

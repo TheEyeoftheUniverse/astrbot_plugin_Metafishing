@@ -32,8 +32,8 @@
                         <input class="form-control" value="{{ user.user_id }}" readonly>
                     </div>
                     <div class="col-sm-6">
-                        <label class="form-label">初始密码</label>
-                        <input class="form-control" value="{{ initial_password }}" readonly>
+                        <label class="form-label">密码状态</label>
+                        <input class="form-control" value="{% if password_is_set %}已设置 WebUI 密码{% else %}尚未设置 WebUI 密码{% endif %}" readonly>
                     </div>
                 </div>
             </div>
@@ -138,30 +138,151 @@
     <div class="col-lg-6">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title mb-3"><i class="fas fa-key"></i> 修改登录密钥</h5>
+                <h5 class="card-title mb-3"><i class="fas fa-key"></i> 管理 WebUI 密码</h5>
                 <form method="post" action="{{ url_for('player_bp.update_profile_password') }}">
+                    {% if password_is_set %}
                     <div class="mb-3">
                         <label class="form-label" for="old_password">旧密码</label>
                         <input type="password" class="form-control" id="old_password" name="old_password" autocomplete="current-password" required>
                     </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-circle-info"></i>
+                        你当前还没有设置过 WebUI 密码。本次保存会把下面输入的新密码直接写入账号。
+                    </div>
+                    {% endif %}
                     <div class="mb-3">
                         <label class="form-label" for="new_password">新密码</label>
-                        <input type="password" class="form-control" id="new_password" name="new_password" autocomplete="new-password" minlength="5" maxlength="20" required>
+                        <input type="password" class="form-control" id="new_password" name="new_password" autocomplete="new-password" minlength="{{ password_min_length }}" maxlength="20" required>
                     </div>
                     <button class="btn btn-primary" type="submit">
-                        <i class="fas fa-check"></i> 确认修改
+                        <i class="fas fa-check"></i> {% if password_is_set %}确认修改{% else %}保存密码{% endif %}
                     </button>
                 </form>
                 <hr>
-                <h6 class="mb-2"><i class="fas fa-rotate-right"></i> 重置为新的初始密码</h6>
-                <p class="text-muted small mb-3">如果忘记了自己设置过的密码，可以直接重置。重置后旧密码会失效，新的初始密码会显示在本页上方。</p>
-                <form method="post" action="{{ url_for('player_bp.reset_profile_password') }}" onsubmit="return confirm('确认将登录密钥重置为新的初始密码吗？');">
+                <h6 class="mb-2"><i class="fas fa-rotate-right"></i> 清空当前密码</h6>
+                <p class="text-muted small mb-3">如果忘记了密码，可以直接清空。清空后旧密码立即失效，下次登录页输入的新密码会被直接保存。</p>
+                <form method="post" action="{{ url_for('player_bp.reset_profile_password') }}" onsubmit="return confirm('确认清空当前 WebUI 密码吗？');">
                     <button class="btn btn-outline-danger" type="submit">
-                        <i class="fas fa-key"></i> 重置密码
+                        <i class="fas fa-key"></i> 清空密码
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+                    <div>
+                        <h5 class="card-title mb-1"><i class="fas fa-ticket"></i> 我的邀请码</h5>
+                        <p class="text-muted small mb-0">当前可持有 {{ invitation_dashboard.quota }} 枚未使用邀请码。生成一枚会扣除 {{ invitation_dashboard.cost }} 钻石。</p>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn btn-primary"
+                        data-bs-toggle="modal"
+                        data-bs-target="#generateInvitationModal"
+                        {% if not invitation_dashboard.can_generate %}disabled title="{{ invitation_dashboard.disable_reason }}"{% endif %}
+                    >
+                        <i class="fas fa-plus"></i> 生成新邀请码
+                    </button>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <h6 class="mb-3">未使用邀请码</h6>
+                        {% if invitation_dashboard.active_codes %}
+                        <div class="vstack gap-2">
+                            {% for item in invitation_dashboard.active_codes %}
+                            <div class="border rounded-3 p-3 d-flex justify-content-between align-items-center gap-3">
+                                <div>
+                                    <div class="fw-semibold">{{ item.code }}</div>
+                                    <div class="text-muted small">
+                                        创建于 {{ item.created_at_label or '未知时间' }}
+                                        {% if item.expires_at_label %}，到期 {{ item.expires_at_label }}{% endif %}
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyInvitationCode('{{ item.code }}')">
+                                    <i class="fas fa-copy"></i> 复制
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0">你当前没有未使用的邀请码。</p>
+                        {% endif %}
+                        {% if invitation_dashboard.expired_codes %}
+                        <div class="mt-3">
+                            <h6 class="mb-2">已过期</h6>
+                            <div class="vstack gap-2">
+                                {% for item in invitation_dashboard.expired_codes %}
+                                <div class="border rounded-3 p-3">
+                                    <div class="fw-semibold">{{ item.code }}</div>
+                                    <div class="text-muted small">过期时间：{{ item.expires_at_label or '未知时间' }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-lg-6">
+                        <h6 class="mb-3">已使用历史</h6>
+                        {% if invitation_dashboard.used_codes %}
+                        <div class="vstack gap-2">
+                            {% for item in invitation_dashboard.used_codes %}
+                            <div class="border rounded-3 p-3">
+                                <div class="fw-semibold">{{ item.code }}</div>
+                                <div class="text-muted small">被 {{ item.used_by_nickname or item.used_by_user_id }} 使用</div>
+                                <div class="text-muted small">使用时间：{{ item.used_at_label or '未知时间' }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0">还没有邀请码被使用。</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="generateInvitationModal" tabindex="-1" aria-labelledby="generateInvitationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="generateInvitationModalLabel"><i class="fas fa-triangle-exclamation"></i> 确认生成邀请码</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>消费提示：</strong>生成将扣除 {{ invitation_dashboard.cost }} 钻石，本操作不可撤销。</p>
+                <p class="mb-0"><strong>连坐风险提示：</strong>被邀请人若违反规则被处罚，作为邀请人可能一并被追责，请仅邀请你信任的玩家。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                <form method="post" action="{{ url_for('player_bp.generate_profile_invitation') }}">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> 确认生成
                     </button>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function copyInvitationCode(code) {
+    navigator.clipboard.writeText(code).then(() => {
+        if (window.showToast) {
+            showToast('邀请码已复制：' + code, 'success');
+        }
+    }).catch(() => {
+        if (window.showToast) {
+            showToast('复制失败，请手动复制邀请码', 'danger');
+        }
+    });
+}
+</script>
 {% endblock %}

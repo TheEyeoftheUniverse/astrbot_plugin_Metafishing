@@ -3,7 +3,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from ..draw.help import draw_help_image
 from ..draw.state import draw_state_image, get_user_state_data
 from ..core.utils import get_now
-from ..utils import parse_target_user_id, parse_amount
+from ..utils import parse_target_user_id, parse_amount, detect_event_account_provider
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,13 +14,37 @@ async def register_user(self: "FishingPlugin", event: AstrMessageEvent):
     """注册用户命令"""
     user_id = self._get_effective_user_id(event)
     nickname = event.get_sender_name() if event.get_sender_name() is not None else user_id
-    if result := self.user_service.register(user_id, nickname):
-        if result.get("success"):
-            from ..player.server import ensure_initial_password
-            ensure_initial_password(user_id)
+    auth_source = detect_event_account_provider(event) or None
+    if result := self.user_service.register(user_id, nickname, auth_source=auth_source):
         yield event.plain_result(result["message"])
     else:
         yield event.plain_result("❌ 出错啦！请稍后再试。")
+
+
+async def invitation_code(self: "FishingPlugin", event: AstrMessageEvent):
+    """邀请码生成与列表查询。"""
+    args = [segment for segment in event.message_str.strip().split() if segment]
+    action = args[1] if len(args) > 1 else ""
+    user_id = self._get_effective_user_id(event)
+
+    if not self.user_repo.check_exists(user_id):
+        yield event.plain_result("❌ 你还没有注册，请先使用“注册”。")
+        return
+
+    if action == "生成":
+        result = self.account_service.create_invitation_code(user_id)
+        yield event.plain_result(result.get("message", "邀请码操作完成"))
+        return
+
+    if action == "列表":
+        yield event.plain_result(self.account_service.format_invitation_list_text(user_id))
+        return
+
+    yield event.plain_result(
+        "❌ 用法：\n"
+        "邀请码 生成\n"
+        "邀请码 列表"
+    )
 
 async def sign_in(self: "FishingPlugin", event: AstrMessageEvent):
     """签到"""

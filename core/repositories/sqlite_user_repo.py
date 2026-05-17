@@ -127,6 +127,9 @@ class SqliteUserRepository(AbstractUserRepository):
 
             # --- [新功能] 添加交易所账户状态字段的读取 ---
             exchange_account_status=bool(row["exchange_account_status"]) if "exchange_account_status" in row_keys else False,
+            password_hash=row["password_hash"] if "password_hash" in row_keys else None,
+            auth_source=row["auth_source"] if "auth_source" in row_keys else None,
+            invited_by_user_id=row["invited_by_user_id"] if "invited_by_user_id" in row_keys else None,
         )
 
     def get_by_id(self, user_id: str) -> Optional[User]:

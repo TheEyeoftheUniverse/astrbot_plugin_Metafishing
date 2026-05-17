@@ -39,15 +39,15 @@
                 {% endif %}
                 <form method="POST">
                     <div class="mb-3">
-                        <label for="user_id" class="form-label">用户ID</label>
+                        <label for="user_id" class="form-label">账号 / 用户ID</label>
                         <input type="text" class="form-control" id="user_id" name="user_id"
                                {% if first_login %}value="{{ user_id }}" readonly{% endif %}
-                               placeholder="输入您在游戏中的用户ID" required>
+                               placeholder="输入您在游戏中的用户ID或 WebUI 账号" required>
                         <div class="form-text">
                             {% if first_login %}
-                                首次登录，请设置您的登录密钥
+                                当前账号还没有设置 WebUI 密码，本次输入会直接保存为新密码
                             {% else %}
-                                请输入您在游戏中的用户ID
+                                老玩家首次使用 WebUI 时，也可以直接在这里输入用户ID和新密码完成初始化
                             {% endif %}
                         </div>
                     </div>
@@ -57,13 +57,13 @@
                         </label>
                         <input type="password" class="form-control" id="password" name="password"
                                placeholder="{% if first_login %}设置一个登录密钥{% else %}输入您的登录密钥{% endif %}"
-                               minlength="5" maxlength="20"
-                               {% if not first_login %}required{% endif %}>
+                               minlength="{{ password_min_length }}" maxlength="20"
+                               required>
                         <div class="form-text">
                             {% if first_login %}
-                                请妥善保管密钥，用于后续登录
+                                请妥善保管密码，用于后续登录
                             {% else %}
-                                首次登录时设置的密钥
+                                WebUI 账号密码或你首次设置的玩家密码
                             {% endif %}
                         </div>
                     </div>
@@ -80,6 +80,12 @@
                     当前站点已关闭密码登录，请直接使用上方的 Linux.do 登录按钮。
                 </div>
                 {% endif %}
+                {% if registration_enabled %}
+                <div class="text-center mt-3">
+                    <small class="text-muted">没有账号？</small>
+                    <a href="{{ url_for('player_bp.register') }}" class="fw-semibold text-decoration-none">立即注册</a>
+                </div>
+                {% endif %}
             </div>
             <div class="auth-footer text-center">
                 <div class="d-flex justify-content-center gap-2 flex-wrap mb-3">
@@ -92,7 +98,7 @@
                 </div>
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i>
-                    若未开启自动注册，请先在游戏中使用 <code>,注册</code> 命令创建账号
+                    老玩家可继续使用 <code>,注册</code> 创建的游戏账号；若未设置过 WebUI 密码，首次登录时会直接进入设置流程
                 </small>
             </div>
         </section>
