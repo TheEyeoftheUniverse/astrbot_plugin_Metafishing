@@ -72,6 +72,17 @@ UNITY_LINUXDO_OAUTH_PENDING = {}
 DEFAULT_GITHUB_URL = "https://github.com/TheEyeoftheUniverse/astrbot_plugin_fishing"
 DEFAULT_APK_DOWNLOAD_URL = f"{DEFAULT_GITHUB_URL}/releases"
 DEFAULT_TAVERN_ADMIN_USER_ID = "2645956495"
+TAVERN_BOARD_PAGE_SIZE = 20
+TAVERN_BOARD_CATEGORY_LABELS = {
+    "all": "全部",
+    "casual": "闲聊",
+    "demand": "需求",
+    "feedback": "反馈",
+}
+TAVERN_BOARD_SORT_LABELS = {
+    "latest": "按最新",
+    "likes": "按点赞数量",
+}
 
 
 def _normalize_external_url(value: Any, default: str = "") -> str:
@@ -89,6 +100,375 @@ def _get_player_link_config() -> Dict[str, str]:
 def _get_tavern_admin_user_id() -> str:
     configured = str(current_app.config.get("TAVERN_ADMIN_USER_ID", DEFAULT_TAVERN_ADMIN_USER_ID) or "").strip()
     return configured or DEFAULT_TAVERN_ADMIN_USER_ID
+
+
+def _get_tavern_messages_file() -> str:
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, "tavern_messages.json")
+
+
+def _default_tavern_data() -> Dict[str, Any]:
+    return {"announcement": "", "messages": []}
+
+
+def _normalize_tavern_category(value: Any, *, default: str = "casual", allow_all: bool = False) -> str:
+    normalized = str(value or "").strip().lower()
+    mapping = {
+        "casual": "casual",
+        "chat": "casual",
+        "idle": "casual",
+        "闲聊": "casual",
+        "demand": "demand",
+        "request": "demand",
+        "需求": "demand",
+        "feedback": "feedback",
+        "bug": "feedback",
+        "bugs": "feedback",
+        "反馈": "feedback",
+    }
+    if allow_all and normalized == "all":
+        return "all"
+    return mapping.get(normalized, default)
+
+
+def _normalize_tavern_sort(value: Any, default: str = "latest") -> str:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in TAVERN_BOARD_SORT_LABELS else default
+
+
+def _format_tavern_datetime(value: datetime) -> str:
+    return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _parse_tavern_datetime(value: Any) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            return value.astimezone().replace(tzinfo=None)
+        return value
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is not None:
+            return parsed.astimezone().replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        return None
+
+
+def _normalize_tavern_liked_by(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    normalized_users = []
+    seen = set()
+    for item in value:
+        user_id = str(item or "").strip()
+        if not user_id or user_id in seen:
+            continue
+        seen.add(user_id)
+        normalized_users.append(user_id)
+    return normalized_users
+
+
+def _build_tavern_display_name(user_id: str, username: str = "") -> str:
+    normalized_name = str(username or "").strip()
+    if normalized_name:
+        return normalized_name
+    normalized_user_id = str(user_id or "").strip()
+    if normalized_user_id:
+        return f"渔夫{normalized_user_id[-4:]}"
+    return "渔夫"
+
+
+def _normalize_tavern_reply(raw_reply: Any) -> Dict[str, Any] | None:
+    if not isinstance(raw_reply, dict):
+        return None
+
+    content = str(raw_reply.get("content", "") or "").strip()
+    if not content:
+        return None
+
+    user_id = str(raw_reply.get("user_id", "") or "").strip()
+    created_sort = (
+        _parse_tavern_datetime(raw_reply.get("created_at"))
+        or _parse_tavern_datetime(raw_reply.get("timestamp"))
+        or datetime.now()
+    )
+
+    return {
+        "id": str(raw_reply.get("id", "") or "").strip() or secrets.token_hex(8),
+        "user_id": user_id,
+        "username": _build_tavern_display_name(user_id, raw_reply.get("username", "")),
+        "content": content,
+        "timestamp": str(raw_reply.get("timestamp", "") or "").strip() or _format_tavern_datetime(created_sort),
+        "created_at": str(raw_reply.get("created_at", "") or "").strip() or created_sort.isoformat(timespec="seconds"),
+        "_created_sort": created_sort,
+    }
+
+
+def _normalize_tavern_message(raw_message: Any) -> Dict[str, Any] | None:
+    if not isinstance(raw_message, dict):
+        return None
+
+    content = str(raw_message.get("content", "") or "").strip()
+    if not content:
+        return None
+
+    user_id = str(raw_message.get("user_id", "") or "").strip()
+    created_sort = (
+        _parse_tavern_datetime(raw_message.get("created_at"))
+        or _parse_tavern_datetime(raw_message.get("timestamp"))
+        or datetime.now()
+    )
+    updated_sort = _parse_tavern_datetime(raw_message.get("updated_at")) or created_sort
+
+    replies = []
+    for raw_reply in raw_message.get("replies", []) if isinstance(raw_message.get("replies", []), list) else []:
+        reply = _normalize_tavern_reply(raw_reply)
+        if reply is not None:
+            replies.append(reply)
+    replies.sort(key=lambda item: item["_created_sort"])
+    if replies:
+        updated_sort = max(updated_sort, replies[-1]["_created_sort"])
+
+    liked_by = _normalize_tavern_liked_by(raw_message.get("liked_by", []))
+
+    return {
+        "id": str(raw_message.get("id", "") or "").strip() or secrets.token_hex(8),
+        "user_id": user_id,
+        "username": _build_tavern_display_name(user_id, raw_message.get("username", "")),
+        "content": content,
+        "category": _normalize_tavern_category(raw_message.get("category")),
+        "timestamp": str(raw_message.get("timestamp", "") or "").strip() or _format_tavern_datetime(created_sort),
+        "created_at": str(raw_message.get("created_at", "") or "").strip() or created_sort.isoformat(timespec="seconds"),
+        "updated_at": str(raw_message.get("updated_at", "") or "").strip() or updated_sort.isoformat(timespec="seconds"),
+        "liked_by": liked_by,
+        "like_count": len(liked_by),
+        "replies": replies,
+        "reply_count": len(replies),
+        "_created_sort": created_sort,
+        "_updated_sort": updated_sort,
+    }
+
+
+def _serialize_tavern_reply(reply: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = _normalize_tavern_reply(reply)
+    if normalized is None:
+        return {}
+    return {
+        "id": normalized["id"],
+        "user_id": normalized["user_id"],
+        "username": normalized["username"],
+        "content": normalized["content"],
+        "timestamp": normalized["timestamp"],
+        "created_at": normalized["created_at"],
+    }
+
+
+def _serialize_tavern_message(message: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = _normalize_tavern_message(message)
+    if normalized is None:
+        return {}
+    return {
+        "id": normalized["id"],
+        "user_id": normalized["user_id"],
+        "username": normalized["username"],
+        "content": normalized["content"],
+        "category": normalized["category"],
+        "timestamp": normalized["timestamp"],
+        "created_at": normalized["created_at"],
+        "updated_at": normalized["updated_at"],
+        "liked_by": normalized["liked_by"],
+        "replies": [
+            serialized for serialized in
+            (_serialize_tavern_reply(reply) for reply in normalized["replies"])
+            if serialized
+        ],
+    }
+
+
+def _load_tavern_board_data() -> Dict[str, Any]:
+    messages_file = _get_tavern_messages_file()
+    if not os.path.exists(messages_file):
+        return _default_tavern_data()
+
+    try:
+        with open(messages_file, "r", encoding="utf-8") as file:
+            raw_data = json.load(file)
+    except Exception as exception:
+        logger.error(f"读取酒馆留言板失败: {exception}", exc_info=True)
+        return _default_tavern_data()
+
+    if not isinstance(raw_data, dict):
+        return _default_tavern_data()
+
+    messages = []
+    for raw_message in raw_data.get("messages", []) if isinstance(raw_data.get("messages", []), list) else []:
+        normalized = _normalize_tavern_message(raw_message)
+        if normalized is not None:
+            messages.append(normalized)
+
+    return {
+        "announcement": str(raw_data.get("announcement", "") or ""),
+        "messages": messages,
+    }
+
+
+def _save_tavern_board_data(tavern_data: Dict[str, Any]) -> None:
+    messages_file = _get_tavern_messages_file()
+    payload = {
+        "announcement": str(tavern_data.get("announcement", "") or ""),
+        "messages": [
+            serialized for serialized in
+            (_serialize_tavern_message(message) for message in tavern_data.get("messages", []))
+            if serialized
+        ],
+    }
+    with open(messages_file, "w", encoding="utf-8") as file:
+        json.dump(payload, file, ensure_ascii=False, indent=2)
+
+
+def _find_tavern_message(messages: list[Dict[str, Any]], message_id: str) -> tuple[int, Dict[str, Any] | None]:
+    for index, message in enumerate(messages):
+        if str(message.get("id", "") or "").strip() == message_id:
+            return index, message
+    return -1, None
+
+
+def _get_tavern_message_counts(messages: list[Dict[str, Any]]) -> Dict[str, int]:
+    counts = {key: 0 for key in TAVERN_BOARD_CATEGORY_LABELS}
+    counts["all"] = len(messages)
+    for message in messages:
+        category = str(message.get("category", "") or "").strip()
+        if category in counts:
+            counts[category] += 1
+    return counts
+
+
+def _build_tavern_board_listing(
+    messages: list[Dict[str, Any]],
+    current_user_id: str,
+    category: str,
+    sort_by: str,
+    page: int,
+    per_page: int = TAVERN_BOARD_PAGE_SIZE,
+) -> Dict[str, Any]:
+    normalized_messages = []
+    for message in messages:
+        normalized = _normalize_tavern_message(message)
+        if normalized is None:
+            continue
+        normalized["liked_by_current_user"] = current_user_id in normalized.get("liked_by", [])
+        normalized_messages.append(normalized)
+
+    counts = _get_tavern_message_counts(normalized_messages)
+    if sort_by == "likes":
+        normalized_messages = sorted(
+            normalized_messages,
+            key=lambda item: (
+                int(item.get("like_count", 0) or 0),
+                item.get("_updated_sort") or datetime.min,
+                item.get("_created_sort") or datetime.min,
+            ),
+            reverse=True,
+        )
+    else:
+        normalized_messages = sorted(
+            normalized_messages,
+            key=lambda item: (
+                item.get("_updated_sort") or datetime.min,
+                item.get("_created_sort") or datetime.min,
+            ),
+            reverse=True,
+        )
+
+    total_messages = len(normalized_messages)
+
+    return {
+        "messages": normalized_messages,
+        "counts": counts,
+        "page": 1,
+        "total_pages": 1,
+        "total_messages": total_messages,
+    }
+
+
+def _build_tavern_user_snapshot(user_id: str, user_repo, item_template_repo) -> Dict[str, Any]:
+    snapshot = {
+        "title_name": "无称号",
+    }
+    normalized_user_id = str(user_id or "").strip()
+    if not normalized_user_id or user_repo is None:
+        return snapshot
+
+    try:
+        user = user_repo.get_by_id(normalized_user_id)
+    except Exception as exception:
+        logger.warning(f"读取酒馆玩家 {normalized_user_id} 信息失败: {exception}")
+        return snapshot
+
+    if user is None:
+        return snapshot
+
+    snapshot["title_name"] = _get_user_title(getattr(user, "current_title_id", None), item_template_repo)
+    return snapshot
+
+
+def _enrich_tavern_messages_for_display(
+    messages: list[Dict[str, Any]],
+    current_user_id: str,
+    user_repo,
+    item_template_repo,
+) -> list[Dict[str, Any]]:
+    user_snapshot_cache: Dict[str, Dict[str, Any]] = {}
+
+    def get_snapshot(user_id: str) -> Dict[str, Any]:
+        normalized_user_id = str(user_id or "").strip()
+        if normalized_user_id not in user_snapshot_cache:
+            user_snapshot_cache[normalized_user_id] = _build_tavern_user_snapshot(
+                normalized_user_id,
+                user_repo,
+                item_template_repo,
+            )
+        return user_snapshot_cache[normalized_user_id]
+
+    enriched_messages = []
+    for message in messages:
+        normalized = _normalize_tavern_message(message)
+        if normalized is None:
+            continue
+
+        author_snapshot = get_snapshot(normalized.get("user_id", ""))
+        normalized["title_name"] = author_snapshot.get("title_name", "无称号")
+        normalized["liked_by_current_user"] = current_user_id in normalized.get("liked_by", [])
+
+        enriched_replies = []
+        for reply in normalized.get("replies", []):
+            normalized_reply = _normalize_tavern_reply(reply)
+            if normalized_reply is None:
+                continue
+            reply_snapshot = get_snapshot(normalized_reply.get("user_id", ""))
+            normalized_reply["title_name"] = reply_snapshot.get("title_name", "无称号")
+            enriched_replies.append(normalized_reply)
+
+        normalized["replies"] = enriched_replies
+        normalized["reply_count"] = len(enriched_replies)
+        enriched_messages.append(normalized)
+
+    return enriched_messages
 
 
 def _get_account_service():
@@ -2299,7 +2679,8 @@ async def api_post_message():
     
     try:
         data = await request.get_json()
-        content = data.get("content", "").strip()
+        content = str((data or {}).get("content", "") or "").strip()
+        category = _normalize_tavern_category((data or {}).get("category"), default="casual")
         
         if not content:
             return jsonify({"success": False, "message": "留言内容不能为空"}), 400
@@ -2312,37 +2693,32 @@ async def api_post_message():
         if not user:
             return jsonify({"success": False, "message": "用户不存在"}), 400
         
-        # 读取留言数据
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-        os.makedirs(data_dir, exist_ok=True)
-        messages_file = os.path.join(data_dir, "tavern_messages.json")
-        
-        if os.path.exists(messages_file):
-            with open(messages_file, "r", encoding="utf-8") as f:
-                tavern_data = json.load(f)
-        else:
-            tavern_data = {"announcement": "", "messages": []}
-        
+        tavern_data = _load_tavern_board_data()
+
         # 添加新留言
-        import uuid
+        now = datetime.now()
         new_message = {
-            "id": str(uuid.uuid4()),
+            "id": secrets.token_hex(16),
             "user_id": user_id,
-            "username": user.nickname or f"渔夫{user_id[-4:]}",
+            "username": _build_tavern_display_name(user_id, getattr(user, "nickname", "")),
             "content": content,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "category": category,
+            "timestamp": _format_tavern_datetime(now),
+            "created_at": now.isoformat(timespec="seconds"),
+            "updated_at": now.isoformat(timespec="seconds"),
+            "liked_by": [],
+            "replies": [],
         }
         
         # 插入到列表开头（最新的在前面）
-        tavern_data.setdefault("messages", []).insert(0, new_message)
+        tavern_data.setdefault("messages", []).insert(0, _normalize_tavern_message(new_message))
         
         # 限制最多保存1000条留言
         if len(tavern_data["messages"]) > 1000:
             tavern_data["messages"] = tavern_data["messages"][:1000]
         
         # 保存到文件
-        with open(messages_file, "w", encoding="utf-8") as f:
-            json.dump(tavern_data, f, ensure_ascii=False, indent=2)
+        _save_tavern_board_data(tavern_data)
         
         return jsonify({"success": True, "message": "留言发表成功！"})
     except Exception as e:
@@ -2358,29 +2734,16 @@ async def api_delete_message():
     
     try:
         data = await request.get_json()
-        message_id = data.get("message_id")
+        message_id = str((data or {}).get("message_id", "") or "").strip()
         
         if not message_id:
             return jsonify({"success": False, "message": "参数无效"}), 400
         
-        # 读取留言数据
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-        messages_file = os.path.join(data_dir, "tavern_messages.json")
-        
-        if not os.path.exists(messages_file):
-            return jsonify({"success": False, "message": "留言不存在"}), 404
-        
-        with open(messages_file, "r", encoding="utf-8") as f:
-            tavern_data = json.load(f)
+        tavern_data = _load_tavern_board_data()
         
         # 查找并删除留言
         messages = tavern_data.get("messages", [])
-        message_to_delete = None
-        
-        for msg in messages:
-            if msg.get("id") == message_id:
-                message_to_delete = msg
-                break
+        _, message_to_delete = _find_tavern_message(messages, message_id)
         
         if not message_to_delete:
             return jsonify({"success": False, "message": "留言不存在"}), 404
@@ -2393,12 +2756,142 @@ async def api_delete_message():
         tavern_data["messages"] = [msg for msg in messages if msg.get("id") != message_id]
         
         # 保存到文件
-        with open(messages_file, "w", encoding="utf-8") as f:
-            json.dump(tavern_data, f, ensure_ascii=False, indent=2)
+        _save_tavern_board_data(tavern_data)
         
         return jsonify({"success": True, "message": "留言已删除"})
     except Exception as e:
         logger.error(f"删除留言失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@player_bp.route("/api/toggle_message_like", methods=["POST"])
+@login_required
+async def api_toggle_message_like():
+    """切换留言点赞状态。"""
+    user_id = session.get("user_id")
+
+    try:
+        data = await request.get_json()
+        message_id = str((data or {}).get("message_id", "") or "").strip()
+        if not message_id:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+
+        tavern_data = _load_tavern_board_data()
+        messages = tavern_data.get("messages", [])
+        message_index, message = _find_tavern_message(messages, message_id)
+        if message is None:
+            return jsonify({"success": False, "message": "留言不存在"}), 404
+
+        liked_by = _normalize_tavern_liked_by(message.get("liked_by", []))
+        if user_id in liked_by:
+            liked_by = [item for item in liked_by if item != user_id]
+            liked = False
+        else:
+            liked_by.append(user_id)
+            liked = True
+
+        message["liked_by"] = liked_by
+        messages[message_index] = _normalize_tavern_message(message)
+        _save_tavern_board_data(tavern_data)
+
+        return jsonify({
+            "success": True,
+            "message": "点赞成功" if liked else "已取消点赞",
+            "liked": liked,
+            "like_count": len(liked_by),
+        })
+    except Exception as e:
+        logger.error(f"切换留言点赞失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@player_bp.route("/api/reply_message", methods=["POST"])
+@login_required
+async def api_reply_message():
+    """给留言添加楼中楼回复。"""
+    user_id = session.get("user_id")
+    user_repo = current_app.config.get("USER_REPO")
+
+    try:
+        data = await request.get_json()
+        message_id = str((data or {}).get("message_id", "") or "").strip()
+        content = str((data or {}).get("content", "") or "").strip()
+
+        if not message_id or not content:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+        if len(content) > 500:
+            return jsonify({"success": False, "message": "回复内容不能超过500字"}), 400
+
+        user = user_repo.get_by_id(user_id)
+        if not user:
+            return jsonify({"success": False, "message": "用户不存在"}), 400
+
+        tavern_data = _load_tavern_board_data()
+        messages = tavern_data.get("messages", [])
+        message_index, message = _find_tavern_message(messages, message_id)
+        if message is None:
+            return jsonify({"success": False, "message": "留言不存在"}), 404
+
+        now = datetime.now()
+        replies = message.setdefault("replies", [])
+        replies.append({
+            "id": secrets.token_hex(12),
+            "user_id": user_id,
+            "username": _build_tavern_display_name(user_id, getattr(user, "nickname", "")),
+            "content": content,
+            "timestamp": _format_tavern_datetime(now),
+            "created_at": now.isoformat(timespec="seconds"),
+        })
+        message["updated_at"] = now.isoformat(timespec="seconds")
+        messages[message_index] = _normalize_tavern_message(message)
+        _save_tavern_board_data(tavern_data)
+
+        return jsonify({"success": True, "message": "回复已发送"})
+    except Exception as e:
+        logger.error(f"回复留言失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@player_bp.route("/api/delete_message_reply", methods=["POST"])
+@login_required
+async def api_delete_message_reply():
+    """删除楼中楼回复。"""
+    user_id = session.get("user_id")
+    admin_user_id = _get_tavern_admin_user_id()
+
+    try:
+        data = await request.get_json()
+        message_id = str((data or {}).get("message_id", "") or "").strip()
+        reply_id = str((data or {}).get("reply_id", "") or "").strip()
+        if not message_id or not reply_id:
+            return jsonify({"success": False, "message": "参数无效"}), 400
+
+        tavern_data = _load_tavern_board_data()
+        messages = tavern_data.get("messages", [])
+        message_index, message = _find_tavern_message(messages, message_id)
+        if message is None:
+            return jsonify({"success": False, "message": "留言不存在"}), 404
+
+        replies = message.get("replies", []) if isinstance(message.get("replies", []), list) else []
+        reply_to_delete = None
+        for reply in replies:
+            if str(reply.get("id", "") or "").strip() == reply_id:
+                reply_to_delete = reply
+                break
+
+        if reply_to_delete is None:
+            return jsonify({"success": False, "message": "回复不存在"}), 404
+        if reply_to_delete.get("user_id") != user_id and user_id != admin_user_id:
+            return jsonify({"success": False, "message": "无权删除此回复"}), 403
+
+        message["replies"] = [reply for reply in replies if str(reply.get("id", "") or "").strip() != reply_id]
+        message["updated_at"] = ""
+        messages[message_index] = _normalize_tavern_message(message)
+        _save_tavern_board_data(tavern_data)
+
+        return jsonify({"success": True, "message": "回复已删除"})
+    except Exception as e:
+        logger.error(f"删除留言回复失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 @player_bp.route("/api/update_announcement", methods=["POST"])
@@ -2413,25 +2906,15 @@ async def api_update_announcement():
     
     try:
         data = await request.get_json()
-        content = data.get("content", "")
+        content = str((data or {}).get("content", "") or "")
         
-        # 读取留言数据
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-        os.makedirs(data_dir, exist_ok=True)
-        messages_file = os.path.join(data_dir, "tavern_messages.json")
-        
-        if os.path.exists(messages_file):
-            with open(messages_file, "r", encoding="utf-8") as f:
-                tavern_data = json.load(f)
-        else:
-            tavern_data = {"announcement": "", "messages": []}
+        tavern_data = _load_tavern_board_data()
         
         # 更新公告
         tavern_data["announcement"] = content
         
         # 保存到文件
-        with open(messages_file, "w", encoding="utf-8") as f:
-            json.dump(tavern_data, f, ensure_ascii=False, indent=2)
+        _save_tavern_board_data(tavern_data)
         
         return jsonify({"success": True, "message": "公告更新成功！"})
     except Exception as e:
@@ -3533,29 +4016,43 @@ async def tavern():
     tavern_admin_user_id = _get_tavern_admin_user_id()
     is_admin = user_id == tavern_admin_user_id
     
-    # 获取留言数据文件路径
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
     os.makedirs(data_dir, exist_ok=True)
-    messages_file = os.path.join(data_dir, "tavern_messages.json")
     exhibition_file = os.path.join(data_dir, "aquarium_exhibition.json")
-    
-    # 读取留言数据
-    if os.path.exists(messages_file):
-        with open(messages_file, "r", encoding="utf-8") as f:
-            tavern_data = json.load(f)
-    else:
-        tavern_data = {"announcement": "", "messages": []}
-    
-    # 分页
+    tavern_data = _load_tavern_board_data()
+
     page = request.args.get("page", 1, type=int)
-    per_page = 20
-    messages = tavern_data.get("messages", [])
-    total_messages = len(messages)
-    total_pages = (total_messages + per_page - 1) // per_page
-    
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    page_messages = messages[start_idx:end_idx]
+    current_category = _normalize_tavern_category(
+        request.args.get("category", "all"),
+        default="all",
+        allow_all=True,
+    )
+    current_sort = _normalize_tavern_sort(request.args.get("sort", "latest"))
+    listing = _build_tavern_board_listing(
+        tavern_data.get("messages", []),
+        user_id,
+        current_category,
+        current_sort,
+        page,
+    )
+    display_messages = _enrich_tavern_messages_for_display(
+        listing["messages"],
+        user_id,
+        user_repo,
+        item_template_repo,
+    )
+    board_categories = [
+        {
+            "key": key,
+            "label": label,
+            "count": listing["counts"].get(key, 0),
+        }
+        for key, label in TAVERN_BOARD_CATEGORY_LABELS.items()
+    ]
+    sort_options = [
+        {"key": key, "label": label}
+        for key, label in TAVERN_BOARD_SORT_LABELS.items()
+    ]
     
     # 获取排行榜数据
     user_service = current_app.config.get("USER_SERVICE")
@@ -3583,12 +4080,18 @@ async def tavern():
     return await render_template("tavern.html",
                                   user=user,
                                   announcement=tavern_data.get("announcement", ""),
-                                  messages=page_messages,
+                                  messages=display_messages,
+                                  message_counts=listing["counts"],
+                                  board_categories=board_categories,
+                                  sort_options=sort_options,
+                                  current_category=current_category,
+                                  current_sort=current_sort,
+                                  filtered_message_count=listing["counts"].get(current_category, listing["total_messages"]),
                                   is_admin=is_admin,
                                   tavern_admin_user_id=tavern_admin_user_id,
                                   current_user_id=user_id,
-                                  page=page,
-                                  total_pages=total_pages,
+                                  page=listing["page"],
+                                  total_pages=listing["total_pages"],
                                   leaderboard=leaderboard,
                                   exhibition=exhibition_data,
                                   expeditions=active_expeditions)

@@ -2,8 +2,85 @@
 
 {% block title %}酒馆 - 钓鱼插件{% endblock %}
 
+{% block extra_css %}
+<style>
+.tavern-board-toolbar {
+    gap: 0.85rem;
+}
+
+.tavern-post-card {
+    border: 1px solid rgba(13, 110, 253, 0.12);
+}
+
+.tavern-post-content,
+.tavern-reply-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.tavern-section-badge {
+    letter-spacing: 0.02em;
+}
+
+.reply-thread-card {
+    border: 1px solid rgba(108, 117, 125, 0.2);
+    border-radius: 0.75rem;
+    background: rgba(248, 249, 250, 0.9);
+    padding: 0.9rem;
+}
+
+.reply-thread-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.reply-thread-item + .reply-thread-item {
+    border-top: 1px dashed rgba(108, 117, 125, 0.25);
+    padding-top: 0.75rem;
+}
+
+.reply-thread-editor {
+    margin-top: 0.9rem;
+}
+
+.tavern-sort-panel {
+    min-width: min(260px, 100%);
+}
+
+.tavern-category-switch.btn-group > .btn {
+    min-width: 5.5rem;
+}
+
+.tavern-compose-hint {
+    display: flex;
+    align-items: center;
+    min-height: calc(2.375rem + 2px);
+    margin-top: 2rem;
+    padding: 0 0 0 0.85rem;
+    color: #116d6e;
+    font-weight: 600;
+}
+
+.tavern-title-badge {
+    background: rgba(21, 166, 166, 0.12);
+    color: #116d6e;
+    border: 1px solid rgba(21, 166, 166, 0.22);
+}
+</style>
+{% endblock %}
+
 {% block content %}
 {% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
+{% macro tavern_category_badge(category) -%}
+    {% if category == "demand" -%}
+        <span class="badge bg-warning text-dark tavern-section-badge">需求</span>
+    {%- elif category == "feedback" -%}
+        <span class="badge bg-danger tavern-section-badge">反馈</span>
+    {%- else -%}
+        <span class="badge bg-info text-dark tavern-section-badge">闲聊</span>
+    {%- endif %}
+{%- endmacro %}
 <div class="row mb-4" id="pageHeaderRow">
     <div class="col-12">
         <h2><i class="fas fa-beer"></i> 渔夫酒馆</h2>
@@ -598,11 +675,7 @@
                         type="button" data-bs-toggle="collapse" data-bs-target="#messageboardCollapse">
                     <h5 class="mb-0">
                         <i class="fas fa-comments"></i> 留言板
-                        {% if messages %}
-                        <span class="badge bg-light text-primary ms-2">{{ messages|length }} 条留言</span>
-                        {% else %}
-                        <span class="badge bg-secondary ms-2">0 条留言</span>
-                        {% endif %}
+                        <span class="badge bg-light text-primary ms-2" id="messageBoardCountBadge">{{ filtered_message_count }} / {{ message_counts['all'] }} 条主题</span>
                         <i class="fas fa-chevron-down ms-2"></i>
                     </h5>
                 </button>
@@ -613,8 +686,25 @@
                 <div class="card bg-light mb-4">
                     <div class="card-body">
                         <h6 class="mb-3"><i class="fas fa-pen"></i> 发表留言</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="messageCategory">发到分区</label>
+                                <select id="messageCategory" class="form-select">
+                                    {% for option in board_categories %}
+                                        {% if option.key != "all" %}
+                                        <option value="{{ option.key }}" {% if option.key == current_category %}selected{% endif %}>
+                                            {{ option.label }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="tavern-compose-hint" id="messageCategoryHint">随便聊聊！</div>
+                            </div>
+                        </div>
                         <textarea id="messageInput" class="form-control mb-3" rows="3"
-                                  placeholder="分享你的钓鱼故事、空军经历或是吐槽..." maxlength="500"></textarea>
+                                  placeholder="分享你的钓鱼故事、发布求助需求，或者写下意见与 BUG 反馈..." maxlength="500"></textarea>
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">
                                 <span id="charCount">0</span>/500 字
@@ -626,24 +716,55 @@
                     </div>
                 </div>
 
+                <div class="filter-strip tavern-board-toolbar mb-4">
+                    <div class="btn-group tavern-category-switch" role="group" aria-label="留言板分区筛选">
+                        {% for option in board_categories %}
+                        <button type="button"
+                                class="btn btn-sm {% if option.key == current_category %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
+                                data-category-filter="{{ option.key }}">
+                            {{ option.label }}
+                            <span class="badge {% if option.key == current_category %}bg-light text-primary{% else %}bg-secondary{% endif %} ms-1">{{ option.count }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <div class="tavern-sort-panel">
+                        <label class="form-label mb-1" for="boardSortSelect">排序方式</label>
+                        <select class="form-select form-select-sm" id="boardSortSelect">
+                            {% for option in sort_options %}
+                            <option value="{{ option.key }}" {% if option.key == current_sort %}selected{% endif %}>{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
                 <!-- 留言列表 -->
                 <div id="messageList">
                     {% if messages %}
                         {% for msg in messages %}
-                        <div class="card mb-3 message-item" data-message-id="{{ msg.id }}">
+                        <div class="card mb-3 message-item tavern-post-card"
+                             data-message-id="{{ msg.id }}"
+                             data-category="{{ msg.category }}"
+                             data-like-count="{{ msg.like_count }}"
+                             data-updated-at="{{ msg.updated_at }}">
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                                     <div>
-                                        <strong class="text-primary">
-                                            <i class="fas fa-user-circle"></i>
-                                            {{ msg.username }}
-                                            {% if msg.user_id == tavern_admin_user_id %}
-                                            <span class="badge bg-danger ms-1">管理员</span>
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            {% if msg.title_name and msg.title_name != '无称号' %}
+                                            <span class="badge tavern-title-badge">{{ msg.title_name }}</span>
                                             {% endif %}
-                                        </strong>
-                                        <small class="text-muted ms-2">
+                                            <strong class="text-primary">
+                                                <i class="fas fa-user-circle"></i>
+                                                {{ msg.username }}
+                                            </strong>
+                                            {{ tavern_category_badge(msg.category) }}
+                                            {% if msg.user_id == tavern_admin_user_id %}
+                                            <span class="badge bg-danger">管理员</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="small text-muted mt-1">
                                             <i class="fas fa-clock"></i> {{ msg.timestamp }}
-                                        </small>
+                                        </div>
                                     </div>
                                     {% if msg.user_id == current_user_id or is_admin %}
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteMessage('{{ msg.id }}')">
@@ -651,41 +772,84 @@
                                     </button>
                                     {% endif %}
                                 </div>
-                                <p class="mb-0" style="white-space: pre-wrap;">{{ msg.content }}</p>
+                                <p class="mb-3 tavern-post-content">{{ msg.content }}</p>
+                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                    <button class="btn btn-sm {% if msg.liked_by_current_user %}btn-danger{% else %}btn-outline-danger{% endif %}"
+                                            onclick="toggleMessageLike('{{ msg.id }}')">
+                                        <i class="fas fa-heart"></i> 点赞 {{ msg.like_count }}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            type="button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#reply-thread-{{ msg.id }}"
+                                            aria-expanded="false"
+                                            aria-controls="reply-thread-{{ msg.id }}">
+                                        <i class="fas fa-code-branch"></i> 楼中楼 {{ msg.reply_count }}
+                                    </button>
+                                </div>
+                                <div class="collapse mt-3" id="reply-thread-{{ msg.id }}">
+                                    <div class="reply-thread-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <strong><i class="fas fa-stream"></i> 楼中楼讨论</strong>
+                                            <span class="badge bg-secondary">{{ msg.reply_count }} 条回复</span>
+                                        </div>
+                                        {% if msg.replies %}
+                                        <div class="reply-thread-list">
+                                            {% for reply in msg.replies %}
+                                            <div class="reply-thread-item">
+                                                <div class="d-flex justify-content-between align-items-start gap-3">
+                                                    <div>
+                                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                                            {% if reply.title_name and reply.title_name != '无称号' %}
+                                                            <span class="badge tavern-title-badge">{{ reply.title_name }}</span>
+                                                            {% endif %}
+                                                            <strong>{{ reply.username }}</strong>
+                                                            {% if reply.user_id == tavern_admin_user_id %}
+                                                            <span class="badge bg-danger">管理员</span>
+                                                            {% endif %}
+                                                            <span class="small text-muted">{{ reply.timestamp }}</span>
+                                                        </div>
+                                                        <div class="mt-1 tavern-reply-content">{{ reply.content }}</div>
+                                                    </div>
+                                                    {% if reply.user_id == current_user_id or is_admin %}
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            onclick="deleteMessageReply('{{ msg.id }}', '{{ reply.id }}')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-light border text-center mb-0">
+                                            <i class="fas fa-inbox"></i> 这里还没有楼中楼回复。
+                                        </div>
+                                        {% endif %}
+                                        <div class="reply-thread-editor">
+                                            <textarea id="replyInput-{{ msg.id }}"
+                                                      class="form-control form-control-sm tavern-reply-input"
+                                                      rows="2"
+                                                      maxlength="500"
+                                                      data-message-id="{{ msg.id }}"
+                                                      placeholder="回复楼主……"></textarea>
+                                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                                <span></span>
+                                                <button class="btn btn-sm btn-primary" onclick="postMessageReply('{{ msg.id }}')">
+                                                    <i class="fas fa-reply"></i> 回复
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         {% endfor %}
-                    {% else %}
-                        <div class="alert alert-info text-center">
-                            <i class="fas fa-inbox"></i> 还没有留言，快来抢沙发吧！
-                        </div>
                     {% endif %}
+                    <div class="alert alert-info text-center {% if messages %}d-none{% endif %}" id="messageEmptyState">
+                        <i class="fas fa-inbox"></i> 当前分区还没有主题，快来开第一帖吧！
+                    </div>
                 </div>
-
-                <!-- 分页 -->
-                {% if total_pages > 1 %}
-                <nav aria-label="留言分页">
-                    <ul class="pagination justify-content-center">
-                        {% if page > 1 %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page - 1 }}">上一页</a>
-                        </li>
-                        {% endif %}
-
-                        {% for p in range(1, total_pages + 1) %}
-                        <li class="page-item {% if p == page %}active{% endif %}">
-                            <a class="page-link" href="?page={{ p }}">{{ p }}</a>
-                        </li>
-                        {% endfor %}
-
-                        {% if page < total_pages %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page + 1 }}">下一页</a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-                {% endif %}
             </div>
             </div>
         </div>
@@ -722,20 +886,125 @@
 
 {% block extra_js %}
 <script>
-// 字符计数
-document.getElementById('messageInput').addEventListener('input', function() {
-    const count = this.value.length;
-    document.getElementById('charCount').textContent = count;
+const messageInput = document.getElementById('messageInput');
+const messageCategorySelect = document.getElementById('messageCategory');
+const messageList = document.getElementById('messageList');
+const boardSortSelect = document.getElementById('boardSortSelect');
+const boardCountBadge = document.getElementById('messageBoardCountBadge');
+const boardEmptyState = document.getElementById('messageEmptyState');
+const messageCategoryHint = document.getElementById('messageCategoryHint');
+const categoryFilterButtons = Array.from(document.querySelectorAll('[data-category-filter]'));
+const boardState = {
+    category: '{{ current_category }}',
+    sort: '{{ current_sort }}',
+};
+const categoryComposeHints = {
+    casual: '随便聊聊！',
+    demand: '发布需求！',
+    feedback: '我有话说！',
+};
 
-    if (count > 500) {
-        this.value = this.value.substring(0, 500);
-        document.getElementById('charCount').textContent = 500;
+function updateComposeCategoryHint() {
+    if (!messageCategoryHint) {
+        return;
     }
-});
+    const category = messageCategorySelect ? messageCategorySelect.value : 'casual';
+    messageCategoryHint.textContent = categoryComposeHints[category] || categoryComposeHints.casual;
+}
+
+function getMessageCards() {
+    return Array.from(document.querySelectorAll('.message-item'));
+}
+
+function parseSortTimestamp(value) {
+    const parsed = Date.parse(value || '');
+    return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function syncBoardUrlState() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('category', boardState.category);
+    url.searchParams.set('sort', boardState.sort);
+    url.searchParams.delete('page');
+    window.history.replaceState({}, '', url);
+}
+
+function updateCategoryFilterButtons() {
+    categoryFilterButtons.forEach((button) => {
+        const active = button.dataset.categoryFilter === boardState.category;
+        button.classList.toggle('active', active);
+        button.classList.toggle('btn-primary', active);
+        button.classList.toggle('btn-outline-secondary', !active);
+        const badge = button.querySelector('.badge');
+        if (badge) {
+            badge.classList.toggle('bg-light', active);
+            badge.classList.toggle('text-primary', active);
+            badge.classList.toggle('bg-secondary', !active);
+        }
+    });
+}
+
+function applyBoardState() {
+    if (!messageList) {
+        return;
+    }
+
+    const cards = getMessageCards();
+    cards.sort((left, right) => {
+        if (boardState.sort === 'likes') {
+            const likeDiff = Number(right.dataset.likeCount || 0) - Number(left.dataset.likeCount || 0);
+            if (likeDiff !== 0) {
+                return likeDiff;
+            }
+        }
+        return parseSortTimestamp(right.dataset.updatedAt) - parseSortTimestamp(left.dataset.updatedAt);
+    });
+
+    cards.forEach((card) => messageList.appendChild(card));
+
+    let visibleCount = 0;
+    cards.forEach((card) => {
+        const visible = boardState.category === 'all' || card.dataset.category === boardState.category;
+        card.classList.toggle('d-none', !visible);
+        if (visible) {
+            visibleCount += 1;
+        }
+    });
+
+    if (boardCountBadge) {
+        boardCountBadge.textContent = `${visibleCount} / ${cards.length} 条主题`;
+    }
+    if (boardEmptyState) {
+        boardEmptyState.classList.toggle('d-none', visibleCount !== 0);
+    }
+    if (boardSortSelect) {
+        boardSortSelect.value = boardState.sort;
+    }
+
+    updateCategoryFilterButtons();
+    syncBoardUrlState();
+}
+
+if (messageInput) {
+    messageInput.addEventListener('input', function() {
+        const count = this.value.length;
+        document.getElementById('charCount').textContent = count;
+
+        if (count > 500) {
+            this.value = this.value.substring(0, 500);
+            document.getElementById('charCount').textContent = 500;
+        }
+    });
+}
+
+if (messageCategorySelect) {
+    messageCategorySelect.addEventListener('change', updateComposeCategoryHint);
+}
 
 // 发表留言
 async function postTavernMessage() {
-    const content = document.getElementById('messageInput').value.trim();
+    const content = messageInput.value.trim();
+    const category = messageCategorySelect ? messageCategorySelect.value : 'casual';
 
     if (!content) {
         showToast('请输入留言内容', 'error');
@@ -751,7 +1020,7 @@ async function postTavernMessage() {
         const response = await fetch('{{ url_for("player_bp.api_post_message") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ content: content })
+            body: JSON.stringify({ content: content, category: category })
         });
 
         const data = await response.json();
@@ -761,6 +1030,59 @@ async function postTavernMessage() {
             location.reload();
         } else {
             showToast(data.message, 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+async function toggleMessageLike(messageId) {
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_toggle_message_like") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message_id: messageId })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            await showToast(data.message || '操作成功', 'success');
+            location.reload();
+        } else {
+            showToast(data.message || '操作失败', 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+async function postMessageReply(messageId) {
+    const input = document.getElementById(`replyInput-${messageId}`);
+    const content = input ? input.value.trim() : '';
+
+    if (!content) {
+        showToast('请输入回复内容', 'error');
+        return;
+    }
+
+    if (content.length > 500) {
+        showToast('回复内容不能超过500字', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_reply_message") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message_id: messageId, content: content })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            await showToast(data.message || '回复已发送', 'success');
+            location.reload();
+        } else {
+            showToast(data.message || '回复失败', 'error');
         }
     } catch (error) {
         showToast('网络错误，请稍后重试', 'error');
@@ -787,16 +1109,38 @@ async function deleteMessage(messageId) {
         const data = await response.json();
 
         if (data.success) {
-            showToast('留言已删除', 'success');
-            // 移除元素
-            const element = document.querySelector(`[data-message-id="${messageId}"]`);
-            if (element) {
-                element.style.transition = 'opacity 0.3s';
-                element.style.opacity = '0';
-                setTimeout(() => element.remove(), 300);
-            }
+            await showToast('留言已删除', 'success');
+            location.reload();
         } else {
             showToast(data.message, 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+async function deleteMessageReply(messageId, replyId) {
+    if (!await webuiConfirm('确认删除这条楼中楼回复吗？', {
+        title: '删除回复',
+        confirmText: '删除',
+        confirmClass: 'btn-danger'
+    })) {
+        return;
+    }
+
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_delete_message_reply") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message_id: messageId, reply_id: replyId })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            await showToast('回复已删除', 'success');
+            location.reload();
+        } else {
+            showToast(data.message || '删除失败', 'error');
         }
     } catch (error) {
         showToast('网络错误，请稍后重试', 'error');
@@ -834,11 +1178,38 @@ async function saveAnnouncement() {
 }
 
 // 回车发送（Ctrl+Enter）
-document.getElementById('messageInput').addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 'Enter') {
-        postTavernMessage();
-    }
+if (messageInput) {
+    messageInput.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            postTavernMessage();
+        }
+    });
+}
+
+document.querySelectorAll('.tavern-reply-input').forEach((input) => {
+    input.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            postMessageReply(this.dataset.messageId);
+        }
+    });
 });
+
+categoryFilterButtons.forEach((button) => {
+    button.addEventListener('click', function() {
+        boardState.category = this.dataset.categoryFilter || 'all';
+        applyBoardState();
+    });
+});
+
+if (boardSortSelect) {
+    boardSortSelect.addEventListener('change', function() {
+        boardState.sort = this.value || 'latest';
+        applyBoardState();
+    });
+}
+
+applyBoardState();
+updateComposeCategoryHint();
 
 // 刷新排行榜
 async function refreshLeaderboard() {
