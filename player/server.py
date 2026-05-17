@@ -3567,3 +3567,118 @@ async def fishing():
     return await render_template("fishing_zones.html",
                                   current_zone=current_zone,
                                   all_zones=all_zones)
+
+
+# ==================== 玄幻渡劫 V2 ====================
+
+@player_bp.route("/tribulation")
+@login_required
+async def tribulation_page():
+    """渡劫主页：展示个人修行 + 公示中的渡劫。"""
+    user_id = session["user_id"]
+    cultivation_service = current_app.config.get("CULTIVATION_SERVICE")
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not cultivation_service or not tribulation_service:
+        return "玄幻渡劫服务未启用。", 503
+
+    summary = cultivation_service.get_status_summary(user_id)
+    eligible_items = tribulation_service.list_eligible_items(user_id)
+    active_events = tribulation_service.list_active_events(limit=20)
+    own_active = tribulation_service.repo.get_active_event_for_user(user_id)
+    return await render_template(
+        "tribulation.html",
+        summary=summary,
+        eligible_items=eligible_items,
+        active_events=active_events,
+        own_active=own_active,
+    )
+
+
+@player_bp.route("/api/tribulation/status")
+@login_required
+async def tribulation_api_status():
+    user_id = session["user_id"]
+    cultivation_service = current_app.config.get("CULTIVATION_SERVICE")
+    if not cultivation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify({"success": True, "summary": cultivation_service.get_status_summary(user_id)})
+
+
+@player_bp.route("/api/tribulation/items")
+@login_required
+async def tribulation_api_items():
+    user_id = session["user_id"]
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not tribulation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify({"success": True, "items": tribulation_service.list_eligible_items(user_id)})
+
+
+@player_bp.route("/api/tribulation/preview", methods=["POST"])
+@login_required
+async def tribulation_api_preview():
+    user_id = session["user_id"]
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not tribulation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    items = payload.get("items") or []
+    result = tribulation_service.preview(user_id, items)
+    return jsonify(result)
+
+
+@player_bp.route("/api/tribulation/start", methods=["POST"])
+@login_required
+async def tribulation_api_start():
+    user_id = session["user_id"]
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not tribulation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    mode = payload.get("mode", "immediate")
+    items = payload.get("items") or []
+    result = tribulation_service.start(user_id, mode, items)
+    return jsonify(result)
+
+
+@player_bp.route("/api/tribulation/join", methods=["POST"])
+@login_required
+async def tribulation_api_join():
+    user_id = session["user_id"]
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not tribulation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    try:
+        event_id = int(payload.get("event_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "event_id 非法"}), 400
+    return jsonify(tribulation_service.join(user_id, event_id))
+
+
+@player_bp.route("/api/tribulation/active")
+@login_required
+async def tribulation_api_active():
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not tribulation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify({"success": True, "events": tribulation_service.list_active_events(limit=50)})
+
+
+@player_bp.route("/api/tribulation/event/<int:event_id>")
+@login_required
+async def tribulation_api_event(event_id: int):
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not tribulation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(tribulation_service.get_event_view(event_id))
+
+
+@player_bp.route("/api/tribulation/reset_realm", methods=["POST"])
+@login_required
+async def tribulation_api_reset_realm():
+    user_id = session["user_id"]
+    tribulation_service = current_app.config.get("TRIBULATION_SERVICE")
+    if not tribulation_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(tribulation_service.reset_realm(user_id))

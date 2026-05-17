@@ -38,6 +38,8 @@ from .core.services.aquarium_income_service import AquariumIncomeService
 from .core.services.aquarium_quips_service import AquariumQuipsService
 
 from .core.database.migration import run_migrations
+from .core.database.sqlite_utils import close_thread_local_connection
+from .core.database.wal_maintenance import WalMaintenanceService
 from .utils import (
     _is_port_available,
     kill_processes_on_port,
@@ -55,11 +57,12 @@ from .handlers import (
     admin_handlers, 
     common_handlers, 
     inventory_handlers, 
-    fishing_handlers, 
-    market_handlers, 
-    social_handlers, 
-    gacha_handlers, 
-    aquarium_handlers, 
+    fishing_handlers,
+    market_handlers,
+    social_handlers,
+    gacha_handlers,
+    aquarium_handlers,
+    tribulation_handlers,
 )
 from .handlers.fishing_handlers import FishingHandlers
 from .handlers.exchange_handlers import ExchangeHandlers
@@ -243,6 +246,7 @@ class FishingPlugin(Star):
         plugin_root_dir = os.path.dirname(__file__)
         migrations_path = os.path.join(plugin_root_dir, "core", "database", "migrations")
         run_migrations(db_path, migrations_path)
+        self.wal_maintenance_service = WalMaintenanceService(db_path)
 
         # --- 2. 组合根：实例化所有仓储层 ---
         self.user_repo = SqliteUserRepository(db_path)
@@ -256,6 +260,9 @@ class FishingPlugin(Star):
         self.buff_repo = SqliteUserBuffRepository(db_path)
         self.exchange_repo = SqliteExchangeRepository(db_path)
         self.aquarium_income_repo = SqliteAquariumIncomeRepository(db_path)
+        # 玄幻渡劫 V2 仓储
+        from .core.repositories.sqlite_tribulation_repo import SqliteTribulationRepository
+        self.tribulation_repo = SqliteTribulationRepository(db_path)
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
         # 3.1 核心服务必须在效果管理器之前实例化，以解决依赖问题
@@ -302,7 +309,11 @@ class FishingPlugin(Star):
         
         # 将科考服务注入到库存服务
         self.inventory_service.expedition_service = self.expedition_service
-        
+
+        # 玄幻渡劫 V2：修行服务（在 FishingService 之前实例化以便注入）
+        from .core.services.cultivation_service import CultivationService
+        self.cultivation_service = CultivationService(self.tribulation_repo)
+
         self.fishing_service = FishingService(
             self.user_repo,
             self.inventory_repo,
@@ -312,7 +323,21 @@ class FishingPlugin(Star):
             self.fishing_zone_service,
             self.game_config,
             self.expedition_service,  # 传递科考服务
+            self.cultivation_service,  # 传递修行服务（玄幻渡劫 V2）
         )
+
+        # 玄幻渡劫 V2：渡劫核心服务
+        from .core.services.tribulation_service import TribulationService
+        self.tribulation_service = TribulationService(
+            tribulation_repo=self.tribulation_repo,
+            cultivation_service=self.cultivation_service,
+            inventory_repo=self.inventory_repo,
+            item_template_repo=self.item_template_repo,
+            user_repo=self.user_repo,
+            game_config=self.game_config,
+        )
+        # 注入到 fishing_service 以便心跳调用 tick
+        self.fishing_service.tribulation_service = self.tribulation_service
         
         # 导入并初始化水族箱服务
         from .core.services.aquarium_service import AquariumService
@@ -380,6 +405,13 @@ class FishingPlugin(Star):
         self.achievement_service.start_achievement_check_task()
         self.exchange_service.start_daily_price_update_task() # 启动交易所后台任务
         self.aquarium_quips_service.start_daily_refresh_task()  # 启动水族箱短评每日刷新任务
+        self.wal_maintenance_service.start()
+
+        # 玄幻渡劫 V2：启动时扫描漏结算事件
+        try:
+            self.tribulation_service.scan_overdue_on_startup()
+        except Exception as exc:
+            logger.warning(f"[tribulation] 启动扫描失败: {exc}")
         
         # --- 5. 初始化核心游戏数据 ---
         data_setup_service = DataSetupService(
@@ -1176,6 +1208,68 @@ class FishingPlugin(Star):
         async for r in admin_handlers.replenish_fish_pools(self, event):
             yield r
 
+    # =========== 玄幻渡劫 V2 ==========
+
+    @filter.command("修行", alias={"我的修行", "我的境界"})
+    async def cultivation_status(self, event: AstrMessageEvent):
+        """查看修行状态"""
+        async for r in tribulation_handlers.show_cultivation(self, event):
+            yield r
+
+    @filter.command("渡劫品", alias={"渡劫材料"})
+    async def cultivation_items(self, event: AstrMessageEvent):
+        """列出可用的渡劫品"""
+        async for r in tribulation_handlers.list_eligible_items(self, event):
+            yield r
+
+    @filter.command("渡劫预览")
+    async def cultivation_preview(self, event: AstrMessageEvent):
+        """预览本次渡劫成功率与品级冲击档"""
+        async for r in tribulation_handlers.preview_tribulation(self, event):
+            yield r
+
+    @filter.command("立即渡劫")
+    async def cultivation_start_immediate(self, event: AstrMessageEvent):
+        """立即发起渡劫，下一次每日刷新时点结算"""
+        async for r in tribulation_handlers.start_immediate(self, event):
+            yield r
+
+    @filter.command("预约渡劫")
+    async def cultivation_start_reserved(self, event: AstrMessageEvent):
+        """预约渡劫，次日刷新点结算"""
+        async for r in tribulation_handlers.start_reserved(self, event):
+            yield r
+
+    @filter.command("渡劫列表", alias={"公示中的渡劫"})
+    async def cultivation_active_list(self, event: AstrMessageEvent):
+        """查看当前公示中的渡劫"""
+        async for r in tribulation_handlers.list_active(self, event):
+            yield r
+
+    @filter.command("渡劫详情")
+    async def cultivation_event_view(self, event: AstrMessageEvent):
+        """查看某个渡劫事件的详情"""
+        async for r in tribulation_handlers.show_event(self, event):
+            yield r
+
+    @filter.command("参与渡劫", alias={"护法", "观道"})
+    async def cultivation_join(self, event: AstrMessageEvent):
+        """参与他人渡劫，系统按境界关系自动分配护法/观道"""
+        async for r in tribulation_handlers.join_tribulation(self, event):
+            yield r
+
+    @filter.command("境界重修")
+    async def cultivation_reset(self, event: AstrMessageEvent):
+        """从最低品级首次出现的境界开始重修"""
+        async for r in tribulation_handlers.reset_realm(self, event):
+            yield r
+
+    @filter.command("渡劫帮助", alias={"修行帮助"})
+    async def cultivation_help(self, event: AstrMessageEvent):
+        """玄幻渡劫玩法帮助"""
+        async for r in tribulation_handlers.tribulation_help(self, event):
+            yield r
+
     async def _check_port_active(self):
         """验证端口是否实际已激活"""
         try:
@@ -1207,7 +1301,54 @@ class FishingPlugin(Star):
             "钓鱼后台管理",
         )
 
+        self.wal_maintenance_service.stop()
+        self._close_sqlite_connections()
+        try:
+            self.wal_maintenance_service.force_truncate_checkpoint()
+        except Exception as e:
+            logger.warning(f"插件终止时执行 SQLite WAL 截断 checkpoint 失败: {e}")
+
         logger.info("钓鱼插件已成功终止。")
+
+    def _close_sqlite_connections(self):
+        closed_count = 0
+        repo_attrs = (
+            "user_repo",
+            "item_template_repo",
+            "inventory_repo",
+            "gacha_repo",
+            "market_repo",
+            "shop_repo",
+            "log_repo",
+            "achievement_repo",
+            "buff_repo",
+            "exchange_repo",
+            "aquarium_income_repo",
+        )
+
+        for attr_name in repo_attrs:
+            repo = getattr(self, attr_name, None)
+            if repo is None:
+                continue
+
+            for manager_attr in ("_connection_manager", "db_manager"):
+                manager = getattr(repo, manager_attr, None)
+                if manager and hasattr(manager, "close_connection"):
+                    try:
+                        manager.close_connection()
+                        closed_count += 1
+                    except Exception as e:
+                        logger.warning(f"关闭 {attr_name}.{manager_attr} 连接失败: {e}")
+
+            local_obj = getattr(repo, "_local", None)
+            if local_obj is not None:
+                try:
+                    if close_thread_local_connection(local_obj):
+                        closed_count += 1
+                except Exception as e:
+                    logger.warning(f"关闭 {attr_name} 线程本地 SQLite 连接失败: {e}")
+
+        logger.info(f"插件终止时已关闭 {closed_count} 个 SQLite 连接")
 
     async def _shutdown_server_task(
         self,
@@ -1414,6 +1555,8 @@ class FishingPlugin(Star):
                 "aquarium_income_service": self.aquarium_income_service,
                 "aquarium_quips_service": self.aquarium_quips_service,
                 "expedition_service": self.expedition_service,
+                "cultivation_service": self.cultivation_service,
+                "tribulation_service": self.tribulation_service,
             }
 
             app = create_player_app(

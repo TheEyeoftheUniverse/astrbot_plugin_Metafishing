@@ -429,5 +429,31 @@
         "description": "商品合并时间窗口（分钟）"
       }
     }
+  },
+  "tribulation": {
+    "description": "玄幻渡劫 V2 配置",
+    "type": "object",
+    "items": {
+      "enabled": {
+        "description": "是否启用玄幻渡劫玩法",
+        "type": "bool",
+        "default": true
+      },
+      "cultivation_zone_id": {
+        "description": "修行区域 ID（在该区域钓鱼可累积修为）",
+        "type": "int",
+        "default": 6
+      },
+      "broadcast_enabled": {
+        "description": "是否广播渡劫公示与结算",
+        "type": "bool",
+        "default": true
+      },
+      "broadcast_target": {
+        "description": "广播目标（与通知器默认目标一致）",
+        "type": "string",
+        "default": "group"
+      }
+    }
   }
 }

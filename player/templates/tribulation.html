@@ -1,0 +1,220 @@
+{% extends "layout.html" %}
+
+{% block title %}玄幻渡劫 - MetaFishing！{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-0">
+            <i class="fas fa-yin-yang"></i> 玄幻渡劫
+        </h2>
+        <p class="text-muted mt-2">区域6 钓鱼累积修为；修满后投入渡劫品发起渡劫。</p>
+    </div>
+</div>
+
+<!-- 修行状态 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-mountain"></i> 修行状态
+            </div>
+            <div class="card-body">
+                {% set realms = {'lianqi':'炼气','zhuji':'筑基','jindan':'金丹','yuanying':'元婴','huashen':'化神'} %}
+                {% set qualities = {'fanxue':'凡蜕','lingyun':'灵蕴','zhenyi':'真一','tiancheng':'天成'} %}
+                <h4 class="mb-2">
+                    {% if summary.current_realm_quality %}{{ qualities.get(summary.current_realm_quality, '') }}{% endif %}{{ realms.get(summary.current_realm, summary.current_realm) }}
+                    {% if summary.lowest_quality and summary.lowest_quality != summary.current_realm_quality %}
+                    <small class="text-muted">（对外展示：{{ qualities.get(summary.lowest_quality, '') }}{{ realms.get(summary.current_realm, '') }}）</small>
+                    {% endif %}
+                </h4>
+                <div class="progress mb-3" style="height: 24px;">
+                    {% set ratio = (summary.accumulated_xiuwei / summary.xiuwei_cap * 100) if summary.xiuwei_cap > 0 else 0 %}
+                    <div class="progress-bar progress-bar-striped {% if summary.is_full %}bg-success{% else %}bg-info{% endif %}"
+                         role="progressbar"
+                         style="width: {{ ratio }}%;">
+                        {{ summary.accumulated_xiuwei }} / {{ summary.xiuwei_cap }} 修为
+                        {% if summary.is_full %}（已圆满，可渡劫）{% endif %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>劫痕未消：</strong>{{ summary.consecutive_failures }} 层
+                    </div>
+                    <div class="col-md-4">
+                        <strong>今日护法奖励：</strong>{{ summary.daily_guard_reward_count }} / 3
+                    </div>
+                    <div class="col-md-4">
+                        <strong>今日观道奖励：</strong>{{ summary.daily_observer_reward_count }} / 3
+                    </div>
+                </div>
+                {% if summary.tiancheng_protection %}
+                <hr>
+                <strong>天成执念：</strong>
+                <ul class="mb-0">
+                    {% for r, n in summary.tiancheng_protection.items() %}
+                        {% if n > 0 %}<li>{{ realms.get(r, r) }}：{{ n }} 层（+{{ n * 5 }}% 天成命中）</li>{% endif %}
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if summary.realm_history %}
+                <hr>
+                <strong>已成就境界：</strong>
+                {% for r, q in summary.realm_history.items() %}
+                    <span class="badge bg-secondary me-1">{{ qualities.get(q, q) }}{{ realms.get(r, r) }}</span>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 我的渡劫 -->
+{% if own_active %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-warning">
+            <i class="fas fa-bolt"></i>
+            您当前已发起渡劫事件 #{{ own_active.event_id }}（{{ own_active.status }}），将于 {{ own_active.scheduled_at }} 结算。
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 发起渡劫 -->
+{% if not own_active and summary.is_full %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning">
+                <i class="fas fa-fire"></i> 发起渡劫
+            </div>
+            <div class="card-body">
+                {% if eligible_items %}
+                <p class="text-muted">勾选要投入的渡劫品（rarity ≥ 5）：</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>渡劫品</th><th>星级</th><th>持有</th><th>投入</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for it in eligible_items %}
+                        <tr>
+                            <td>{{ it.name }}</td>
+                            <td>{{ it.rarity }}★</td>
+                            <td>{{ it.quantity }}</td>
+                            <td><input type="number" min="0" max="{{ it.quantity }}" value="0" data-bait-id="{{ it.bait_id }}" class="form-control form-control-sm tribulation-input" style="width:90px;"></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button id="btn-preview" class="btn btn-info btn-sm">预览成功率</button>
+                <button id="btn-start-immediate" class="btn btn-warning btn-sm">立即渡劫</button>
+                <button id="btn-start-reserved" class="btn btn-secondary btn-sm">预约渡劫</button>
+                <div id="preview-result" class="mt-3"></div>
+                {% else %}
+                <p class="text-muted mb-0">暂无可作为渡劫品的鱼饵（需 rarity ≥ 5）。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% elif not summary.is_full %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-secondary">修为未圆满，无法渡劫。请前往区域 6 钓鱼。</div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 公示中的渡劫 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-broadcast-tower"></i> 公示中的渡劫</div>
+            <div class="card-body">
+                {% if active_events %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>#</th><th>渡劫者</th><th>目标境界</th><th>护法</th><th>观道</th><th>结算时间</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for e in active_events %}
+                        <tr>
+                            <td>#{{ e.event_id }}</td>
+                            <td>{{ e.host_nickname }}</td>
+                            <td>{{ e.target_realm_display }}</td>
+                            <td>{{ e.guard_count }}</td>
+                            <td>{{ e.observer_count }}</td>
+                            <td>{{ e.scheduled_at }}</td>
+                            <td><button class="btn btn-sm btn-primary tribulation-join-btn" data-event-id="{{ e.event_id }}">参与</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted mb-0">当前无公示中的渡劫。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function collectItems() {
+    const out = [];
+    document.querySelectorAll(".tribulation-input").forEach(el => {
+        const c = parseInt(el.value || "0", 10);
+        if (c > 0) out.push({bait_id: parseInt(el.dataset.baitId, 10), count: c});
+    });
+    return out;
+}
+
+async function postJSON(url, body) {
+    const resp = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+    });
+    return await resp.json();
+}
+
+document.getElementById("btn-preview")?.addEventListener("click", async () => {
+    const items = collectItems();
+    if (items.length === 0) { alert("请至少投入一种渡劫品"); return; }
+    const res = await postJSON("/player/api/tribulation/preview", {items});
+    const div = document.getElementById("preview-result");
+    if (!res.success) { div.innerHTML = `<div class="alert alert-danger">${res.message}</div>`; return; }
+    div.innerHTML = `
+      <div class="alert alert-info">
+        <strong>目标境界：</strong>${res.target_realm_display}<br>
+        <strong>总权重：</strong>${res.total_weight}（装备 +${res.equip_weight_bonus}）<br>
+        <strong>可冲击：</strong>${res.candidate_quality_display}（命中率 ${res.candidate_hit_rate}%）<br>
+        <strong>天成执念：</strong>${res.tiancheng_protection} 层<br>
+        <strong>渡劫品/装备/劫痕加成：</strong>+${res.items_bonus}% / +${res.equip_success_bonus}% / +${res.buff_bonus.toFixed(0)}%<br>
+        <strong>预估最终成功率：</strong>${res.final_success_rate}%（不含护法）
+      </div>`;
+});
+
+async function startTribulation(mode) {
+    const items = collectItems();
+    if (items.length === 0) { alert("请至少投入一种渡劫品"); return; }
+    if (!confirm(`确认以 ${mode === "immediate" ? "立即" : "预约"} 方式发起渡劫？发起即扣除材料且不可撤回。`)) return;
+    const res = await postJSON("/player/api/tribulation/start", {mode, items});
+    if (!res.success) { alert(res.message || "失败"); return; }
+    alert(`已发起渡劫 #${res.event_id}，将于 ${res.scheduled_at} 结算`);
+    location.reload();
+}
+
+document.getElementById("btn-start-immediate")?.addEventListener("click", () => startTribulation("immediate"));
+document.getElementById("btn-start-reserved")?.addEventListener("click", () => startTribulation("reserved"));
+
+document.querySelectorAll(".tribulation-join-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+        const eventId = parseInt(btn.dataset.eventId, 10);
+        const res = await postJSON("/player/api/tribulation/join", {event_id: eventId});
+        alert(res.message || (res.success ? "已加入" : "失败"));
+        if (res.success) location.reload();
+    });
+});
+</script>
+{% endblock %}

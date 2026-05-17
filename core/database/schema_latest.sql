@@ -596,3 +596,73 @@ CREATE INDEX idx_aquarium_income_pending_user_unclaimed ON aquarium_income_pendi
 
 -- index: idx_aquarium_income_pending_window_date
 CREATE INDEX idx_aquarium_income_pending_window_date ON aquarium_income_pending(window_date);
+
+-- table: user_cultivation （玄幻渡劫 V2）
+CREATE TABLE user_cultivation (
+            user_id                       TEXT PRIMARY KEY,
+            current_realm                 TEXT NOT NULL DEFAULT 'lianqi',
+            current_realm_quality         TEXT,
+            accumulated_xiuwei            INTEGER NOT NULL DEFAULT 0,
+            consecutive_failures          INTEGER NOT NULL DEFAULT 0,
+            realm_history                 TEXT,
+            tiancheng_protection          TEXT,
+            daily_observer_reward_count   INTEGER NOT NULL DEFAULT 0,
+            daily_guard_reward_count      INTEGER NOT NULL DEFAULT 0,
+            daily_count_reset_at          TEXT,
+            sci_fi_intervention_level     INTEGER NOT NULL DEFAULT 0,
+            updated_at                    TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
+-- table: tribulation_events
+CREATE TABLE tribulation_events (
+            event_id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id              TEXT NOT NULL,
+            target_realm         TEXT NOT NULL,
+            mode                 TEXT NOT NULL,
+            status               TEXT NOT NULL,
+            equipment_snapshot   TEXT,
+            items_invested       TEXT,
+            accumulated_xiuwei   INTEGER NOT NULL DEFAULT 0,
+            created_at           TEXT NOT NULL,
+            announce_at          TEXT,
+            scheduled_at         TEXT NOT NULL,
+            resolved_at          TEXT,
+            result               TEXT,
+            quality              TEXT,
+            final_success_rate   REAL,
+            final_total_weight   INTEGER,
+            daowang_collected    INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
+-- index: idx_tribulation_events_user_status
+CREATE INDEX idx_tribulation_events_user_status ON tribulation_events(user_id, status);
+
+-- index: idx_tribulation_events_schedule
+CREATE INDEX idx_tribulation_events_schedule ON tribulation_events(scheduled_at, status);
+
+-- index: idx_tribulation_events_announce
+CREATE INDEX idx_tribulation_events_announce ON tribulation_events(announce_at, status);
+
+-- table: tribulation_participants
+CREATE TABLE tribulation_participants (
+            participant_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id         INTEGER NOT NULL,
+            user_id          TEXT NOT NULL,
+            type             TEXT NOT NULL,
+            joined_at        TEXT NOT NULL,
+            reward_paid      INTEGER NOT NULL DEFAULT 0,
+            reward_amount    TEXT,
+            is_effective     INTEGER NOT NULL DEFAULT 1,
+            xiuwei_granted   INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(event_id, user_id),
+            FOREIGN KEY (event_id) REFERENCES tribulation_events(event_id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        );
+
+-- index: idx_tribulation_participants_event
+CREATE INDEX idx_tribulation_participants_event ON tribulation_participants(event_id, type);
+
+-- index: idx_tribulation_participants_user
+CREATE INDEX idx_tribulation_participants_user ON tribulation_participants(user_id);

@@ -62,6 +62,7 @@ class FishingService:
         fishing_zone_service: FishingZoneService,
         config: Dict[str, Any],
         expedition_service=None,  # 可选的科考服务
+        cultivation_service=None,  # 可选的修行服务（玄幻渡劫 V2）
     ):
         self.user_repo = user_repo
         self.inventory_repo = inventory_repo
@@ -71,6 +72,9 @@ class FishingService:
         self.fishing_zone_service = fishing_zone_service
         self.config = config
         self.expedition_service = expedition_service
+        self.cultivation_service = cultivation_service
+        # 玄幻渡劫 V2：渡劫核心服务（在 main.py 内 set 进来；可能为 None）
+        self.tribulation_service = None
 
         # 获取每日刷新时间配置
         self.daily_reset_hour = self.config.get("daily_reset_hour", 0)
@@ -490,6 +494,19 @@ class FishingService:
         )
         self.log_repo.add_fishing_record(record, log_to_records=not is_auto)
 
+        # 玄幻渡劫 V2：在区域 6 钓鱼时累积修为（不影响主流程）
+        xiuwei_gained = 0
+        if self.cultivation_service is not None:
+            try:
+                xiuwei_gained = self.cultivation_service.award_xiuwei_for_fishing(
+                    user_id=user.user_id,
+                    fish_rarity=fish_template.rarity,
+                    fish_count=total_catches,
+                    zone_id=user.fishing_zone_id,
+                )
+            except Exception:
+                xiuwei_gained = 0
+
         # 8. 构建成功返回结果
         result = {
             "success": True,
@@ -501,6 +518,9 @@ class FishingService:
                 "quality_label": "✨高品质" if quality_level == 1 else "普通"  # 添加品质标签
             }
         }
+
+        if xiuwei_gained > 0:
+            result["xiuwei_gained"] = xiuwei_gained
         
         # 添加装备损坏消息
         if equipment_broken_messages:
@@ -1579,6 +1599,13 @@ class FishingService:
 
         if self._cleanup_logs_if_needed(current_reset_time):
             maintenance_ran = True
+
+        # 玄幻渡劫 V2：每次维护都触发一次 tick（处理 promote / resolve）
+        if self.tribulation_service is not None:
+            try:
+                self.tribulation_service.tick()
+            except Exception as exc:
+                logger.warning(f"[tribulation] tick 失败: {exc}")
 
         return maintenance_ran
 
