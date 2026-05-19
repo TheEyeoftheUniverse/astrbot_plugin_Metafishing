@@ -584,6 +584,67 @@ async def replenish_fish_pools(plugin: "FishingPlugin", event: AstrMessageEvent)
         return
 
 
+async def manual_daily_refresh(plugin: "FishingPlugin", event: AstrMessageEvent):
+    """[管理员] 手动触发项目内可安全重跑的每日刷新逻辑。"""
+    try:
+        maintenance_result = plugin.fishing_service.force_daily_maintenance()
+        tax_result = plugin.fishing_service.apply_daily_taxes()
+        exchange_result = plugin.exchange_service.manual_update_prices()
+        if not exchange_result.get("success", False):
+            raise RuntimeError(exchange_result.get("message", "交易所价格刷新失败"))
+        if maintenance_result.get("tribulation_error"):
+            raise RuntimeError(f"渡劫 tick 失败：{maintenance_result.get('tribulation_error')}")
+
+        quips_result = None
+        aquarium_quips_service = getattr(plugin, "aquarium_quips_service", None)
+        if aquarium_quips_service is not None:
+            quips_result = await aquarium_quips_service.refresh_today_quips()
+
+        zone_pass = maintenance_result.get("zone_pass") or {}
+        lines = [
+            "✅ 手动每日刷新已执行",
+            f"🕒 刷新基准周期：{maintenance_result.get('reset_time', 'unknown')}",
+            "",
+            "🎣 钓鱼维护：",
+            f"  · 通行证检查：续票 {zone_pass.get('renewed_count', 0)} 人，回传 {zone_pass.get('relocated_count', 0)} 人",
+            f"  · 稀有鱼配额重置区域：{maintenance_result.get('rare_fish_reset_count', 0)} 个",
+            f"  · 日志清理结果：{maintenance_result.get('log_cleanup_result')}",
+            "",
+            "💰 每日资产税：",
+            f"  · 已征税：{tax_result.get('taxed_user_count', 0)} 人",
+            f"  · 已跳过：{tax_result.get('skipped_user_count', 0)} 人",
+            f"  · 累计税额：{tax_result.get('total_tax_collected', 0)} 金币",
+            "",
+            "📈 交易所：",
+            f"  · 本次刷新商品数：{len(exchange_result.get('prices') or {})}",
+            "",
+            "🐠 水族箱短评：",
+        ]
+        if quips_result is None:
+            lines.append("  · 未启用短评服务")
+        else:
+            lines.append(
+                f"  · 来源：{quips_result.get('source', 'unknown')}，鱼种数：{quips_result.get('fish_count', 0)}，日期：{quips_result.get('date', 'unknown')}"
+            )
+
+        lines.extend(["", "🧿 渡劫："])
+        tribulation_result = maintenance_result.get("tribulation_result")
+        if tribulation_result is None:
+            lines.append("  · 未启用渡劫服务")
+        else:
+            lines.append(f"  · tick 已执行：{tribulation_result}")
+
+        lines.extend([
+            "",
+            "ℹ️ 说明：该指令不会代替团战结算；如需团战测试，请继续使用现有团战管理指令。",
+        ])
+        yield event.plain_result("\n".join(lines))
+    except Exception as exc:
+        logger.error(f"管理员手动触发每日刷新失败: {exc}", exc_info=True)
+        yield event.plain_result(f"❌ 手动触发每日刷新失败：{exc}")
+        return
+
+
 async def grant_title(plugin: "FishingPlugin", event: AstrMessageEvent):
     """授予用户称号"""
     args = event.message_str.split(" ")

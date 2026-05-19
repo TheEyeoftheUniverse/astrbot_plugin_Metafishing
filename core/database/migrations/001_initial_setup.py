@@ -15,7 +15,7 @@ REQUIRED_SEED_COUNTS = {
     "rods": 42,
     "accessories": 42,
     "baits": 22,
-    "items": 54,
+    "items": 57,
     "fishing_zones": 8,
     "zone_fish_mapping": 862,
     "shops": 8,
@@ -24,6 +24,8 @@ REQUIRED_SEED_COUNTS = {
     "shop_item_rewards": 128,
     "gacha_pools": 8,
     "gacha_pool_items": 108,
+    "cthulhu_authority": 12,
+    "cthulhu_global_pollution": 7,
 }
 
 

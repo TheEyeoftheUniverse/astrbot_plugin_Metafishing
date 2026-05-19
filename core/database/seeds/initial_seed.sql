@@ -856,6 +856,9 @@ INSERT OR IGNORE INTO "items" ("item_id", "name", "description", "rarity", "effe
 INSERT OR IGNORE INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable") VALUES (52, '梦核', '钻石被层层幻梦浓缩拉伸后形成的不祥核心，深处埋着一只尚未睁开的眼睛。', 8, '用于兑换特殊装备。', 0, 0);
 INSERT OR IGNORE INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable") VALUES (53, '龙屑', '金币在跨越位面时会融化为细小碎片。由龙息、圣泉与秘法余波共同沉淀。', 6, '用于兑换特殊装备。', 0, 0);
 INSERT OR IGNORE INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable") VALUES (54, '龙晶', '钻石在漫长岁月中被龙威、圣辉与元素潮汐反复淬炼后诞生的结晶。', 8, '用于兑换特殊装备。', 0, 0);
+INSERT OR IGNORE INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable", "effect_type", "effect_payload") VALUES (55, '深潜门票', '进入区域七时会被克苏鲁深潜系统自动消耗，用于开启当日深潜。', 6, '进入区域七开始钓鱼时自动消耗，开启一次当日深潜。', 0, 1, 'NONE', '{}');
+INSERT OR IGNORE INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable", "effect_type", "effect_payload") VALUES (56, '低语之露', '冰凉如夜潮的露滴，入口后理智会被勉强缝回一点。', 6, '使用后恢复 5 点 SAN，不会超过当前上限。', 0, 1, 'ADD_SAN', '{"amount":5}');
+INSERT OR IGNORE INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable", "effect_type", "effect_payload") VALUES (57, '古旧瞳孔', '像鱼眼又像星眼的干瘪器官，被它看过的人会多承受一点真相。', 8, '使用后永久提升 1 点 SAN 上限。', 0, 1, 'ADD_MAX_SAN', '{"amount":1}');
 
 -- table: fishing_zones
 INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "requires_pass", "fishing_cost") VALUES (1, '区域一：新手港湾', '刚买到人生第一杆钓竿的人常被推荐的钓点，只能钓到寻常鱼类。', 500, 8, '{"rarity_distribution": [0.6, 0.3, 0.08, 0.02, 0]}', 1, 0, 10);
@@ -864,7 +867,7 @@ INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_
 INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "required_item_id", "requires_pass", "fishing_cost") VALUES (4, '区域四：鱼光临海域-VIP专属区域', '为VIP客户开放的特殊区域，资本的大手养殖着一些特殊的鱼类。钓起的鱼最终还是卖给了他们公司，你也分不清到底是你赚了还是他们赚了。', 5000, 0, '{"rarity_distribution": [0.25, 0.25, 0.25, 0.18, 0.0695, 0.0005]}', 1, 13, 1, 300);
 INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "required_item_id", "requires_pass", "fishing_cost") VALUES (5, '区域五：全自动工厂污染区域', '被久远的工业自动化群排除的污水污染得不成样的海域，工厂至今也还在全自动运作；有一些独特的鱼生活在这里。', 10000, 0, '{"rarity_distribution": [0.25, 0.25, 0.25, 0.14, 0.1, 0.01]}', 1, 14, 1, 1000);
 INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "required_item_id", "requires_pass", "fishing_cost") VALUES (6, '区域六：云雾缭绕的龙瀑之巅', '传说中鲤鱼化龙之地，此地位处极高，又冷又缺氧，但灵气充裕，修行之鱼会在此停留。', 10000, 0, '{"rarity_distribution": [0.25, 0.25, 0.25, 0.14, 0.1, 0.01]}', 1, 15, 1, 1000);
-INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "required_item_id", "requires_pass", "fishing_cost") VALUES (7, '区域七：莫可名状的深渊之底', '海域中凭空出现的神秘巨大漩涡，宁静得就像寻常海面一般。一些奇特的鱼会在此出没，也不知它们是否是遭到漩涡影响。', 10000, 0, '{"rarity_distribution": [0.25, 0.25, 0.25, 0.14, 0.1, 0.01]}', 1, 16, 1, 1000);
+INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "required_item_id", "requires_pass", "fishing_cost") VALUES (7, '区域七：莫可名状的深渊之底', '海域中凭空出现的神秘巨大漩涡，宁静得就像寻常海面一般。一些奇特的鱼会在此出没，也不知它们是否是遭到漩涡影响。', 10000, 0, '{"rarity_distribution": [0.25, 0.25, 0.25, 0.14, 0.1, 0.01]}', 1, NULL, 0, 1000);
 INSERT OR IGNORE INTO "fishing_zones" ("id", "name", "description", "daily_rare_fish_quota", "rare_fish_caught_today", "configs", "is_active", "required_item_id", "requires_pass", "fishing_cost") VALUES (8, '区域八：空气沸腾的龙之洞窟', '巨大的火山洞窟中，深不见底的地下水池，洞窟深处仿佛连空气都在沸腾翻滚，一些特殊的鱼出没于此地。', 10000, 0, '{"rarity_distribution": [0.25, 0.25, 0.25, 0.14, 0.1, 0.01]}', 1, 17, 1, 1000);
 
 -- table: zone_fish_mapping
@@ -1793,6 +1796,25 @@ INSERT OR IGNORE INTO "exchange_prices" ("price_id", "date", "time", "commodity_
 INSERT OR IGNORE INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (13, '1970-01-01', '00:00:00', 'cthulhu_stable', 70000, 'initial', '1970-01-01T00:00:00');
 INSERT OR IGNORE INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (14, '1970-01-01', '00:00:00', 'cthulhu_high_risk', 50000, 'initial', '1970-01-01T00:00:00');
 INSERT OR IGNORE INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (15, '1970-01-01', '00:00:00', 'cthulhu_speculative', 30000, 'initial', '1970-01-01T00:00:00');
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('predict_upper', 'predict', 'upper', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('predict_middle', 'predict', 'middle', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('predict_lower', 'predict', 'lower', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('time_upper', 'time', 'upper', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('time_middle', 'time', 'middle', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('time_lower', 'time', 'lower', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('pollute_upper', 'pollute', 'upper', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('pollute_middle', 'pollute', 'middle', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('pollute_lower', 'pollute', 'lower', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('sacrifice_upper', 'sacrifice', 'upper', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('sacrifice_middle', 'sacrifice', 'middle', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_authority" ("authority_id", "god_type", "tier", "current_holder", "acquired_at", "previous_holder", "previous_acquired_at") VALUES ('sacrifice_lower', 'sacrifice', 'lower', NULL, NULL, NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_global_pollution" ("pollution_id", "activated_at", "triggered_by_name_id") VALUES ('U1', NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_global_pollution" ("pollution_id", "activated_at", "triggered_by_name_id") VALUES ('U2', NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_global_pollution" ("pollution_id", "activated_at", "triggered_by_name_id") VALUES ('U5', NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_global_pollution" ("pollution_id", "activated_at", "triggered_by_name_id") VALUES ('U8', NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_global_pollution" ("pollution_id", "activated_at", "triggered_by_name_id") VALUES ('U10', NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_global_pollution" ("pollution_id", "activated_at", "triggered_by_name_id") VALUES ('U11', NULL, NULL);
+INSERT OR IGNORE INTO "cthulhu_global_pollution" ("pollution_id", "activated_at", "triggered_by_name_id") VALUES ('U14', NULL, NULL);
 
 -- table: gacha_pools
 INSERT OR IGNORE INTO "gacha_pools" ("gacha_pool_id", "name", "description", "cost_coins", "is_limited_time") VALUES (1, '黑洞', '向黑洞投入的硬币转动着命运的星轨，神秘的物品从不知何处的白洞中倾泻而出。', 6666666, 0);

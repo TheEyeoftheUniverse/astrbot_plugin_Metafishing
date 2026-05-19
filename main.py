@@ -1266,6 +1266,13 @@ class FishingPlugin(Star):
         async for r in admin_handlers.replenish_fish_pools(self, event):
             yield r
 
+    @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("手动触发每日刷新", alias={"管理每日刷新", "手动每日刷新"})
+    async def manual_daily_refresh(self, event: AstrMessageEvent):
+        """[管理员] 强制执行可安全重跑的每日刷新逻辑，用于玩法测试。"""
+        async for r in admin_handlers.manual_daily_refresh(self, event):
+            yield r
+
     # =========== 玄幻渡劫 V2 ==========
 
     @filter.command("修行", alias={"我的修行", "我的境界"})

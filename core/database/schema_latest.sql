@@ -780,3 +780,96 @@ CREATE TABLE team_battle_daily_settle (
     settled_at      TEXT NOT NULL,
     settle_summary  TEXT
 );
+
+-- ============================================================
+-- 克苏鲁深潜 V2 (migration 008)
+-- ============================================================
+
+-- table: true_names
+CREATE TABLE true_names (
+    name_id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name_string         TEXT NOT NULL UNIQUE,
+    god_type            TEXT NOT NULL,
+    tier                TEXT NOT NULL,
+    threshold           INTEGER NOT NULL,
+    progress            INTEGER NOT NULL DEFAULT 0,
+    status              TEXT NOT NULL,
+    owner_user_id       TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    called_at           TEXT,
+    consumed_at         TEXT
+);
+
+-- index: idx_true_names_status_god_tier
+CREATE INDEX idx_true_names_status_god_tier ON true_names(status, god_type, tier);
+
+-- index: idx_true_names_owner
+CREATE INDEX idx_true_names_owner ON true_names(owner_user_id, status);
+
+-- table: true_name_votes
+CREATE TABLE true_name_votes (
+    vote_id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name_id             INTEGER NOT NULL,
+    voter_user_id       TEXT NOT NULL,
+    voted_at            TEXT NOT NULL,
+    FOREIGN KEY (name_id) REFERENCES true_names(name_id)
+);
+
+-- index: idx_true_name_votes_name
+CREATE INDEX idx_true_name_votes_name ON true_name_votes(name_id);
+
+-- index: idx_true_name_votes_voter
+CREATE INDEX idx_true_name_votes_voter ON true_name_votes(voter_user_id, voted_at);
+
+-- table: cthulhu_authority
+CREATE TABLE cthulhu_authority (
+    authority_id            TEXT PRIMARY KEY,
+    god_type                TEXT NOT NULL,
+    tier                    TEXT NOT NULL,
+    current_holder          TEXT,
+    acquired_at             TEXT,
+    previous_holder         TEXT,
+    previous_acquired_at    TEXT
+);
+
+-- table: cthulhu_global_pollution
+CREATE TABLE cthulhu_global_pollution (
+    pollution_id            TEXT PRIMARY KEY,
+    activated_at            TEXT,
+    triggered_by_name_id    INTEGER
+);
+
+-- table: user_cthulhu_state
+CREATE TABLE user_cthulhu_state (
+    user_id                      TEXT PRIMARY KEY,
+    current_san                  INTEGER NOT NULL DEFAULT 100,
+    max_san                      INTEGER NOT NULL DEFAULT 100,
+    is_in_deepdive_today         INTEGER NOT NULL DEFAULT 0,
+    pending_event_id             TEXT,
+    pending_event_tier           TEXT,
+    pending_event_force_pollute  INTEGER NOT NULL DEFAULT 0,
+    pending_event_choice         TEXT,
+    forced_pollution_until       TEXT,
+    pending_san_cap_tokens       INTEGER NOT NULL DEFAULT 0,
+    sci_fi_intervention_level    INTEGER NOT NULL DEFAULT 0,
+    last_daily_reset_at          TEXT,
+    pending_predict_candidates   TEXT,
+    pending_predict_expires_at   TEXT
+);
+
+-- table: cthulhu_event_log
+CREATE TABLE cthulhu_event_log (
+    log_id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id             TEXT NOT NULL,
+    event_id            TEXT,
+    choice_id           TEXT,
+    is_main_roll        INTEGER NOT NULL DEFAULT 0,
+    d100_roll           INTEGER NOT NULL,
+    result              TEXT NOT NULL,
+    san_delta           INTEGER NOT NULL,
+    granted_name_id     INTEGER,
+    occurred_at         TEXT NOT NULL
+);
+
+-- index: idx_cthulhu_event_log_user_time
+CREATE INDEX idx_cthulhu_event_log_user_time ON cthulhu_event_log(user_id, occurred_at);

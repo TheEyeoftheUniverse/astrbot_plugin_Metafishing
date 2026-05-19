@@ -1395,7 +1395,7 @@ class FishingService:
 
         return {"success": True, "message": success_message}
 
-    def apply_daily_taxes(self) -> None:
+    def apply_daily_taxes(self) -> Dict[str, Any]:
         """对所有高价值用户征收每日税收。逐用户检查，确保不遗漏也不重复征收。"""
         import uuid
         
@@ -1405,7 +1405,14 @@ class FishingService:
         tax_config = self.config.get("tax", {})
         if tax_config.get("is_tax", False) is False:
             logger.info(f"[税收-{execution_id}] 税收功能未启用，跳过")
-            return
+            return {
+                "executed": False,
+                "reason": "tax_disabled",
+                "execution_id": execution_id,
+                "taxed_user_count": 0,
+                "skipped_user_count": 0,
+                "total_tax_collected": 0,
+            }
         
         logger.info(f"[税收-{execution_id}] 开始检查每日资产税（执行ID: {execution_id}）")
         
@@ -1463,8 +1470,16 @@ class FishingService:
                 taxed_user_count += 1
         
         logger.info(f"[税收-{execution_id}] 每日资产税执行完成，征税 {taxed_user_count} 人，跳过 {skipped_user_count} 人（已缴税），总计 {total_tax_collected} 金币")
+        return {
+            "executed": True,
+            "reason": "ok",
+            "execution_id": execution_id,
+            "taxed_user_count": taxed_user_count,
+            "skipped_user_count": skipped_user_count,
+            "total_tax_collected": total_tax_collected,
+        }
 
-    def enforce_zone_pass_requirements_for_all_users(self) -> None:
+    def enforce_zone_pass_requirements_for_all_users(self) -> Dict[str, Any]:
         """
         每日刷新检查：消耗型通行证到达新周期后自动续票，无法续票则回传安全区域。
         永久通行证不走日周期授权，只校验背包持有状态。
@@ -1475,7 +1490,7 @@ class FishingService:
             logger.info(f"找到 {len(all_users)} 个用户需要检查")
         except Exception as e:
             logger.error(f"获取用户列表失败: {e}")
-            return
+            return {"renewed_count": 0, "relocated_count": 0, "relocated_users": []}
 
         relocated_users = []
         renewed_count = 0
@@ -1510,6 +1525,11 @@ class FishingService:
         
         if relocated_users:
             logger.info(f"被传送用户详情：{relocated_users}")
+        return {
+            "renewed_count": renewed_count,
+            "relocated_count": len(relocated_users),
+            "relocated_users": relocated_users,
+        }
 
     def _enforce_zone_pass_requirements_if_needed(self, current_reset_time=None) -> bool:
         """按每日刷新周期统一执行一次区域通行证检查。"""
@@ -1608,6 +1628,48 @@ class FishingService:
                 logger.warning(f"[tribulation] tick 失败: {exc}")
 
         return maintenance_ran
+
+    def force_daily_maintenance(self) -> Dict[str, Any]:
+        """管理员手动触发一次每日维护，不要求当前时间已经跨过 daily_reset_hour。"""
+        current_reset_time = get_last_reset_time(self.daily_reset_hour)
+
+        with self.zone_pass_reset_lock:
+            zone_pass_result = self.enforce_zone_pass_requirements_for_all_users()
+            self.last_zone_pass_check_reset_time = current_reset_time
+
+        with self.rare_fish_reset_lock:
+            all_zones = self.inventory_repo.get_all_zones()
+            rare_fish_reset_count = 0
+            for zone in all_zones:
+                if zone.daily_rare_fish_quota > 0:
+                    zone.rare_fish_caught_today = 0
+                    self.inventory_repo.update_fishing_zone(zone)
+                    rare_fish_reset_count += 1
+            self.last_reset_time = current_reset_time
+            logger.info(f"管理员手动触发稀有鱼配额重置完成，共重置 {rare_fish_reset_count} 个区域")
+
+        with self.log_cleanup_lock:
+            log_cleanup_result = self.log_repo.cleanup_expired_records()
+            self.last_log_cleanup_reset_time = current_reset_time
+            logger.info(f"管理员手动触发日志清理完成，结果：{log_cleanup_result}")
+
+        tribulation_result = None
+        tribulation_error = None
+        if self.tribulation_service is not None:
+            try:
+                tribulation_result = self.tribulation_service.tick()
+            except Exception as exc:
+                tribulation_error = str(exc)
+                logger.warning(f"[tribulation] 管理员手动触发 tick 失败: {exc}")
+
+        return {
+            "reset_time": current_reset_time.isoformat(),
+            "zone_pass": zone_pass_result,
+            "rare_fish_reset_count": rare_fish_reset_count,
+            "log_cleanup_result": log_cleanup_result,
+            "tribulation_result": tribulation_result,
+            "tribulation_error": tribulation_error,
+        }
 
     def start_auto_fishing_task(self):
         """启动自动钓鱼的后台线程。"""
