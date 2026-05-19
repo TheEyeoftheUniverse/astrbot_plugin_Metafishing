@@ -46,6 +46,35 @@
 </div>
 {% endif %}
 
+{% if cthulhu_view and current_zone and current_zone.id == 7 %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-danger-subtle">
+            <div class="card-header bg-danger-subtle">
+                <h5 class="mb-0"><i class="fas fa-water"></i> 深潜待抉择</h5>
+            </div>
+            <div class="card-body">
+                {% if cthulhu_view.pending_event %}
+                    <h5>{{ cthulhu_view.pending_event.title }}</h5>
+                    <p class="text-muted">{{ cthulhu_view.pending_event.scene_text }}</p>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        {% for choice in cthulhu_view.pending_event.choices %}
+                            <button class="btn btn-outline-danger btn-sm" onclick="chooseDeepdive('{{ choice.choice_id }}')">
+                                {{ choice.choice_id }}. {{ choice.label }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                    <p class="mb-0">当前选择：{{ cthulhu_view.pending_choice or "未选择" }}</p>
+                {% else %}
+                    <p class="mb-2">当前没有待抉择事件。</p>
+                    <p class="text-muted mb-0">如果你持有深潜门票，切入区域七时会立即开启一次当日深潜。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- 所有可用区域 -->
 <div class="row mb-4">
     <div class="col-12">
@@ -137,6 +166,23 @@ async function changeZone(zoneId, zoneName) {
             location.reload();
         } else {
             showToast(data.message, 'error');
+        }
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+async function chooseDeepdive(choiceId) {
+    try {
+        const response = await fetch('{{ url_for("player_bp.cthulhu_api_choose") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({choice_id: choiceId})
+        });
+        const data = await response.json();
+        showToast(data.message || (data.success ? '选择成功' : '选择失败'), data.success ? 'success' : 'error');
+        if (data.success) {
+            location.reload();
         }
     } catch (error) {
         showToast('网络错误，请稍后重试', 'error');

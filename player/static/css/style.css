@@ -1489,3 +1489,15 @@ body.cthulhu-u11 * {
 body.cthulhu-u14 .player-main {
     animation: cthulhu-tremble 1s infinite step-end;
 }
+
+.authority-board-column {
+    background:
+        linear-gradient(180deg, rgba(112, 18, 32, 0.08), rgba(18, 24, 38, 0.02)),
+        #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+}
+
+.authority-board-tier {
+    background: rgba(255, 248, 248, 0.78);
+    border-color: rgba(129, 28, 40, 0.12) !important;
+}

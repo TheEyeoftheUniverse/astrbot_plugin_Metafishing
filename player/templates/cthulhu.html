@@ -142,6 +142,7 @@ async function useAuthority(authorityId) {
 
 function renderCthulhu() {
     const state = cthulhuView.state || {};
+    const godLabels = {predict: '预知权柄', time: '时间权柄', pollute: '污染权柄', sacrifice: '献祭权柄'};
     document.getElementById('cthulhuStateCard').innerHTML = `
         <p class="mb-2">SAN：<strong>${state.current_san}/${state.max_san}</strong></p>
         <p class="mb-2">今日深潜：${state.is_in_deepdive_today ? '已开启' : '未开启'}</p>
@@ -173,7 +174,7 @@ function renderCthulhu() {
                     <div class="d-flex justify-content-between align-items-start gap-2">
                         <div>
                             <div><strong>#${name.name_id}</strong> ${name.name_string}</div>
-                            <div class="small text-muted">${name.god_type} · ${name.tier} · ${name.status}</div>
+                            <div class="small text-muted">${godLabels[name.god_type] || name.god_type} · ${name.tier_label || name.tier} · ${name.status}</div>
                         </div>
                         ${name.status === 'in_inventory' ? `<button class="btn btn-sm btn-primary" onclick="startCalling(${name.name_id})">发起呼唤</button>` : ''}
                     </div>
@@ -193,29 +194,40 @@ function renderCthulhu() {
         ${calls.length ? calls.map(call => `
             <div class="border rounded p-2 mb-2">
                 <div><strong>${call.name_string}</strong></div>
-                <div class="small text-muted">${call.owner_nickname || call.owner_user_id} · ${call.god_type} · ${call.tier}</div>
+                <div class="small text-muted">${call.owner_nickname || call.owner_user_id} · ${godLabels[call.god_type] || call.god_type} · ${call.tier_label || call.tier}</div>
                 <div class="mt-1">${call.progress}/${call.threshold}</div>
             </div>
         `).join('') : '<p class="text-muted mb-0">当前没有呼唤进行中。</p>'}
     `;
 
     const ownedSet = new Set((cthulhuView.owned_authorities || []).map(item => item.authority_id));
-    const authorities = cthulhuView.authority_board || [];
-    document.getElementById('cthulhuAuthorityCard').innerHTML = authorities.length ? `
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead><tr><th>ID</th><th>当前持有者</th><th>上一任</th><th></th></tr></thead>
-                <tbody>
-                    ${authorities.map(authority => `
-                        <tr>
-                            <td>${authority.authority_id}</td>
-                            <td>${authority.current_holder_nickname || authority.current_holder || '无'}</td>
-                            <td>${authority.previous_holder_nickname || authority.previous_holder || '无'}</td>
-                            <td>${ownedSet.has(authority.authority_id) ? `<button class="btn btn-sm btn-outline-danger" onclick="useAuthority('${authority.authority_id}')">使用</button>` : ''}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+    const sections = cthulhuView.authority_board_sections || [];
+    document.getElementById('cthulhuAuthorityCard').innerHTML = sections.length ? `
+        <div class="row g-3">
+            ${sections.map(section => `
+                <div class="col-lg-3 col-md-6">
+                    <div class="border rounded-4 h-100 p-3 authority-board-column">
+                        <div class="mb-3">
+                            <div class="fw-semibold">${section.title}</div>
+                            <div class="small text-muted">${section.subtitle}</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            ${section.tiers.map(authority => `
+                                <div class="border rounded-3 p-2 authority-board-tier">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="fw-semibold">${authority.tier_label}</div>
+                                            <div class="small text-muted">现任：${authority.holder_label}</div>
+                                            <div class="small text-muted">上一任：${authority.previous_holder_label}</div>
+                                        </div>
+                                        ${ownedSet.has(authority.authority_id) ? `<button class="btn btn-sm btn-outline-danger" onclick="useAuthority('${authority.authority_id}')">使用</button>` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
         </div>
     ` : '<p class="text-muted mb-0">暂无权柄数据。</p>';
 }

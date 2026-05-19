@@ -26,6 +26,7 @@ REQUIRED_SEED_COUNTS = {
     "gacha_pool_items": 108,
     "cthulhu_authority": 12,
     "cthulhu_global_pollution": 7,
+    "user_cthulhu_state": 0,
 }
 
 

@@ -31,7 +31,8 @@ AUTHORITY_DISPLAY = {
     "pollute": "污染",
     "sacrifice": "献祭",
 }
-TIER_DISPLAY = {"upper": "上", "middle": "中", "lower": "下"}
+TIER_DISPLAY = {"upper": "冠冕位阶", "middle": "秘仪位阶", "lower": "潮痕位阶"}
+TIER_SHORT_DISPLAY = {"upper": "冠冕", "middle": "秘仪", "lower": "潮痕"}
 POLLUTION_NAME = {
     "U1": "群星错位",
     "U2": "众生失名",
@@ -94,8 +95,8 @@ class CthulhuService:
 
     def _sanitize_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
         state = dict(state)
-        state["current_san"] = int(state.get("current_san", 100) or 100)
-        state["max_san"] = int(state.get("max_san", 100) or 100)
+        state["current_san"] = int(state.get("current_san", 50) or 50)
+        state["max_san"] = int(state.get("max_san", 50) or 50)
         state["pending_san_cap_tokens"] = int(state.get("pending_san_cap_tokens", 0) or 0)
         state["sci_fi_intervention_level"] = int(state.get("sci_fi_intervention_level", 0) or 0)
         state["pending_predict_candidates"] = state.get("pending_predict_candidates") or []
@@ -455,21 +456,61 @@ class CthulhuService:
             },
             "pending_event": pending_event,
             "pending_choice": state.get("pending_event_choice"),
-            "true_names": self.repo.list_true_names(user_id),
+            "true_names": self.list_true_names(user_id)["true_names"],
             "owned_authorities": self.repo.list_authorities_for_holder(user_id),
-            "active_calls": self.repo.list_active_calls(),
+            "active_calls": self.list_active_calls()["calls"],
             "authority_board": self.repo.list_authorities(),
+            "authority_board_sections": self._build_authority_board_sections(),
             "visible_pollutions": self.get_visible_pollutions(user_id),
         }
+
+    def _build_authority_board_sections(self) -> List[Dict[str, Any]]:
+        rows = self.repo.list_authorities()
+        by_type: Dict[str, Dict[str, Any]] = {}
+        for god_type, title, subtitle in (
+            ("predict", "预知权柄", "先于潮声看见结果"),
+            ("time", "时间权柄", "让一次夜潮多活几息"),
+            ("pollute", "污染权柄", "把注视分给别的渔人"),
+            ("sacrifice", "献祭权柄", "以自身理智换取暴烈改写"),
+        ):
+            by_type[god_type] = {
+                "god_type": god_type,
+                "title": title,
+                "subtitle": subtitle,
+                "tiers": [],
+            }
+        tier_order = ["upper", "middle", "lower"]
+        for god_type in ("predict", "time", "pollute", "sacrifice"):
+            god_rows = {row["tier"]: row for row in rows if row["god_type"] == god_type}
+            for tier in tier_order:
+                row = dict(god_rows.get(tier) or {})
+                row["tier_label"] = TIER_DISPLAY[tier]
+                row["tier_short_label"] = TIER_SHORT_DISPLAY[tier]
+                row["holder_label"] = row.get("current_holder_nickname") or row.get("current_holder") or "暂无持有者"
+                row["previous_holder_label"] = row.get("previous_holder_nickname") or row.get("previous_holder") or "无前任记录"
+                by_type[god_type]["tiers"].append(row)
+        return [by_type[key] for key in ("predict", "time", "pollute", "sacrifice")]
 
     def list_event_logs(self, user_id: str, limit: int = 50) -> Dict[str, Any]:
         return {"success": True, "logs": self.repo.list_event_logs(user_id, limit)}
 
     def list_true_names(self, user_id: str) -> Dict[str, Any]:
-        return {"success": True, "true_names": self.repo.list_true_names(user_id)}
+        rows = []
+        for row in self.repo.list_true_names(user_id):
+            row = dict(row)
+            row["god_type_label"] = AUTHORITY_DISPLAY.get(row["god_type"], row["god_type"])
+            row["tier_label"] = TIER_DISPLAY.get(row["tier"], row["tier"])
+            rows.append(row)
+        return {"success": True, "true_names": rows}
 
     def list_active_calls(self) -> Dict[str, Any]:
-        return {"success": True, "calls": self.repo.list_active_calls()}
+        rows = []
+        for row in self.repo.list_active_calls():
+            row = dict(row)
+            row["god_type_label"] = AUTHORITY_DISPLAY.get(row["god_type"], row["god_type"])
+            row["tier_label"] = TIER_DISPLAY.get(row["tier"], row["tier"])
+            rows.append(row)
+        return {"success": True, "calls": rows}
 
     def list_authorities(self) -> Dict[str, Any]:
         return {"success": True, "authorities": self.repo.list_authorities()}
@@ -668,4 +709,3 @@ class CthulhuService:
 
         self._save_state(user_id, current_san=0)
         return {"success": True, "message": f"献祭完成，深渊回赠了【{replacement_name}】。你的 SAN 已归零。"}
-

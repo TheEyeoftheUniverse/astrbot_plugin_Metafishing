@@ -5,10 +5,16 @@ if TYPE_CHECKING:
     from ..main import FishingPlugin
 
 
+TIER_SHORT_LABEL = {"upper": "冠冕", "middle": "秘仪", "lower": "潮痕"}
+GOD_LABEL = {"predict": "预知", "time": "时间", "pollute": "污染", "sacrifice": "献祭"}
+
+
 def _format_authority(authority: dict) -> str:
     holder = authority.get("current_holder_nickname") or authority.get("current_holder") or "无"
     previous = authority.get("previous_holder_nickname") or authority.get("previous_holder") or "无"
-    return f"{authority['authority_id']} 持有者：{holder} 上一任：{previous}"
+    god = GOD_LABEL.get(authority["god_type"], authority["god_type"])
+    tier = TIER_SHORT_LABEL.get(authority["tier"], authority["tier"])
+    return f"{god}·{tier} 持有者：{holder} 上一任：{previous}"
 
 
 async def show_state(self: "FishingPlugin", event: AstrMessageEvent):
@@ -53,11 +59,12 @@ async def list_true_names(self: "FishingPlugin", event: AstrMessageEvent):
     if not names:
         yield event.plain_result("你当前没有持有真名。")
         return
-    lines = ["【真名列表】"]
-    for name in names:
-        lines.append(
+        lines = ["【真名列表】"]
+        for name in names:
+            lines.append(
             f"#{name['name_id']} {name['name_string']} [{name['status']}] "
-            f"{name['god_type']}·{name['tier']} {name['progress']}/{name['threshold']}"
+            f"{GOD_LABEL.get(name['god_type'], name['god_type'])}·{TIER_SHORT_LABEL.get(name['tier'], name['tier'])} "
+            f"{name['progress']}/{name['threshold']}"
         )
     yield event.plain_result("\n".join(lines))
 
@@ -96,7 +103,10 @@ async def show_authorities(self: "FishingPlugin", event: AstrMessageEvent):
         return
     lines = ["【我的权柄】"]
     for authority in owned:
-        lines.append(f"{authority['authority_id']} -> {authority['god_type']}·{authority['tier']}")
+        lines.append(
+            f"{GOD_LABEL.get(authority['god_type'], authority['god_type'])}"
+            f"·{TIER_SHORT_LABEL.get(authority['tier'], authority['tier'])}"
+        )
     lines.append("预知权柄先使用一次生成候选，再用相同指令加编号确认。")
     yield event.plain_result("\n".join(lines))
 

@@ -4105,6 +4105,7 @@ async def fishing():
     fishing_service = current_app.config.get("FISHING_SERVICE")
     inventory_repo = current_app.config.get("INVENTORY_REPO")
     item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
     
     user = user_repo.get_by_id(user_id)
     if not user:
@@ -4145,10 +4146,18 @@ async def fishing():
     
     # 按ID排序
     all_zones.sort(key=lambda z: z["id"])
+
+    cthulhu_view = None
+    if current_zone_id == 7 and cthulhu_service:
+        try:
+            cthulhu_view = cthulhu_service.get_state_view(user_id)
+        except Exception as exc:
+            logger.warning(f"加载区域七深潜视图失败: {exc}")
     
     return await render_template("fishing_zones.html",
                                   current_zone=current_zone,
-                                  all_zones=all_zones)
+                                  all_zones=all_zones,
+                                  cthulhu_view=cthulhu_view)
 
 
 @player_bp.route("/cthulhu")

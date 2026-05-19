@@ -54,8 +54,8 @@ def up(cursor):
 
         CREATE TABLE IF NOT EXISTS user_cthulhu_state (
             user_id TEXT PRIMARY KEY,
-            current_san INTEGER NOT NULL DEFAULT 100,
-            max_san INTEGER NOT NULL DEFAULT 100,
+            current_san INTEGER NOT NULL DEFAULT 50,
+            max_san INTEGER NOT NULL DEFAULT 50,
             is_in_deepdive_today INTEGER NOT NULL DEFAULT 0,
             pending_event_id TEXT,
             pending_event_tier TEXT,

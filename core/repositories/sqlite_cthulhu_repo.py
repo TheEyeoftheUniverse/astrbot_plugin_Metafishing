@@ -22,7 +22,7 @@ class SqliteCthulhuRepository:
         with self._cm.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                "INSERT OR IGNORE INTO user_cthulhu_state(user_id) VALUES (?)",
+                "INSERT OR IGNORE INTO user_cthulhu_state(user_id, current_san, max_san) VALUES (?, 50, 50)",
                 (user_id,),
             )
             conn.commit()
@@ -33,8 +33,8 @@ class SqliteCthulhuRepository:
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT OR IGNORE INTO user_cthulhu_state(user_id)
-                SELECT user_id FROM users
+                INSERT OR IGNORE INTO user_cthulhu_state(user_id, current_san, max_san)
+                SELECT user_id, 50, 50 FROM users
                 """
             )
             conn.commit()
