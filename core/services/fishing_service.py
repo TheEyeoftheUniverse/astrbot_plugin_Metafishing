@@ -1403,12 +1403,17 @@ class FishingService:
                 deepdive_result = self.cthulhu_service.try_enter_deepdive(user_id)
                 if deepdive_result.get("deepdive_started"):
                     event = deepdive_result.get("event") or {}
-                    cthulhu_suffix = (
-                        f"\n🫧 深潜已经开始：{event.get('title', '未知深潜')}"
-                        "\n请在深潜页面查看并做出抉择。"
-                    )
-                elif deepdive_result.get("reason") == "no_ticket":
-                    cthulhu_suffix = "\n🫧 你进入了深渊，但没有深潜门票，因此这次只是普通钓鱼。"
+                    if deepdive_result.get("compatibility_mode"):
+                        cthulhu_suffix = (
+                            f"\n🫧 深潜已经开始：{event.get('title', '未知深潜')}"
+                            "\n当前门票来源尚未接入，已按兼容模式免票开启本次深潜。"
+                            "\n请在深潜页面查看并做出抉择。"
+                        )
+                    else:
+                        cthulhu_suffix = (
+                            f"\n🫧 深潜已经开始：{event.get('title', '未知深潜')}"
+                            "\n请在深潜页面查看并做出抉择。"
+                        )
             except Exception as exc:
                 logger.warning(f"[cthulhu] 区域切换触发深潜失败: {exc}")
 
