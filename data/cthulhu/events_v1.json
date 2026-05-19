@@ -1,0 +1,182 @@
+[
+  {
+    "event_id": "ECU01",
+    "tier": "upper",
+    "title": "永燃之祭",
+    "scene_text": "蓝色火焰悬在浪上，等名字被烧掉。",
+    "choices": [
+      {"choice_id": "A", "label": "投身焰心 · 献名（献祭·上）", "god_type": "sacrifice", "difficulty": 35},
+      {"choice_id": "B", "label": "静观至灰烬（时间·上）", "god_type": "time", "difficulty": 40}
+    ]
+  },
+  {
+    "event_id": "ECU02",
+    "tier": "upper",
+    "title": "脐带的尽头",
+    "scene_text": "苍白脐带从海底伸上来，末端仍在搏动。",
+    "choices": [
+      {"choice_id": "A", "label": "咬断它（献祭·上）", "god_type": "sacrifice", "difficulty": 35},
+      {"choice_id": "B", "label": "看它连着什么（预知·上）", "god_type": "predict", "difficulty": 45}
+    ]
+  },
+  {
+    "event_id": "ECU03",
+    "tier": "upper",
+    "title": "沉祭之砧",
+    "scene_text": "浪下浮出铁砧，上面摆着你失去的每一样东西。",
+    "choices": [
+      {"choice_id": "A", "label": "把渔获放上砧（献祭·上）", "god_type": "sacrifice", "difficulty": 35},
+      {"choice_id": "B", "label": "搅散浪影（污染·上）", "god_type": "pollute", "difficulty": 50}
+    ]
+  },
+  {
+    "event_id": "ECU04",
+    "tier": "upper",
+    "title": "时蛙",
+    "scene_text": "透明巨蛙伏在礁石上，每一声鸣叫都让浪倒流一息。",
+    "choices": [
+      {"choice_id": "A", "label": "打碎它（时间·上）", "god_type": "time", "difficulty": 40},
+      {"choice_id": "B", "label": "合掌挡住蛙鸣（预知·上）", "god_type": "predict", "difficulty": 45}
+    ]
+  },
+  {
+    "event_id": "ECU05",
+    "tier": "upper",
+    "title": "蜃影·旧岸",
+    "scene_text": "童年的码头从浪里浮回，有老人站在尽头朝你摇头。",
+    "choices": [
+      {"choice_id": "A", "label": "朝他游去（时间·上）", "god_type": "time", "difficulty": 40},
+      {"choice_id": "B", "label": "咬舌吞血（污染·上）", "god_type": "pollute", "difficulty": 50}
+    ]
+  },
+  {
+    "event_id": "ECU06",
+    "tier": "upper",
+    "title": "镜潮·逆瞳",
+    "scene_text": "潮水立成镜面，镜中瞳仁里写满细小文字。",
+    "choices": [
+      {"choice_id": "A", "label": "读瞳文（预知·上）", "god_type": "predict", "difficulty": 45},
+      {"choice_id": "B", "label": "打碎镜壁（污染·上）", "god_type": "pollute", "difficulty": 50}
+    ]
+  },
+  {
+    "event_id": "ECM01",
+    "tier": "middle",
+    "title": "鱼灯的葬列",
+    "scene_text": "死鱼顶着灯笼游过，嘴里都衔着自己的鱼鳔。",
+    "choices": [
+      {"choice_id": "A", "label": "拔出一盏灯（献祭·中）", "god_type": "sacrifice", "difficulty": 50},
+      {"choice_id": "B", "label": "随行列游一度（时间·中）", "god_type": "time", "difficulty": 55}
+    ]
+  },
+  {
+    "event_id": "ECM02",
+    "tier": "middle",
+    "title": "低潮泥画",
+    "scene_text": "滩涂上浮出一幅覆盖整片湾的指画，画的是你出生那一刻。",
+    "choices": [
+      {"choice_id": "A", "label": "描摹画廓（献祭·中）", "god_type": "sacrifice", "difficulty": 50},
+      {"choice_id": "B", "label": "数它有几个指头（预知·中）", "god_type": "predict", "difficulty": 60}
+    ]
+  },
+  {
+    "event_id": "ECM03",
+    "tier": "middle",
+    "title": "骨礁",
+    "scene_text": "鲸肋还在长，从沙里扎进浪里，像一座反向生长的礁。",
+    "choices": [
+      {"choice_id": "A", "label": "拨沙看根（献祭·中）", "god_type": "sacrifice", "difficulty": 50},
+      {"choice_id": "B", "label": "尝一口骨上苔（污染·中）", "god_type": "pollute", "difficulty": 65}
+    ]
+  },
+  {
+    "event_id": "ECM04",
+    "tier": "middle",
+    "title": "渊钟",
+    "scene_text": "深水里有钟声，每敲一下，你手臂上就多一粒盐结晶。",
+    "choices": [
+      {"choice_id": "A", "label": "敲回去（时间·中）", "god_type": "time", "difficulty": 55},
+      {"choice_id": "B", "label": "数晶粒预下次敲（预知·中）", "god_type": "predict", "difficulty": 60}
+    ]
+  },
+  {
+    "event_id": "ECM05",
+    "tier": "middle",
+    "title": "蚀月潮",
+    "scene_text": "月亮碎成七块沉入浪底，海面漂满一摸就冷的月光片。",
+    "choices": [
+      {"choice_id": "A", "label": "捞起一片保存（时间·中）", "god_type": "time", "difficulty": 55},
+      {"choice_id": "B", "label": "掬冷月擦眼（污染·中）", "god_type": "pollute", "difficulty": 65}
+    ]
+  },
+  {
+    "event_id": "ECM06",
+    "tier": "middle",
+    "title": "漂语瓶",
+    "scene_text": "瓶中纸条用你的笔迹写着：别再往下钓了。",
+    "choices": [
+      {"choice_id": "A", "label": "对镜逐字念（预知·中）", "god_type": "predict", "difficulty": 60},
+      {"choice_id": "B", "label": "砸破瓶喝掉水（污染·中）", "god_type": "pollute", "difficulty": 65}
+    ]
+  },
+  {
+    "event_id": "ECL01",
+    "tier": "lower",
+    "title": "沉锚",
+    "scene_text": "锚钩住了一只还在呼吸的东西，它说锚链那头更冷。",
+    "choices": [
+      {"choice_id": "A", "label": "割断锚链放走它（献祭·下）", "god_type": "sacrifice", "difficulty": 65},
+      {"choice_id": "B", "label": "慢慢收链（时间·下）", "god_type": "time", "difficulty": 70}
+    ]
+  },
+  {
+    "event_id": "ECL02",
+    "tier": "lower",
+    "title": "溺钟",
+    "scene_text": "铁锈色老钟停在你出生的时刻，镜面里像另一个海。",
+    "choices": [
+      {"choice_id": "A", "label": "砸沉不看（献祭·下）", "god_type": "sacrifice", "difficulty": 65},
+      {"choice_id": "B", "label": "擦开钟面（预知·下）", "god_type": "predict", "difficulty": 75}
+    ]
+  },
+  {
+    "event_id": "ECL03",
+    "tier": "lower",
+    "title": "尸网",
+    "scene_text": "渔网拖上来一具穿着你衣服的浮尸，字条写着：第三次才是你。",
+    "choices": [
+      {"choice_id": "A", "label": "焚尸烧字（献祭·下）", "god_type": "sacrifice", "difficulty": 65},
+      {"choice_id": "B", "label": "把它拖上船（污染·下）", "god_type": "pollute", "difficulty": 80}
+    ]
+  },
+  {
+    "event_id": "ECL04",
+    "tier": "lower",
+    "title": "壳之潮",
+    "scene_text": "海螺里回响着每一个别人答应你却没做到的声音。",
+    "choices": [
+      {"choice_id": "A", "label": "把贝壳踩碎（时间·下）", "god_type": "time", "difficulty": 70},
+      {"choice_id": "B", "label": "挑一只聆听（预知·下）", "god_type": "predict", "difficulty": 75}
+    ]
+  },
+  {
+    "event_id": "ECL05",
+    "tier": "lower",
+    "title": "海烟",
+    "scene_text": "雾从浪底翻上来，每吸一口，就多记得一件从未发生过的事。",
+    "choices": [
+      {"choice_id": "A", "label": "屏息划出雾区（时间·下）", "god_type": "time", "difficulty": 70},
+      {"choice_id": "B", "label": "大口吸满雾（污染·下）", "god_type": "pollute", "difficulty": 80}
+    ]
+  },
+  {
+    "event_id": "ECL06",
+    "tier": "lower",
+    "title": "哨礁",
+    "scene_text": "礁石上的风削出一首调子，竟是你母亲哄你入睡时哼过的歌。",
+    "choices": [
+      {"choice_id": "A", "label": "用鱼骨重奏（预知·下）", "god_type": "predict", "difficulty": 75},
+      {"choice_id": "B", "label": "捡礁石带走风（污染·下）", "god_type": "pollute", "difficulty": 80}
+    ]
+  }
+]

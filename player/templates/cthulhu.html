@@ -1,0 +1,225 @@
+{% extends "layout.html" %}
+
+{% block title %}深潜 - MetaFishing！{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-0"><i class="fas fa-water"></i> 克苏鲁深潜</h2>
+        <p class="text-muted mt-2">个人深潜、真名呼唤、全服权柄与永久污染。</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header"><strong>理智与深潜</strong></div>
+            <div class="card-body" id="cthulhuStateCard"></div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header"><strong>待抉择事件</strong></div>
+            <div class="card-body" id="cthulhuEventCard"></div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>我的真名</strong>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshCthulhu()">刷新</button>
+            </div>
+            <div class="card-body" id="cthulhuNamesCard"></div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><strong>进行中的呼唤</strong></div>
+            <div class="card-body" id="cthulhuCallsCard"></div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><strong>权柄展板</strong></div>
+            <div class="card-body" id="cthulhuAuthorityCard"></div>
+        </div>
+    </div>
+</div>
+
+<script id="cthulhuInitialData" type="application/json">{{ initial_view|tojson }}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let cthulhuView = JSON.parse(document.getElementById('cthulhuInitialData').textContent);
+
+async function refreshCthulhu() {
+    const response = await fetch('{{ url_for("player_bp.cthulhu_api_state") }}');
+    cthulhuView = await response.json();
+    renderCthulhu();
+}
+
+async function chooseCthulhu(choiceId) {
+    const response = await fetch('{{ url_for("player_bp.cthulhu_api_choose") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({choice_id: choiceId}),
+    });
+    const data = await response.json();
+    showToast(data.message || (data.success ? '操作成功' : '操作失败'), data.success ? 'success' : 'error');
+    await refreshCthulhu();
+}
+
+async function startCalling(nameId) {
+    const response = await fetch(`/player/api/cthulhu/names/${nameId}/call`, {method: 'POST'});
+    const data = await response.json();
+    showToast(data.message || (data.success ? '已发起呼唤' : '操作失败'), data.success ? 'success' : 'error');
+    await refreshCthulhu();
+}
+
+async function voteCall() {
+    const input = document.getElementById('cthulhuVoteInput');
+    const response = await fetch('{{ url_for("player_bp.cthulhu_api_vote") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name_string: input.value.trim()}),
+    });
+    const data = await response.json();
+    showToast(data.message || (data.success ? '呼唤成功' : '呼唤失败'), data.success ? 'success' : 'error');
+    if (data.success) input.value = '';
+    await refreshCthulhu();
+}
+
+async function useAuthority(authorityId) {
+    if (authorityId.startsWith('time_') || authorityId.startsWith('pollute_')) {
+        const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})});
+        const data = await response.json();
+        showToast(data.message || (data.success ? '权柄已发动' : '权柄使用失败'), data.success ? 'success' : 'error');
+        await refreshCthulhu();
+        return;
+    }
+    if (authorityId.startsWith('predict_')) {
+        const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})});
+        const data = await response.json();
+        if (!data.success) {
+            showToast(data.message || '权柄使用失败', 'error');
+            return;
+        }
+        const lines = (data.candidates || []).map((item, idx) => `${idx + 1}. ${item.name} ${item.rarity}星`).join('\n');
+        const choice = prompt(`预知候选：\n${lines}\n请输入编号确认`);
+        if (!choice) return;
+        const confirmResponse = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({candidate_index: Number(choice) - 1}),
+        });
+        const confirmData = await confirmResponse.json();
+        showToast(confirmData.message || (confirmData.success ? '已确认预知' : '确认失败'), confirmData.success ? 'success' : 'error');
+        await refreshCthulhu();
+        return;
+    }
+    if (authorityId.startsWith('sacrifice_')) {
+        const itemType = prompt('请输入献祭类型：rod / accessory / bait / item');
+        if (!itemType) return;
+        const token = prompt('请输入标识：鱼竿/饰品可用实例 ID 或短码，其余用模板 ID');
+        if (!token) return;
+        const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_type: itemType, token}),
+        });
+        const data = await response.json();
+        showToast(data.message || (data.success ? '献祭成功' : '献祭失败'), data.success ? 'success' : 'error');
+        await refreshCthulhu();
+    }
+}
+
+function renderCthulhu() {
+    const state = cthulhuView.state || {};
+    document.getElementById('cthulhuStateCard').innerHTML = `
+        <p class="mb-2">SAN：<strong>${state.current_san}/${state.max_san}</strong></p>
+        <p class="mb-2">今日深潜：${state.is_in_deepdive_today ? '已开启' : '未开启'}</p>
+        <p class="mb-0">可见污染：${(cthulhuView.visible_pollutions?.visible_pollutions || []).join(', ') || '无'}</p>
+    `;
+
+    const pending = cthulhuView.pending_event;
+    if (!pending) {
+        document.getElementById('cthulhuEventCard').innerHTML = '<p class="text-muted mb-0">当前没有待抉择事件。</p>';
+    } else {
+        const choiceButtons = pending.choices.map(choice => `
+            <button class="btn btn-sm btn-outline-primary me-2 mb-2" onclick="chooseCthulhu('${choice.choice_id}')">
+                ${choice.choice_id}. ${choice.label}
+            </button>
+        `).join('');
+        document.getElementById('cthulhuEventCard').innerHTML = `
+            <h5>${pending.title}</h5>
+            <p class="text-muted">${pending.scene_text}</p>
+            <div>${choiceButtons}</div>
+            <p class="mb-0">当前选择：${cthulhuView.pending_choice || '未选择'}</p>
+        `;
+    }
+
+    const trueNames = cthulhuView.true_names || [];
+    document.getElementById('cthulhuNamesCard').innerHTML = trueNames.length ? `
+        <div class="list-group">
+            ${trueNames.map(name => `
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <div><strong>#${name.name_id}</strong> ${name.name_string}</div>
+                            <div class="small text-muted">${name.god_type} · ${name.tier} · ${name.status}</div>
+                        </div>
+                        ${name.status === 'in_inventory' ? `<button class="btn btn-sm btn-primary" onclick="startCalling(${name.name_id})">发起呼唤</button>` : ''}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    ` : '<p class="text-muted mb-0">你当前没有真名。</p>';
+
+    const calls = cthulhuView.active_calls || [];
+    document.getElementById('cthulhuCallsCard').innerHTML = `
+        <div class="mb-3">
+            <div class="input-group">
+                <input id="cthulhuVoteInput" class="form-control" placeholder="输入精确真名字符串">
+                <button class="btn btn-primary" onclick="voteCall()">呼唤</button>
+            </div>
+        </div>
+        ${calls.length ? calls.map(call => `
+            <div class="border rounded p-2 mb-2">
+                <div><strong>${call.name_string}</strong></div>
+                <div class="small text-muted">${call.owner_nickname || call.owner_user_id} · ${call.god_type} · ${call.tier}</div>
+                <div class="mt-1">${call.progress}/${call.threshold}</div>
+            </div>
+        `).join('') : '<p class="text-muted mb-0">当前没有呼唤进行中。</p>'}
+    `;
+
+    const ownedSet = new Set((cthulhuView.owned_authorities || []).map(item => item.authority_id));
+    const authorities = cthulhuView.authority_board || [];
+    document.getElementById('cthulhuAuthorityCard').innerHTML = authorities.length ? `
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>ID</th><th>当前持有者</th><th>上一任</th><th></th></tr></thead>
+                <tbody>
+                    ${authorities.map(authority => `
+                        <tr>
+                            <td>${authority.authority_id}</td>
+                            <td>${authority.current_holder_nickname || authority.current_holder || '无'}</td>
+                            <td>${authority.previous_holder_nickname || authority.previous_holder || '无'}</td>
+                            <td>${ownedSet.has(authority.authority_id) ? `<button class="btn btn-sm btn-outline-danger" onclick="useAuthority('${authority.authority_id}')">使用</button>` : ''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    ` : '<p class="text-muted mb-0">暂无权柄数据。</p>';
+}
+
+renderCthulhu();
+</script>
+{% endblock %}

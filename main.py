@@ -57,6 +57,7 @@ from .utils import (
 from .handlers import (
     admin_handlers,
     common_handlers,
+    cthulhu_handlers,
     inventory_handlers,
     fishing_handlers,
     market_handlers,
@@ -285,6 +286,8 @@ class FishingPlugin(Star):
         # 魔幻团战 V2 仓储
         from .core.repositories.sqlite_team_battle_repo import SqliteTeamBattleRepository
         self.team_battle_repo = SqliteTeamBattleRepository(db_path)
+        from .core.repositories.sqlite_cthulhu_repo import SqliteCthulhuRepository
+        self.cthulhu_repo = SqliteCthulhuRepository(db_path)
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
         # 3.1 核心服务必须在效果管理器之前实例化，以解决依赖问题
@@ -384,6 +387,18 @@ class FishingPlugin(Star):
             context=self.context,
             image_provider=self.boss_image_provider,
         )
+        from .core.services.cthulhu_service import CthulhuService
+        self.cthulhu_service = CthulhuService(
+            repo=self.cthulhu_repo,
+            user_repo=self.user_repo,
+            inventory_repo=self.inventory_repo,
+            item_template_repo=self.item_template_repo,
+            log_repo=self.log_repo,
+            fishing_service=self.fishing_service,
+            game_config=self.game_config,
+        )
+        self.fishing_service.cthulhu_service = self.cthulhu_service
+        self.fishing_service.inventory_service = self.inventory_service
 
         # 导入并初始化水族箱服务
         from .core.services.aquarium_service import AquariumService
@@ -436,6 +451,7 @@ class FishingPlugin(Star):
                 "achievement_repo": self.achievement_repo,
                 "item_template_repo": self.item_template_repo,
                 "inventory_repo": self.inventory_repo,
+                "cthulhu_repo": self.cthulhu_repo,
             },
         )
         
@@ -465,6 +481,11 @@ class FishingPlugin(Star):
             self.team_battle_service.scan_overdue_on_startup()
         except Exception as exc:
             logger.warning(f"[team_battle] 启动扫描失败: {exc}")
+        self.cthulhu_service.start_daily_settle_task()
+        try:
+            self.cthulhu_service.scan_overdue_on_startup()
+        except Exception as exc:
+            logger.warning(f"[cthulhu] 启动扫描失败: {exc}")
 
         # --- 5. 初始化核心游戏数据 ---
         data_setup_service = DataSetupService(
@@ -588,6 +609,51 @@ class FishingPlugin(Star):
     async def sign_in(self, event: AstrMessageEvent):
         """每日签到领取奖励，连续签到奖励更丰厚"""
         async for r in common_handlers.sign_in(self, event):
+            yield r
+
+    @filter.command("深潜状态")
+    async def cthulhu_state(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.show_state(self, event):
+            yield r
+
+    @filter.command("深潜选择")
+    async def cthulhu_choose(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.choose_event(self, event):
+            yield r
+
+    @filter.command("真名列表")
+    async def cthulhu_true_names(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.list_true_names(self, event):
+            yield r
+
+    @filter.command("发起呼唤")
+    async def cthulhu_start_call(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.initiate_calling(self, event):
+            yield r
+
+    @filter.command("呼唤")
+    async def cthulhu_vote_call(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.vote_calling(self, event):
+            yield r
+
+    @filter.command("权柄")
+    async def cthulhu_authorities(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.show_authorities(self, event):
+            yield r
+
+    @filter.command("权柄使用")
+    async def cthulhu_use_authority(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.use_authority(self, event):
+            yield r
+
+    @filter.command("全服权柄")
+    async def cthulhu_global_authorities(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.show_global_authorities(self, event):
+            yield r
+
+    @filter.command("呼唤进度")
+    async def cthulhu_call_progress(self, event: AstrMessageEvent):
+        async for r in cthulhu_handlers.show_active_calls(self, event):
             yield r
 
     @filter.command("自动钓鱼")
@@ -1393,6 +1459,10 @@ class FishingPlugin(Star):
             self.team_battle_service.stop_daily_settle_task()
         except Exception as exc:
             logger.warning(f"[team_battle] 停止 daily settle task 失败: {exc}")
+        try:
+            self.cthulhu_service.stop_daily_settle_task()
+        except Exception as exc:
+            logger.warning(f"[cthulhu] 停止 daily settle task 失败: {exc}")
 
         await self._shutdown_server_task(
             "web_player_task",
@@ -1665,6 +1735,7 @@ class FishingPlugin(Star):
                 "cultivation_service": self.cultivation_service,
                 "tribulation_service": self.tribulation_service,
                 "team_battle_service": self.team_battle_service,
+                "cthulhu_service": self.cthulhu_service,
             }
 
             app = create_player_app(

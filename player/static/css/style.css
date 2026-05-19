@@ -1446,3 +1446,46 @@ a:hover {
         width: 100%;
     }
 }
+
+body.cthulhu-u8-red {
+    filter: hue-rotate(-18deg) sepia(0.18) saturate(1.32);
+}
+
+body.cthulhu-u8-green {
+    filter: hue-rotate(48deg) sepia(0.2) saturate(1.18);
+}
+
+body.cthulhu-u8-purple {
+    filter: hue-rotate(-46deg) sepia(0.24) saturate(1.28);
+}
+
+.cthulhu-noise-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.12;
+    z-index: 9998;
+    background-image:
+        linear-gradient(transparent 0, rgba(255,255,255,0.08) 50%, transparent 100%),
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18) 0 1px, transparent 1px),
+        radial-gradient(circle at 80% 60%, rgba(255,255,255,0.12) 0 1px, transparent 1px);
+    background-size: 100% 4px, 6px 6px, 8px 8px;
+    mix-blend-mode: overlay;
+}
+
+body.cthulhu-u11,
+body.cthulhu-u11 * {
+    cursor: crosshair;
+}
+
+@keyframes cthulhu-tremble {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(1px, 0); }
+    50% { transform: translate(0, 1px); }
+    75% { transform: translate(-1px, 0); }
+    100% { transform: translate(0, -1px); }
+}
+
+body.cthulhu-u14 .player-main {
+    animation: cthulhu-tremble 1s infinite step-end;
+}

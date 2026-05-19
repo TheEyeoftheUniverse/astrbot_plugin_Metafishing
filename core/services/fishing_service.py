@@ -75,6 +75,7 @@ class FishingService:
         self.cultivation_service = cultivation_service
         # 玄幻渡劫 V2：渡劫核心服务（在 main.py 内 set 进来；可能为 None）
         self.tribulation_service = None
+        self.cthulhu_service = None
 
         # 获取每日刷新时间配置
         self.daily_reset_hour = self.config.get("daily_reset_hour", 0)
@@ -156,6 +157,12 @@ class FishingService:
             self.run_daily_maintenance_if_needed()
 
         user_id = user.user_id
+
+        if user.fishing_zone_id == 7 and self.cthulhu_service is not None:
+            try:
+                self.cthulhu_service.try_enter_deepdive(user_id)
+            except Exception as exc:
+                logger.warning(f"[cthulhu] 深潜触发失败: {exc}")
 
         # 1. 检查成本（从区域配置中读取）
         zone = self.inventory_repo.get_zone_by_id(user.fishing_zone_id)
@@ -1627,6 +1634,12 @@ class FishingService:
             except Exception as exc:
                 logger.warning(f"[tribulation] tick 失败: {exc}")
 
+        if self.cthulhu_service is not None:
+            try:
+                self.cthulhu_service.tick()
+            except Exception as exc:
+                logger.warning(f"[cthulhu] tick 失败: {exc}")
+
         return maintenance_ran
 
     def force_daily_maintenance(self) -> Dict[str, Any]:
@@ -1661,6 +1674,14 @@ class FishingService:
             except Exception as exc:
                 tribulation_error = str(exc)
                 logger.warning(f"[tribulation] 管理员手动触发 tick 失败: {exc}")
+        cthulhu_result = None
+        cthulhu_error = None
+        if self.cthulhu_service is not None:
+            try:
+                cthulhu_result = self.cthulhu_service.force_daily_reset()
+            except Exception as exc:
+                cthulhu_error = str(exc)
+                logger.warning(f"[cthulhu] 管理员手动触发 reset 失败: {exc}")
 
         return {
             "reset_time": current_reset_time.isoformat(),
@@ -1669,6 +1690,8 @@ class FishingService:
             "log_cleanup_result": log_cleanup_result,
             "tribulation_result": tribulation_result,
             "tribulation_error": tribulation_error,
+            "cthulhu_result": cthulhu_result,
+            "cthulhu_error": cthulhu_error,
         }
 
     def start_auto_fishing_task(self):

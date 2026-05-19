@@ -4151,6 +4151,138 @@ async def fishing():
                                   all_zones=all_zones)
 
 
+@player_bp.route("/cthulhu")
+@login_required
+async def cthulhu_page():
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return "克苏鲁深潜服务未启用。", 503
+    view = cthulhu_service.get_state_view(user_id)
+    return await render_template("cthulhu.html", initial_view=view)
+
+
+@player_bp.route("/api/cthulhu/state/me")
+@login_required
+async def cthulhu_api_state():
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(cthulhu_service.get_state_view(user_id))
+
+
+@player_bp.route("/api/cthulhu/names/me")
+@login_required
+async def cthulhu_api_names():
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(cthulhu_service.list_true_names(user_id))
+
+
+@player_bp.route("/api/cthulhu/names/<int:name_id>/call", methods=["POST"])
+@login_required
+async def cthulhu_api_call_name(name_id: int):
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(cthulhu_service.initiate_calling(user_id, name_id))
+
+
+@player_bp.route("/api/cthulhu/calls/active")
+@login_required
+async def cthulhu_api_calls():
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(cthulhu_service.list_active_calls())
+
+
+@player_bp.route("/api/cthulhu/calls/vote", methods=["POST"])
+@login_required
+async def cthulhu_api_vote():
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    return jsonify(cthulhu_service.vote_on_call(user_id, str(payload.get("name_string", "") or "").strip()))
+
+
+@player_bp.route("/api/cthulhu/authority/all")
+@login_required
+async def cthulhu_api_authority():
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(cthulhu_service.list_authorities())
+
+
+@player_bp.route("/api/cthulhu/authority/<authority_id>/use", methods=["POST"])
+@login_required
+async def cthulhu_api_use_authority(authority_id: str):
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    if authority_id.startswith("predict_"):
+        if payload.get("candidate_index") is not None:
+            result = cthulhu_service.confirm_predict(user_id, int(payload.get("candidate_index")))
+        else:
+            result = cthulhu_service.prepare_predict(user_id, authority_id)
+    elif authority_id.startswith("time_"):
+        result = cthulhu_service.use_time_authority(user_id, authority_id)
+    elif authority_id.startswith("pollute_"):
+        result = cthulhu_service.use_pollute_authority(user_id, authority_id)
+    elif authority_id.startswith("sacrifice_"):
+        result = cthulhu_service.use_sacrifice_authority(
+            user_id,
+            authority_id,
+            str(payload.get("item_type", "") or ""),
+            str(payload.get("token", "") or ""),
+        )
+    else:
+        result = {"success": False, "message": "unknown authority"}
+    return jsonify(result)
+
+
+@player_bp.route("/api/cthulhu/pollution/me")
+@login_required
+async def cthulhu_api_pollution():
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(cthulhu_service.get_visible_pollutions(user_id))
+
+
+@player_bp.route("/api/cthulhu/event/choose", methods=["POST"])
+@login_required
+async def cthulhu_api_choose():
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    result = cthulhu_service.stage_event_choice(user_id, str(payload.get("choice_id", "") or ""))
+    return jsonify(result)
+
+
+@player_bp.route("/api/cthulhu/event_log/me")
+@login_required
+async def cthulhu_api_event_log():
+    user_id = session["user_id"]
+    cthulhu_service = current_app.config.get("CTHULHU_SERVICE")
+    if not cthulhu_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    limit = request.args.get("limit", 50, type=int)
+    return jsonify(cthulhu_service.list_event_logs(user_id, limit))
+
+
 # ==================== 玄幻渡劫 V2 ====================
 
 @player_bp.route("/tribulation")
