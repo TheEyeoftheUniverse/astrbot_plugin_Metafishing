@@ -1,0 +1,220 @@
+{% extends "layout.html" %}
+{% block title %}科幻干预 - MetaFishing！{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header"><i class="fas fa-satellite-dish"></i> 科技总览</div>
+            <div class="card-body" id="scifiSummaryCard"></div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header"><i class="fas fa-project-diagram"></i> 分支加点</div>
+            <div class="card-body" id="scifiBranchCard"></div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header"><i class="fas fa-bolt"></i> 觉醒协议</div>
+            <div class="card-body" id="scifiApexCard"></div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header"><i class="fas fa-trophy"></i> 科技榜</div>
+            <div class="card-body" id="scifiBoardCard"></div>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header"><i class="fas fa-history"></i> 最近日志</div>
+            <div class="card-body" id="scifiLogCard"></div>
+        </div>
+    </div>
+</div>
+
+<script id="scifiInitialData" type="application/json">{{ initial_view|tojson }}</script>
+<script>
+let scifiView = JSON.parse(document.getElementById('scifiInitialData').textContent);
+let scifiBoard = [];
+let scifiLogs = [];
+
+async function refreshScifiState() {
+    const response = await fetch('{{ url_for("player_bp.scifi_api_state") }}');
+    scifiView = await response.json();
+    renderScifi();
+}
+
+async function refreshScifiBoard() {
+    const response = await fetch('{{ url_for("player_bp.scifi_api_leaderboard") }}?limit=10');
+    const payload = await response.json();
+    scifiBoard = payload.leaderboard || [];
+    renderBoard();
+}
+
+async function refreshScifiLogs() {
+    const response = await fetch('{{ url_for("player_bp.scifi_api_event_log") }}?limit=20');
+    const payload = await response.json();
+    scifiLogs = payload.logs || [];
+    renderLogs();
+}
+
+async function postScifi(url, payload = {}) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    });
+    return await response.json();
+}
+
+async function levelUpBranch(branchId) {
+    const result = await postScifi('{{ url_for("player_bp.scifi_api_level_up") }}', {branch: branchId, count: 1});
+    showToast(result.message || (result.success ? '加点成功' : '加点失败'), result.success ? 'success' : 'danger');
+    if (result.success) {
+        await refreshScifiState();
+        await refreshScifiBoard();
+        await refreshScifiLogs();
+    }
+}
+
+async function selectApex(apexId) {
+    const result = await postScifi('{{ url_for("player_bp.scifi_api_apex_select") }}', {apex: apexId});
+    showToast(result.message || (result.success ? '觉醒成功' : '觉醒失败'), result.success ? 'success' : 'danger');
+    if (result.success) {
+        await refreshScifiState();
+        await refreshScifiBoard();
+        await refreshScifiLogs();
+    }
+}
+
+async function resetApex() {
+    const confirmed = await webuiConfirm('将消耗 1 个协议重写芯并清空当前觉醒协议，是否继续？', {
+        title: '重写协议',
+        confirmText: '确认重写',
+        confirmClass: 'btn-danger'
+    });
+    if (!confirmed) return;
+    const result = await postScifi('{{ url_for("player_bp.scifi_api_apex_reset") }}');
+    showToast(result.message || (result.success ? '重写成功' : '重写失败'), result.success ? 'success' : 'danger');
+    if (result.success) {
+        await refreshScifiState();
+        await refreshScifiBoard();
+        await refreshScifiLogs();
+    }
+}
+
+function renderScifi() {
+    const state = scifiView.state || {};
+    const append = scifiView.append_rate || {};
+    document.getElementById('scifiSummaryCard').innerHTML = `
+        <div class="d-flex justify-content-between mb-2"><span>科研点</span><strong>${state.research_points ?? 0}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>总等级</span><strong>${scifiView.total_level ?? 0}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>总追加率</span><strong>${append.total_append_rate_bp ?? 0} bp</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>等价百分比</span><strong>${(append.total_append_rate_percent ?? 0).toFixed(2)}%</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>觉醒协议</span><strong>${state.apex_protocol ? apexName(state.apex_protocol) : '未选择'}</strong></div>
+        <div class="d-flex justify-content-between"><span>协议重写芯</span><strong>${scifiView.chip_count ?? 0}</strong></div>
+    `;
+
+    const branches = scifiView.branches || [];
+    document.getElementById('scifiBranchCard').innerHTML = branches.map(branch => `
+        <div class="border rounded p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <h5 class="mb-1">${branch.name}</h5>
+                    <div class="text-muted small">影响：${branch.target}</div>
+                </div>
+                <span class="badge bg-primary">Lv.${branch.level}</span>
+            </div>
+            <div class="small text-muted mb-2">当前追加率：${branch.append_rate_bp} bp</div>
+            ${branch.cthulhu_offset !== null ? `<div class="small text-muted mb-1">克苏鲁大失败阈值偏移：-${branch.cthulhu_offset}</div>` : ''}
+            ${branch.tribulation_multiplier !== null ? `<div class="small text-muted mb-1">渡劫成功率乘区：×${branch.tribulation_multiplier.toFixed(2)}</div>` : ''}
+            ${branch.team_battle_penalty !== null ? `<div class="small text-muted mb-1">团战 d20 惩罚：-${branch.team_battle_penalty}</div>` : ''}
+            <button class="btn btn-sm btn-outline-primary mt-2" ${branch.level >= branch.max_level ? 'disabled' : ''} onclick="levelUpBranch('${branch.id}')">
+                升 1 级${branch.level < branch.max_level ? ` (${branch.next_level_cost} 点)` : ''}
+            </button>
+        </div>
+    `).join('');
+
+    const apexUnlocks = scifiView.apex_unlocks || [];
+    document.getElementById('scifiApexCard').innerHTML = `
+        <div class="mb-3">当前协议：<strong>${state.apex_protocol ? apexName(state.apex_protocol) : '未选择'}</strong></div>
+        ${apexUnlocks.map(apex => `
+            <div class="border rounded p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>${apex.name}</strong>
+                    <span class="badge ${apex.selected ? 'bg-success' : (apex.unlocked ? 'bg-primary' : 'bg-secondary')}">
+                        ${apex.selected ? '已持有' : (apex.unlocked ? '可选择' : '未解锁')}
+                    </span>
+                </div>
+                <div class="small text-muted mb-2">追加加成：+${apex.append_rate_bp} bp</div>
+                <div class="small text-muted mb-2">条件：${formatRequirements(apex.requirements)}</div>
+                <button class="btn btn-sm btn-outline-success" ${(!apex.unlocked || state.apex_protocol) ? 'disabled' : ''} onclick="selectApex('${apex.id}')">选择协议</button>
+            </div>
+        `).join('')}
+        <button class="btn btn-sm btn-outline-danger" ${!state.apex_protocol ? 'disabled' : ''} onclick="resetApex()">消耗重写芯重置协议</button>
+    `;
+}
+
+function renderBoard() {
+    document.getElementById('scifiBoardCard').innerHTML = scifiBoard.length ? `
+        <div class="list-group list-group-flush">
+            ${scifiBoard.map(row => `
+                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <div>
+                        <div>#${row.rank} ${row.nickname}</div>
+                        <div class="small text-muted">总等级 ${row.total_level} · 科研累计 ${row.total_research_points_earned}</div>
+                    </div>
+                    <span class="badge bg-dark">${row.append_rate_bp} bp</span>
+                </div>
+            `).join('')}
+        </div>
+    ` : '<p class="text-muted mb-0">暂无排行数据。</p>';
+}
+
+function renderLogs() {
+    document.getElementById('scifiLogCard').innerHTML = scifiLogs.length ? `
+        <div class="list-group list-group-flush">
+            ${scifiLogs.map(log => `
+                <div class="list-group-item px-0">
+                    <div class="d-flex justify-content-between">
+                        <strong>${log.event_type}</strong>
+                        <span class="small text-muted">${log.occurred_at}</span>
+                    </div>
+                    <div class="small text-muted">${formatEventDetail(log.event_detail || {})}</div>
+                </div>
+            `).join('')}
+        </div>
+    ` : '<p class="text-muted mb-0">暂无事件日志。</p>';
+}
+
+function apexName(apexId) {
+    const mapping = {
+        singularity: '奇点协议',
+        abyss_unity: '深渊归一',
+        fate_solitude: '天命独行',
+        resonance_summit: '共振之巅',
+    };
+    return mapping[apexId] || apexId;
+}
+
+function formatRequirements(requirements) {
+    const mapping = {
+        abyss_compression: '深渊压缩',
+        fate_severance: '天命截断',
+        resonance_dampening: '共振拑鋭',
+    };
+    return Object.entries(requirements || {}).map(([key, value]) => `${mapping[key] || key} Lv.${value}`).join(' / ');
+}
+
+function formatEventDetail(detail) {
+    return Object.entries(detail || {}).map(([key, value]) => `${key}: ${value}`).join(' · ') || '无细节';
+}
+
+renderScifi();
+refreshScifiBoard();
+refreshScifiLogs();
+</script>
+{% endblock %}

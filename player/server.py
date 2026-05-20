@@ -4171,6 +4171,96 @@ async def cthulhu_page():
     return await render_template("cthulhu.html", initial_view=view)
 
 
+@player_bp.route("/scifi")
+@login_required
+async def scifi_page():
+    user_id = session["user_id"]
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return "科幻干预服务未启用。", 503
+    view = scifi_service.get_state_view(user_id)
+    return await render_template("scifi.html", initial_view=view)
+
+
+@player_bp.route("/api/scifi/state/me")
+@login_required
+async def scifi_api_state():
+    user_id = session["user_id"]
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(scifi_service.get_state_view(user_id))
+
+
+@player_bp.route("/api/scifi/append_rate/me")
+@login_required
+async def scifi_api_append_rate():
+    user_id = session["user_id"]
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(scifi_service.get_append_rate_breakdown(user_id))
+
+
+@player_bp.route("/api/scifi/level_up", methods=["POST"])
+@login_required
+async def scifi_api_level_up():
+    user_id = session["user_id"]
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    return jsonify(
+        scifi_service.level_up_branch(
+            user_id,
+            str(payload.get("branch", "") or "").strip(),
+            int(payload.get("count", 1) or 1),
+        )
+    )
+
+
+@player_bp.route("/api/scifi/apex/select", methods=["POST"])
+@login_required
+async def scifi_api_apex_select():
+    user_id = session["user_id"]
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    payload = await _read_request_payload()
+    return jsonify(scifi_service.select_apex(user_id, str(payload.get("apex", "") or "").strip()))
+
+
+@player_bp.route("/api/scifi/apex/reset", methods=["POST"])
+@login_required
+async def scifi_api_apex_reset():
+    user_id = session["user_id"]
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    return jsonify(scifi_service.reset_apex(user_id))
+
+
+@player_bp.route("/api/scifi/leaderboard")
+@login_required
+async def scifi_api_leaderboard():
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    limit = request.args.get("limit", 50, type=int)
+    return jsonify(scifi_service.get_leaderboard(limit=limit))
+
+
+@player_bp.route("/api/scifi/event_log/me")
+@login_required
+async def scifi_api_event_log():
+    user_id = session["user_id"]
+    scifi_service = current_app.config.get("SCIFI_SERVICE")
+    if not scifi_service:
+        return jsonify({"success": False, "message": "service unavailable"}), 503
+    limit = request.args.get("limit", 50, type=int)
+    return jsonify(scifi_service.list_event_logs(user_id, limit=limit))
+
+
 @player_bp.route("/api/cthulhu/state/me")
 @login_required
 async def cthulhu_api_state():

@@ -645,6 +645,7 @@ CREATE TABLE user_cultivation (
             daily_guard_reward_count      INTEGER NOT NULL DEFAULT 0,
             daily_count_reset_at          TEXT,
             sci_fi_intervention_level     INTEGER NOT NULL DEFAULT 0,
+            sci_fi_apex_fate_solitude     INTEGER NOT NULL DEFAULT 0,
             updated_at                    TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         );
@@ -852,10 +853,47 @@ CREATE TABLE user_cthulhu_state (
     forced_pollution_until       TEXT,
     pending_san_cap_tokens       INTEGER NOT NULL DEFAULT 0,
     sci_fi_intervention_level    INTEGER NOT NULL DEFAULT 0,
+    sci_fi_apex_abyss_unity      INTEGER NOT NULL DEFAULT 0,
     last_daily_reset_at          TEXT,
     pending_predict_candidates   TEXT,
     pending_predict_expires_at   TEXT
 );
+
+-- table: user_scifi_state
+CREATE TABLE user_scifi_state (
+    user_id                        TEXT PRIMARY KEY,
+    research_points                INTEGER NOT NULL DEFAULT 0,
+    abyss_compression_level        INTEGER NOT NULL DEFAULT 0 CHECK(abyss_compression_level BETWEEN 0 AND 5),
+    fate_severance_level           INTEGER NOT NULL DEFAULT 0 CHECK(fate_severance_level BETWEEN 0 AND 5),
+    resonance_dampening_level      INTEGER NOT NULL DEFAULT 0 CHECK(resonance_dampening_level BETWEEN 0 AND 5),
+    apex_protocol                  TEXT CHECK(apex_protocol IN ('singularity','abyss_unity','fate_solitude','resonance_summit') OR apex_protocol IS NULL),
+    apex_acquired_at               TEXT,
+    last_recompose_at              TEXT,
+    total_research_points_earned   INTEGER NOT NULL DEFAULT 0,
+    total_append_triggered         INTEGER NOT NULL DEFAULT 0,
+    created_at                     TEXT NOT NULL,
+    updated_at                     TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- index: idx_user_scifi_state_apex
+CREATE INDEX idx_user_scifi_state_apex ON user_scifi_state(apex_protocol);
+
+-- table: scifi_event_log
+CREATE TABLE scifi_event_log (
+    log_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    event_detail  TEXT,
+    occurred_at   TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user_scifi_state(user_id) ON DELETE CASCADE
+);
+
+-- index: idx_scifi_event_log_user_time
+CREATE INDEX idx_scifi_event_log_user_time ON scifi_event_log(user_id, occurred_at);
+
+-- index: idx_scifi_event_log_type_time
+CREATE INDEX idx_scifi_event_log_type_time ON scifi_event_log(event_type, occurred_at);
 
 -- table: cthulhu_event_log
 CREATE TABLE cthulhu_event_log (

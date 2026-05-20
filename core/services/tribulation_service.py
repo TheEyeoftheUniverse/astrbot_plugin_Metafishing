@@ -39,6 +39,7 @@ from ..domain.tribulation_models import (
 )
 from ..repositories.sqlite_tribulation_repo import SqliteTribulationRepository
 from . import tribulation_constants as C
+from . import scifi_constants as SCIFI
 from ..utils import get_now, get_last_reset_time
 
 
@@ -289,9 +290,11 @@ class TribulationService:
         base_rate = C.BASE_SUCCESS_RATE.get(target_realm, 0.0)
         self_rate = base_rate + items_bonus + equip_bonus + buff_bonus
 
-        # 接入点 #1：渡劫者削弱（V2+）
-        if self_intervention_level > 0:
-            self_rate *= (1 - 0.05 * self_intervention_level)
+        # 接入点 #1：渡劫者削弱（科幻天命截断）
+        self_rate *= SCIFI.TRIBULATION_SELF_RATE_MULTIPLIER.get(
+            max(0, min(int(self_intervention_level or 0), SCIFI.MAX_BRANCH_LEVEL)),
+            1.0,
+        )
 
         self_rate_capped = min(self_rate, C.SELF_SUCCESS_RATE_CAP)
 
@@ -350,6 +353,8 @@ class TribulationService:
             self_intervention_level=profile.sci_fi_intervention_level,
             guards_with_intervention=None,
         )
+        if profile.sci_fi_apex_fate_solitude:
+            success_rate *= 0.75
 
         return {
             "success": True,
@@ -551,6 +556,8 @@ class TribulationService:
             self_intervention_level=profile.sci_fi_intervention_level,
             guards_with_intervention=None,
         )
+        if profile.sci_fi_apex_fate_solitude:
+            success_rate *= 0.75
 
         # §6.5.2 天成自动成功
         if final_quality == "tiancheng":
@@ -645,7 +652,11 @@ class TribulationService:
             ptype = PARTICIPANT_OBSERVER
 
         joined_at = _now_iso()
-        ok = self.repo.add_participant(event_id, user_id, ptype, joined_at, is_effective=True)
+        is_effective = True
+        if ptype == PARTICIPANT_GUARD and int(my_profile.sci_fi_intervention_level or 0) >= 1:
+            is_effective = False
+
+        ok = self.repo.add_participant(event_id, user_id, ptype, joined_at, is_effective=is_effective)
         if not ok:
             return {"success": False, "message": "已存在参与记录。"}
 
@@ -653,7 +664,11 @@ class TribulationService:
             "success": True,
             "event_id": event_id,
             "type": ptype,
-            "message": f"已加入 #{event_id}（{'护法' if ptype == PARTICIPANT_GUARD else '观道'}）",
+            "message": (
+                f"已加入 #{event_id}（{'护法' if ptype == PARTICIPANT_GUARD else '观道'}）"
+                if is_effective
+                else f"已加入 #{event_id}（护法，受科幻干预影响，本次护法不会提供成功率加成）"
+            ),
         }
 
     # ------------------------------------------------------------------

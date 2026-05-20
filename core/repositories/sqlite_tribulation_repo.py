@@ -44,6 +44,7 @@ def _row_to_profile(row) -> CultivationProfile:
         daily_guard_reward_count=int(row["daily_guard_reward_count"] or 0),
         daily_count_reset_at=row["daily_count_reset_at"],
         sci_fi_intervention_level=int(row["sci_fi_intervention_level"] or 0),
+        sci_fi_apex_fate_solitude=bool(row["sci_fi_apex_fate_solitude"]),
         updated_at=row["updated_at"],
     )
 
@@ -115,8 +116,9 @@ class SqliteTribulationRepository:
                     accumulated_xiuwei, consecutive_failures,
                     realm_history, tiancheng_protection,
                     daily_observer_reward_count, daily_guard_reward_count,
-                    daily_count_reset_at, sci_fi_intervention_level, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    daily_count_reset_at, sci_fi_intervention_level,
+                    sci_fi_apex_fate_solitude, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
                     current_realm = excluded.current_realm,
                     current_realm_quality = excluded.current_realm_quality,
@@ -128,6 +130,7 @@ class SqliteTribulationRepository:
                     daily_guard_reward_count = excluded.daily_guard_reward_count,
                     daily_count_reset_at = excluded.daily_count_reset_at,
                     sci_fi_intervention_level = excluded.sci_fi_intervention_level,
+                    sci_fi_apex_fate_solitude = excluded.sci_fi_apex_fate_solitude,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -142,6 +145,7 @@ class SqliteTribulationRepository:
                     int(profile.daily_guard_reward_count),
                     profile.daily_count_reset_at,
                     int(profile.sci_fi_intervention_level),
+                    1 if profile.sci_fi_apex_fate_solitude else 0,
                     profile.updated_at,
                 ),
             )

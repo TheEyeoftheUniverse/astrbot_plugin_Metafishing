@@ -64,6 +64,7 @@ from .handlers import (
     social_handlers,
     gacha_handlers,
     aquarium_handlers,
+    scifi_handlers,
     tribulation_handlers,
     team_battle_handlers,
 )
@@ -288,6 +289,8 @@ class FishingPlugin(Star):
         self.team_battle_repo = SqliteTeamBattleRepository(db_path)
         from .core.repositories.sqlite_cthulhu_repo import SqliteCthulhuRepository
         self.cthulhu_repo = SqliteCthulhuRepository(db_path)
+        from .core.repositories.sqlite_scifi_repo import SqliteSciFiRepository
+        self.scifi_repo = SqliteSciFiRepository(db_path)
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
         # 3.1 核心服务必须在效果管理器之前实例化，以解决依赖问题
@@ -345,6 +348,14 @@ class FishingPlugin(Star):
         # 玄幻渡劫 V2：修行服务（在 FishingService 之前实例化以便注入）
         from .core.services.cultivation_service import CultivationService
         self.cultivation_service = CultivationService(self.tribulation_repo)
+        from .core.services.scifi_service import SciFiService
+        self.scifi_service = SciFiService(
+            repo=self.scifi_repo,
+            inventory_repo=self.inventory_repo,
+            item_template_repo=self.item_template_repo,
+            cthulhu_repo=self.cthulhu_repo,
+            cultivation_service=self.cultivation_service,
+        )
 
         self.fishing_service = FishingService(
             self.user_repo,
@@ -357,6 +368,7 @@ class FishingPlugin(Star):
             self.expedition_service,  # 传递科考服务
             self.cultivation_service,  # 传递修行服务（玄幻渡劫 V2）
         )
+        self.fishing_service.scifi_service = self.scifi_service
 
         # 玄幻渡劫 V2：渡劫核心服务
         from .core.services.tribulation_service import TribulationService
@@ -387,6 +399,7 @@ class FishingPlugin(Star):
             context=self.context,
             image_provider=self.boss_image_provider,
         )
+        self.team_battle_service.scifi_service = self.scifi_service
         from .core.services.cthulhu_service import CthulhuService
         self.cthulhu_service = CthulhuService(
             repo=self.cthulhu_repo,
@@ -654,6 +667,36 @@ class FishingPlugin(Star):
     @filter.command("呼唤进度")
     async def cthulhu_call_progress(self, event: AstrMessageEvent):
         async for r in cthulhu_handlers.show_active_calls(self, event):
+            yield r
+
+    @filter.command("科技", alias={"科幻", "科技状态"})
+    async def scifi_state(self, event: AstrMessageEvent):
+        async for r in scifi_handlers.show_state(self, event):
+            yield r
+
+    @filter.command("加点")
+    async def scifi_level_up(self, event: AstrMessageEvent):
+        async for r in scifi_handlers.level_up(self, event):
+            yield r
+
+    @filter.command("觉醒")
+    async def scifi_select_apex(self, event: AstrMessageEvent):
+        async for r in scifi_handlers.select_apex(self, event):
+            yield r
+
+    @filter.command("重写协议")
+    async def scifi_reset_apex(self, event: AstrMessageEvent):
+        async for r in scifi_handlers.reset_apex(self, event):
+            yield r
+
+    @filter.command("追加率")
+    async def scifi_append_rate(self, event: AstrMessageEvent):
+        async for r in scifi_handlers.show_append_rate(self, event):
+            yield r
+
+    @filter.command("科技榜")
+    async def scifi_leaderboard(self, event: AstrMessageEvent):
+        async for r in scifi_handlers.show_leaderboard(self, event):
             yield r
 
     @filter.command("自动钓鱼")
@@ -1733,6 +1776,7 @@ class FishingPlugin(Star):
                 "aquarium_quips_service": self.aquarium_quips_service,
                 "expedition_service": self.expedition_service,
                 "cultivation_service": self.cultivation_service,
+                "scifi_service": self.scifi_service,
                 "tribulation_service": self.tribulation_service,
                 "team_battle_service": self.team_battle_service,
                 "cthulhu_service": self.cthulhu_service,

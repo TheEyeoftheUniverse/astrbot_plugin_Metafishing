@@ -56,7 +56,7 @@ class SqliteCthulhuRepository:
                 except Exception:
                     data["pending_predict_candidates"] = []
             else:
-                data["pending_predict_candidates"] = []
+                    data["pending_predict_candidates"] = []
             return data
 
     def update_state_fields(self, user_id: str, **fields: Any) -> None:

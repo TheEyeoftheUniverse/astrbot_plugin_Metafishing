@@ -63,6 +63,7 @@ class TeamBattleService:
         self.game_config = game_config
         self.context = context
         self.image_provider = image_provider or NullBossImageProvider()
+        self.scifi_service = None
 
         tb_cfg = self.game_config.get("team_battle", {}) if isinstance(self.game_config, dict) else {}
         self._settle_offset_minutes = int(tb_cfg.get("settle_offset_minutes", 2))
@@ -438,16 +439,25 @@ class TeamBattleService:
         highlights: List[str] = []
         nickname = self._lookup_nickname(user_id)
         for fish in fish_team:
-            roll = random.randint(1, 20)
-            hit = (roll + int(fish["rarity"])) >= ac
+            raw_roll = random.randint(1, 20)
+            penalty = 0
+            if self.scifi_service is not None:
+                try:
+                    penalty = int(self.scifi_service.get_resonance_d20_penalty(user_id))
+                except Exception as exc:
+                    logger.warning(f"[team_battle] scifi resonance penalty lookup failed: {exc}")
+                    penalty = 0
+            effective_roll = raw_roll - penalty
+            hit = (effective_roll + int(fish["rarity"])) >= ac
             if not hit:
                 total += 1
                 continue
             damage = int(fish["value"])
             is_crit = False
-            if roll == 20:
+            if raw_roll == 20:
                 second_roll = random.randint(1, 20)
-                if (second_roll + int(fish["rarity"])) >= ac:
+                second_effective_roll = second_roll - penalty
+                if (second_effective_roll + int(fish["rarity"])) >= ac:
                     damage *= 2
                     is_crit = True
             total += damage
