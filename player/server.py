@@ -4160,6 +4160,28 @@ async def fishing():
                                   cthulhu_view=cthulhu_view)
 
 
+@player_bp.route("/expedition")
+@login_required
+async def expedition_page():
+    """科学考察公告板页面"""
+    user_id = session.get("user_id")
+    expedition_service = current_app.config.get("EXPEDITION_SERVICE")
+    active_expeditions = []
+
+    if expedition_service:
+        try:
+            active_expeditions = expedition_service.get_all_active_expeditions(user_id)
+            logger.info(f"成功获取科考数据，共{len(active_expeditions)}个进行中的科考")
+            if active_expeditions:
+                logger.info(f"科考数据示例: {active_expeditions[0]}")
+        except Exception as e:
+            logger.error(f"获取科考数据失败: {e}", exc_info=True)
+    else:
+        logger.warning("expedition_service未初始化")
+
+    return await render_template("expedition.html", expeditions=active_expeditions)
+
+
 @player_bp.route("/cthulhu")
 @login_required
 async def cthulhu_page():

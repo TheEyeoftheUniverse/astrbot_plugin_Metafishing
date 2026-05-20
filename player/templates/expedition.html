@@ -1,0 +1,263 @@
+{% extends "layout.html" %}
+
+{% block title %}考察 - MetaFishing！{% endblock %}
+
+{% block extra_css %}
+<style>
+.expedition-hero {
+    border: 1px solid rgba(13, 202, 240, 0.25);
+    background: linear-gradient(135deg, rgba(13, 202, 240, 0.08), rgba(25, 135, 84, 0.08));
+}
+
+.expedition-card .card-header {
+    min-height: 78px;
+}
+
+.expedition-invite-pill {
+    font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    letter-spacing: 0.08em;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-0">
+            <i class="fas fa-compass"></i> 科学考察公告板
+        </h2>
+        <p class="text-muted mt-2">查看进行中的科考队伍，公开邀请码加入，或在完成后领取个人奖励。</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card expedition-hero">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-lg-8">
+                        <h5 class="mb-2"><i class="fas fa-flask"></i> 发起方式</h5>
+                        <p class="mb-0 text-muted">使用命令 <code>,发起科考 探险|征服|圣域</code> 创建队伍。队长可在本页公开邀请码，队员可直接点击邀请码加入。</p>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                            <span class="badge bg-success">探险</span>
+                            <span class="badge bg-warning text-dark">征服</span>
+                            <span class="badge bg-danger">圣域</span>
+                            <span class="badge bg-info text-dark">{{ expeditions|length }} 个进行中</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        {% if expeditions %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+            {% for exp in expeditions %}
+            <div class="col">
+                <div class="card h-100 expedition-card {% if exp.type == 'short' %}border-success{% elif exp.type == 'medium' %}border-warning{% else %}border-danger{% endif %}">
+                    <div class="card-header {% if exp.type == 'short' %}bg-success{% elif exp.type == 'medium' %}bg-warning{% else %}bg-danger{% endif %} text-white">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div class="d-flex flex-column gap-1">
+                                <strong>
+                                    {% if exp.type == 'short' %}
+                                    <i class="fas fa-leaf"></i> 探险科考
+                                    {% elif exp.type == 'medium' %}
+                                    <i class="fas fa-compass"></i> 征服科考
+                                    {% else %}
+                                    <i class="fas fa-rocket"></i> 圣域科考
+                                    {% endif %}
+                                </strong>
+                                <span class="badge bg-light text-dark align-self-start">{{ exp.member_count }} 人</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 expedition-action-bar">
+                                {% if exp.is_current_user_creator and exp.status == 'active' %}
+                                <button class="btn btn-sm expedition-action-button {% if exp.invite_public %}btn-warning{% else %}btn-light{% endif %}"
+                                        type="button"
+                                        title="{% if exp.invite_public %}关闭公开邀请码{% else %}公开邀请码{% endif %}"
+                                        onclick="setExpeditionInvitePublic('{{ exp.expedition_id }}', {% if exp.invite_public %}false{% else %}true{% endif %})">
+                                    <i class="fas {% if exp.invite_public %}fa-eye-slash{% else %}fa-bullhorn{% endif %}"></i>
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm expedition-action-button {% if exp.current_user_can_claim %}btn-success{% elif exp.current_user_claimed %}btn-outline-light{% else %}btn-secondary{% endif %}"
+                                        type="button"
+                                        title="{% if exp.current_user_claimed %}奖励已领取{% elif exp.current_user_can_claim %}领取奖励{% else %}任务全部完成后可领取{% endif %}"
+                                        {% if exp.current_user_can_claim %}
+                                        onclick="claimExpeditionReward('{{ exp.expedition_id }}')"
+                                        {% else %}
+                                        disabled
+                                        {% endif %}>
+                                    <i class="fas {% if exp.current_user_claimed %}fa-check{% else %}fa-gift{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-user"></i> 队长：{{ exp.creator_name }}
+                            </small>
+                        </div>
+                        {% if exp.can_show_invite_code %}
+                        <div class="mb-3">
+                            {% if exp.can_join_via_public_invite %}
+                            <button class="btn btn-sm btn-light expedition-invite-pill" type="button"
+                                    title="点击加入科考"
+                                    onclick="joinExpedition('{{ exp.expedition_id }}')">
+                                {{ exp.expedition_id }}
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-light expedition-invite-pill" type="button"
+                                    title="复制邀请码"
+                                    onclick="copyExpeditionCode('{{ exp.expedition_id }}')">
+                                {{ exp.expedition_id }}
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small><strong>总进度</strong></small>
+                                <small class="text-muted">{{ (exp.total_progress * 100)|round(1) }}%</small>
+                            </div>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-info progress-bar-striped progress-bar-animated"
+                                     role="progressbar"
+                                     style="width: {{ (exp.total_progress * 100)|round(1) }}%"
+                                     aria-valuenow="{{ (exp.total_progress * 100)|round(1) }}"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    {{ (exp.total_progress * 100)|round(1) }}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <small><strong>目标鱼类</strong></small>
+                            <div class="mt-1">
+                                {% for key, target in exp.targets.items() %}
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="small">{{ star_label(target.rarity) }} {{ target.fish_name }}</span>
+                                    <span class="small text-muted">{{ target.caught }}/{{ target.required }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="mt-auto">
+                            <small class="text-muted text-center d-block">
+                                {{ exp.current_user_reward_text or '任务全部完成后可领取' }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="fas fa-compass fa-3x mb-3"></i>
+                <p class="mb-2">暂无进行中的科学考察</p>
+                <small>使用命令 <code>,发起科考 探险|征服|圣域</code> 发起科考队伍</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+    }
+
+    const tempInput = document.createElement('input');
+    tempInput.value = text;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    tempInput.setSelectionRange(0, 99999);
+
+    try {
+        return document.execCommand('copy');
+    } finally {
+        document.body.removeChild(tempInput);
+    }
+}
+
+async function copyExpeditionCode(code) {
+    try {
+        const copied = await copyTextToClipboard(code);
+        showToast(copied ? `邀请码已复制：${code}` : `复制失败，请手动复制：${code}`, copied ? 'success' : 'error');
+    } catch (error) {
+        showToast(`复制失败，请手动复制：${code}`, 'error');
+    }
+}
+
+async function setExpeditionInvitePublic(expeditionId, isPublic) {
+    try {
+        const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/publish-invite`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                public: !!isPublic
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            await showToast(data.message || (isPublic ? '邀请码已公开' : '邀请码已取消公开'), 'success');
+            window.location.reload();
+            return;
+        }
+
+        showToast(data.message || '操作失败', 'error');
+    } catch (error) {
+        showToast('操作失败，请稍后重试', 'error');
+    }
+}
+
+async function joinExpedition(expeditionId) {
+    try {
+        const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/join`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        if (data.success) {
+            await showToast(data.message || '加入成功', 'success');
+            window.location.reload();
+            return;
+        }
+        showToast(data.message || '加入失败', 'error');
+    } catch (error) {
+        showToast('加入失败，请稍后重试', 'error');
+    }
+}
+
+async function claimExpeditionReward(expeditionId) {
+    try {
+        const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/claim`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        if (data.success) {
+            await showToast(data.message || '领取成功', 'success');
+            window.location.reload();
+            return;
+        }
+        showToast(data.message || '领取失败', 'error');
+    } catch (error) {
+        showToast('领取失败，请稍后重试', 'error');
+    }
+}
+</script>
+{% endblock %}
