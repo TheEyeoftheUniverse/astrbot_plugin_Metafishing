@@ -4006,8 +4006,6 @@ async def tavern():
     aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
     inventory_repo = current_app.config.get("INVENTORY_REPO")
     item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
-    expedition_service = current_app.config.get("EXPEDITION_SERVICE")
-    
     user = user_repo.get_by_id(user_id)
     if not user:
         await flash("用户数据异常", "danger")
@@ -4064,19 +4062,6 @@ async def tavern():
         inventory_repo, item_template_repo
     )
     
-    # 获取进行中的科考
-    active_expeditions = []
-    if expedition_service:
-        try:
-            active_expeditions = expedition_service.get_all_active_expeditions(user_id)
-            logger.info(f"成功获取科考数据，共{len(active_expeditions)}个进行中的科考")
-            if active_expeditions:
-                logger.info(f"科考数据示例: {active_expeditions[0]}")
-        except Exception as e:
-            logger.error(f"获取科考数据失败: {e}", exc_info=True)
-    else:
-        logger.warning("expedition_service未初始化")
-    
     return await render_template("tavern.html",
                                   user=user,
                                   announcement=tavern_data.get("announcement", ""),
@@ -4093,8 +4078,7 @@ async def tavern():
                                   page=listing["page"],
                                   total_pages=listing["total_pages"],
                                   leaderboard=leaderboard,
-                                  exhibition=exhibition_data,
-                                  expeditions=active_expeditions)
+                                  exhibition=exhibition_data)
 
 @player_bp.route("/fishing")
 @login_required
