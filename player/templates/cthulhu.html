@@ -63,6 +63,7 @@ async function refreshCthulhu() {
     const response = await fetch('{{ url_for("player_bp.cthulhu_api_state") }}');
     cthulhuView = await response.json();
     renderCthulhu();
+    window.applyCthulhuDomPollution?.(cthulhuView.visible_pollutions?.visible_pollutions || []);
 }
 
 async function chooseCthulhu(choiceId) {
@@ -194,7 +195,7 @@ function renderCthulhu() {
         ${calls.length ? calls.map(call => `
             <div class="border rounded p-2 mb-2">
                 <div><strong>${call.name_string}</strong></div>
-                <div class="small text-muted">${call.owner_nickname || call.owner_user_id} · ${godLabels[call.god_type] || call.god_type} · ${call.tier_label || call.tier}</div>
+                <div class="small text-muted"><span class="cthulhu-player-name" data-cthulhu-name="${call.owner_nickname || call.owner_user_id}">${call.owner_nickname || call.owner_user_id}</span> · ${godLabels[call.god_type] || call.god_type} · ${call.tier_label || call.tier}</div>
                 <div class="mt-1">${call.progress}/${call.threshold}</div>
             </div>
         `).join('') : '<p class="text-muted mb-0">当前没有呼唤进行中。</p>'}
@@ -217,8 +218,8 @@ function renderCthulhu() {
                                     <div class="d-flex justify-content-between align-items-start gap-2">
                                         <div>
                                             <div class="fw-semibold">${authority.tier_label}</div>
-                                            <div class="small text-muted">现任：${authority.holder_label}</div>
-                                            <div class="small text-muted">上一任：${authority.previous_holder_label}</div>
+                                            <div class="small text-muted">现任：<span class="cthulhu-player-name" data-cthulhu-name="${authority.holder_label}">${authority.holder_label}</span></div>
+                                            <div class="small text-muted">上一任：<span class="cthulhu-player-name" data-cthulhu-name="${authority.previous_holder_label}">${authority.previous_holder_label}</span></div>
                                         </div>
                                         ${ownedSet.has(authority.authority_id) ? `<button class="btn btn-sm btn-outline-danger" onclick="useAuthority('${authority.authority_id}')">使用</button>` : ''}
                                     </div>
@@ -233,5 +234,6 @@ function renderCthulhu() {
 }
 
 renderCthulhu();
+window.applyCthulhuDomPollution?.(cthulhuView.visible_pollutions?.visible_pollutions || []);
 </script>
 {% endblock %}

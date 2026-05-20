@@ -108,7 +108,7 @@
                                 {% else %}<span class="badge bg-light text-muted">{{ idx }}</span>
                                 {% endif %}
                             </td>
-                            <td>{{ row.user_id }}</td>
+                            <td><span class="cthulhu-player-name" data-cthulhu-name="{{ row.user_id }}">{{ row.user_id }}</span></td>
                             <td>{% if row.is_leader_at_last_settle %}👑{% endif %}</td>
                             <td class="text-end">{{ "{:,}".format(row.total_damage) }}</td>
                         </tr>
@@ -204,7 +204,7 @@
                         <tr>
                             <td>{{ {"sci_fi": "科幻", "xianhuan": "玄幻", "cthulhu": "克苏鲁", "magic": "魔幻"}.get(h.region_key, h.region_key) }}</td>
                             <td><strong>{{ h.boss_name }}</strong></td>
-                            <td>{{ h.finisher_user_id or "—" }}</td>
+                            <td>{% if h.finisher_user_id %}<span class="cthulhu-player-name" data-cthulhu-name="{{ h.finisher_user_id }}">{{ h.finisher_user_id }}</span>{% else %}—{% endif %}</td>
                             <td><small>{{ h.killed_at[:16].replace("T", " ") }}</small></td>
                         </tr>
                         {% endfor %}

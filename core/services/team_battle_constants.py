@@ -208,41 +208,40 @@ EQUIPMENT_POOL: dict[tuple[str, int, str], tuple[int, ...]] = {
     (REGION_XIANHUAN, 8, EQUIP_TYPE_ROD): (22, 23, 25),     # 诛仙竿 / 百炼成仙竿 / 冰晶溯流竿
     (REGION_XIANHUAN, 7, EQUIP_TYPE_ACCESSORY): (10, 11, 12), # 镇魂铃 / 太极鱼坠 / 紫府符纸
     (REGION_XIANHUAN, 8, EQUIP_TYPE_ACCESSORY): (22, 24),     # 青鸾褪羽 / 通幽玉佩
-    # 9-10 星暂用 8 星池兜底（现网尚无 9-10 星装备）
-    (REGION_XIANHUAN, 9, EQUIP_TYPE_ROD): (22, 23, 25),
-    (REGION_XIANHUAN, 9, EQUIP_TYPE_ACCESSORY): (22, 24),
-    (REGION_XIANHUAN, 10, EQUIP_TYPE_ROD): (22, 23, 25),
-    (REGION_XIANHUAN, 10, EQUIP_TYPE_ACCESSORY): (22, 24),
+    (REGION_XIANHUAN, 9, EQUIP_TYPE_ROD): (33, 34),
+    (REGION_XIANHUAN, 9, EQUIP_TYPE_ACCESSORY): (33, 34),
+    (REGION_XIANHUAN, 10, EQUIP_TYPE_ROD): (40,),
+    (REGION_XIANHUAN, 10, EQUIP_TYPE_ACCESSORY): (40,),
 
     # ---- 魔幻 ----
     (REGION_MAGIC, 7, EQUIP_TYPE_ROD): (14, 15),            # 雷云捕手 / 古龙鳞竿
     (REGION_MAGIC, 8, EQUIP_TYPE_ROD): (26,),                # 龙王骨竿
     (REGION_MAGIC, 7, EQUIP_TYPE_ACCESSORY): (14, 15),       # 海洋之心 / 古龙之息
     (REGION_MAGIC, 8, EQUIP_TYPE_ACCESSORY): (26, 27),       # 丰收号角 / 圣杯水滴
-    (REGION_MAGIC, 9, EQUIP_TYPE_ROD): (26,),
-    (REGION_MAGIC, 9, EQUIP_TYPE_ACCESSORY): (26, 27),
-    (REGION_MAGIC, 10, EQUIP_TYPE_ROD): (26,),
-    (REGION_MAGIC, 10, EQUIP_TYPE_ACCESSORY): (26, 27),
+    (REGION_MAGIC, 9, EQUIP_TYPE_ROD): (35, 36),
+    (REGION_MAGIC, 9, EQUIP_TYPE_ACCESSORY): (35, 36),
+    (REGION_MAGIC, 10, EQUIP_TYPE_ROD): (41,),
+    (REGION_MAGIC, 10, EQUIP_TYPE_ACCESSORY): (41,),
 
     # ---- 克苏鲁 ----
     (REGION_CTHULHU, 7, EQUIP_TYPE_ROD): (7, 8, 9),         # 触须钓线 / 黏液浮标杆 / 神经传导钓竿
     (REGION_CTHULHU, 8, EQUIP_TYPE_ROD): (19, 20, 21),       # 共生触腕 / 尖细的羊蹄竿 / 黏稠漆黑的羊蹄竿
     (REGION_CTHULHU, 7, EQUIP_TYPE_ACCESSORY): (7, 8, 9),    # 蠕动眼瞳护符 / 胎膜手套 / 哀鸣项链
     (REGION_CTHULHU, 8, EQUIP_TYPE_ACCESSORY): (19, 20, 21, 23, 25), # 黄印怀表 / 孕梦珊瑚戒指 / 同心眼网袋 / 心魔标 / 水妖发丝腕带
-    (REGION_CTHULHU, 9, EQUIP_TYPE_ROD): (19, 20, 21),
-    (REGION_CTHULHU, 9, EQUIP_TYPE_ACCESSORY): (19, 20, 21, 23, 25),
-    (REGION_CTHULHU, 10, EQUIP_TYPE_ROD): (19, 20, 21),
-    (REGION_CTHULHU, 10, EQUIP_TYPE_ACCESSORY): (19, 20, 21, 23, 25),
+    (REGION_CTHULHU, 9, EQUIP_TYPE_ROD): (31, 32),
+    (REGION_CTHULHU, 9, EQUIP_TYPE_ACCESSORY): (31, 32),
+    (REGION_CTHULHU, 10, EQUIP_TYPE_ROD): (39,),
+    (REGION_CTHULHU, 10, EQUIP_TYPE_ACCESSORY): (39,),
 
     # ---- 科幻 ----
     (REGION_SCI_FI, 7, EQUIP_TYPE_ROD): (16, 17, 18, 13),   # 虫洞投射钓竿 / 纳米修复钓竿 / 量子纠缠钓竿 / 溪语者
     (REGION_SCI_FI, 8, EQUIP_TYPE_ROD): (24,),               # 万竿归宗
     (REGION_SCI_FI, 7, EQUIP_TYPE_ACCESSORY): (16, 17, 18, 13), # 虚空虹吸戒指 / 全息渔获扫描仪 / AI 鱼饵决策器 / 藤蔓编织鱼篓
     (REGION_SCI_FI, 8, EQUIP_TYPE_ACCESSORY): (28, 29, 30),  # 时间沙漏钓坠 / 智械义眼 / 暗物质坠饰
-    (REGION_SCI_FI, 9, EQUIP_TYPE_ROD): (24,),
-    (REGION_SCI_FI, 9, EQUIP_TYPE_ACCESSORY): (28, 29, 30),
-    (REGION_SCI_FI, 10, EQUIP_TYPE_ROD): (24,),
-    (REGION_SCI_FI, 10, EQUIP_TYPE_ACCESSORY): (28, 29, 30),
+    (REGION_SCI_FI, 9, EQUIP_TYPE_ROD): (37, 38),
+    (REGION_SCI_FI, 9, EQUIP_TYPE_ACCESSORY): (37, 38),
+    (REGION_SCI_FI, 10, EQUIP_TYPE_ROD): (42,),
+    (REGION_SCI_FI, 10, EQUIP_TYPE_ACCESSORY): (42,),
 }
 
 

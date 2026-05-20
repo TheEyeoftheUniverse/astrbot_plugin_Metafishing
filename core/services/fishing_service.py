@@ -76,6 +76,7 @@ class FishingService:
         # 玄幻渡劫 V2：渡劫核心服务（在 main.py 内 set 进来；可能为 None）
         self.tribulation_service = None
         self.cthulhu_service = None
+        self.scifi_service = None
 
         # 获取每日刷新时间配置
         self.daily_reset_hour = self.config.get("daily_reset_hour", 0)
@@ -388,6 +389,42 @@ class FishingService:
                 if new_fish_template:
                     fish_template = new_fish_template
 
+        original_rarity = fish_template.rarity
+        if self.scifi_service is not None and fish_template.rarity < 6:
+            try:
+                append_result = self.scifi_service.roll_append(user.user_id, fish_template.rarity)
+                if append_result.get("hit"):
+                    new_rarity = self._get_random_high_rarity(zone)
+                    new_fish_template = self._get_fish_template(new_rarity, zone, value_bonus)
+                    if new_fish_template and new_fish_template.rarity >= 6:
+                        fish_template = new_fish_template
+                        self.scifi_service.log_append_result(
+                            user.user_id,
+                            user.fishing_zone_id,
+                            original_rarity,
+                            append_result,
+                            replaced_rarity=new_fish_template.rarity,
+                        )
+                    else:
+                        self.scifi_service.log_append_result(
+                            user.user_id,
+                            user.fishing_zone_id,
+                            original_rarity,
+                            append_result,
+                            replaced_rarity=None,
+                            reason="no_higher_pool",
+                        )
+                elif append_result.get("rolled"):
+                    self.scifi_service.log_append_result(
+                        user.user_id,
+                        user.fishing_zone_id,
+                        original_rarity,
+                        append_result,
+                        replaced_rarity=None,
+                    )
+            except Exception as exc:
+                logger.warning(f"[scifi] append hook failed: {exc}")
+
         # 计算最终属性
         value = fish_template.base_value
 
@@ -514,6 +551,22 @@ class FishingService:
             except Exception:
                 xiuwei_gained = 0
 
+        scifi_research_gained = 0
+        if self.scifi_service is not None:
+            try:
+                research_rarity = original_rarity if fish_template.rarity >= 6 else fish_template.rarity
+                scifi_research_gained = int(research_rarity) * int(total_catches)
+                self.scifi_service.on_fish_caught(
+                    user_id=user.user_id,
+                    zone_id=user.fishing_zone_id,
+                    final_rarity=fish_template.rarity,
+                    original_rarity=research_rarity,
+                    fish_count=total_catches,
+                )
+            except Exception as exc:
+                logger.warning(f"[scifi] research hook failed: {exc}")
+                scifi_research_gained = 0
+
         # 8. 构建成功返回结果
         result = {
             "success": True,
@@ -528,6 +581,8 @@ class FishingService:
 
         if xiuwei_gained > 0:
             result["xiuwei_gained"] = xiuwei_gained
+        if scifi_research_gained > 0:
+            result["scifi_research_gained"] = scifi_research_gained
         
         # 添加装备损坏消息
         if equipment_broken_messages:
@@ -1403,17 +1458,10 @@ class FishingService:
                 deepdive_result = self.cthulhu_service.try_enter_deepdive(user_id)
                 if deepdive_result.get("deepdive_started"):
                     event = deepdive_result.get("event") or {}
-                    if deepdive_result.get("compatibility_mode"):
-                        cthulhu_suffix = (
-                            f"\n🫧 深潜已经开始：{event.get('title', '未知深潜')}"
-                            "\n当前门票来源尚未接入，已按兼容模式免票开启本次深潜。"
-                            "\n请在深潜页面查看并做出抉择。"
-                        )
-                    else:
-                        cthulhu_suffix = (
-                            f"\n🫧 深潜已经开始：{event.get('title', '未知深潜')}"
-                            "\n请在深潜页面查看并做出抉择。"
-                        )
+                    cthulhu_suffix = (
+                        f"\n🫧 深潜已经开始：{event.get('title', '未知深潜')}"
+                        "\n请在深潜页面查看并做出抉择。"
+                    )
             except Exception as exc:
                 logger.warning(f"[cthulhu] 区域切换触发深潜失败: {exc}")
 

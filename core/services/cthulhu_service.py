@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from astrbot.api import logger
 
+from . import scifi_constants as SCIFI
 from ..utils import get_now, get_current_daily_marker, get_last_reset_time
 
 
@@ -99,6 +100,7 @@ class CthulhuService:
         state["max_san"] = int(state.get("max_san", 50) or 50)
         state["pending_san_cap_tokens"] = int(state.get("pending_san_cap_tokens", 0) or 0)
         state["sci_fi_intervention_level"] = int(state.get("sci_fi_intervention_level", 0) or 0)
+        state["sci_fi_apex_abyss_unity"] = bool(state.get("sci_fi_apex_abyss_unity", 0))
         state["pending_predict_candidates"] = state.get("pending_predict_candidates") or []
         return state
 
@@ -111,17 +113,21 @@ class CthulhuService:
     def _threshold_for_tier(self, tier: str) -> int:
         return THRESHOLD_BY_TIER[tier]
 
-    def _tier_roll(self, intervention: int) -> tuple[str, bool]:
+    def _tier_roll(self, intervention: int, apex_abyss_unity: bool = False) -> tuple[str, bool]:
         roll = random.randint(1, 100)
-        great_failure_threshold = 96 - intervention * 10
-        middle_threshold = max(6, 20 - intervention * 2)
+        offset = SCIFI.CTHULHU_GREAT_FAILURE_OFFSET.get(
+            max(0, min(int(intervention or 0), SCIFI.MAX_BRANCH_LEVEL)),
+            0,
+        )
+        great_failure_threshold = 96 - offset
+        middle_threshold = 20
         if roll <= 5:
             return "upper", False
         if roll <= middle_threshold:
             return "middle", False
         if roll < great_failure_threshold:
             return "lower", False
-        return "lower", True
+        return "lower", True or apex_abyss_unity
 
     def _apply_san_delta(self, user_id: str, delta: int) -> Dict[str, int]:
         state = self._get_state(user_id)
@@ -168,17 +174,12 @@ class CthulhuService:
         state = self._get_state(user_id)
         if state["is_in_deepdive_today"]:
             return {"success": True, "deepdive_started": False, "reason": "already_deepdived"}
-        items = self.inventory_repo.get_user_item_inventory(user_id)
-        ticket_consumed = False
-        compatibility_mode = False
-        if items.get(55, 0) > 0:
-            self.inventory_repo.decrease_item_quantity(user_id, 55, 1)
-            ticket_consumed = True
-        else:
-            # 兼容回退：当前版本尚未把深潜门票来源接入到外部经济系统，
-            # 为保证区域 7 可实际测试，允许免票开启一次当日深潜。
-            compatibility_mode = True
-        tier, force_pollute = self._tier_roll(state["sci_fi_intervention_level"])
+        tier, force_pollute = self._tier_roll(
+            state["sci_fi_intervention_level"],
+            state.get("sci_fi_apex_abyss_unity", False),
+        )
+        if state.get("sci_fi_apex_abyss_unity", False):
+            force_pollute = True
         event = random.choice(self.events_by_tier[tier])
         self._save_state(
             user_id,
@@ -193,8 +194,6 @@ class CthulhuService:
             "deepdive_started": True,
             "event": event,
             "great_failure_pending": force_pollute,
-            "ticket_consumed": ticket_consumed,
-            "compatibility_mode": compatibility_mode,
         }
 
     def stage_event_choice(self, user_id: str, choice_id: str) -> Dict[str, Any]:
