@@ -15,7 +15,7 @@ CURRENT_SEED_COUNTS = {
     "rods": 42,
     "accessories": 42,
     "baits": 22,
-    "items": 58,
+    "items": 57,
     "titles": 36,
     "fishing_zones": 8,
     "zone_fish_mapping": 862,
