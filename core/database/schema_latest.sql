@@ -634,7 +634,10 @@ CREATE TABLE user_cultivation (
             daily_guard_reward_count      INTEGER NOT NULL DEFAULT 0,
             daily_count_reset_at          TEXT,
             sci_fi_intervention_level     INTEGER NOT NULL DEFAULT 0,
+            sci_fi_apex_singularity       INTEGER NOT NULL DEFAULT 0,
+            sci_fi_apex_abyss_unity       INTEGER NOT NULL DEFAULT 0,
             sci_fi_apex_fate_solitude     INTEGER NOT NULL DEFAULT 0,
+            sci_fi_apex_resonance_summit  INTEGER NOT NULL DEFAULT 0,
             updated_at                    TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         );

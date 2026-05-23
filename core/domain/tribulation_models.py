@@ -78,7 +78,10 @@ class CultivationProfile:
     daily_guard_reward_count: int = 0
     daily_count_reset_at: Optional[str] = None
     sci_fi_intervention_level: int = 0
+    sci_fi_apex_singularity: bool = False
+    sci_fi_apex_abyss_unity: bool = False
     sci_fi_apex_fate_solitude: bool = False
+    sci_fi_apex_resonance_summit: bool = False
     updated_at: Optional[str] = None
 
     def lowest_quality(self) -> Optional[str]:

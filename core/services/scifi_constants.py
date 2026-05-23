@@ -37,6 +37,25 @@ CTHULHU_GREAT_FAILURE_OFFSET = {0: 0, 1: 1, 2: 2, 3: 4, 4: 7, 5: 10}
 TRIBULATION_SELF_RATE_MULTIPLIER = {0: 1.0, 1: 0.99, 2: 0.98, 3: 0.95, 4: 0.90, 5: 0.86}
 TEAM_BATTLE_D20_PENALTY = {0: 0, 1: 0, 2: 0, 3: 1, 4: 3, 5: 5}
 
+APEX_ABYSS_OFFSET = {
+    "singularity": 2,
+    "abyss_unity": 0,
+    "fate_solitude": 5,
+    "resonance_summit": 5,
+}
+APEX_TRIBULATION_MULTIPLIER = {
+    "singularity": 0.98,
+    "abyss_unity": 0.85,
+    "fate_solitude": 0.75,
+    "resonance_summit": 0.85,
+}
+APEX_D20_PENALTY = {
+    "singularity": 1,
+    "abyss_unity": 3,
+    "fate_solitude": 3,
+    "resonance_summit": 5,
+}
+
 APEX_SINGULARITY = "singularity"
 APEX_ABYSS_UNITY = "abyss_unity"
 APEX_FATE_SOLITUDE = "fate_solitude"

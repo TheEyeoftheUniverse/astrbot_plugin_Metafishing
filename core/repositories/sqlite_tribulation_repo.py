@@ -44,7 +44,10 @@ def _row_to_profile(row) -> CultivationProfile:
         daily_guard_reward_count=int(row["daily_guard_reward_count"] or 0),
         daily_count_reset_at=row["daily_count_reset_at"],
         sci_fi_intervention_level=int(row["sci_fi_intervention_level"] or 0),
-        sci_fi_apex_fate_solitude=bool(row["sci_fi_apex_fate_solitude"]),
+        sci_fi_apex_singularity=bool(row.get("sci_fi_apex_singularity", 0)),
+        sci_fi_apex_abyss_unity=bool(row.get("sci_fi_apex_abyss_unity", 0)),
+        sci_fi_apex_fate_solitude=bool(row.get("sci_fi_apex_fate_solitude", 0)),
+        sci_fi_apex_resonance_summit=bool(row.get("sci_fi_apex_resonance_summit", 0)),
         updated_at=row["updated_at"],
     )
 
@@ -117,8 +120,10 @@ class SqliteTribulationRepository:
                     realm_history, tiancheng_protection,
                     daily_observer_reward_count, daily_guard_reward_count,
                     daily_count_reset_at, sci_fi_intervention_level,
-                    sci_fi_apex_fate_solitude, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    sci_fi_apex_singularity, sci_fi_apex_abyss_unity,
+                    sci_fi_apex_fate_solitude, sci_fi_apex_resonance_summit,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
                     current_realm = excluded.current_realm,
                     current_realm_quality = excluded.current_realm_quality,
@@ -130,7 +135,10 @@ class SqliteTribulationRepository:
                     daily_guard_reward_count = excluded.daily_guard_reward_count,
                     daily_count_reset_at = excluded.daily_count_reset_at,
                     sci_fi_intervention_level = excluded.sci_fi_intervention_level,
+                    sci_fi_apex_singularity = excluded.sci_fi_apex_singularity,
+                    sci_fi_apex_abyss_unity = excluded.sci_fi_apex_abyss_unity,
                     sci_fi_apex_fate_solitude = excluded.sci_fi_apex_fate_solitude,
+                    sci_fi_apex_resonance_summit = excluded.sci_fi_apex_resonance_summit,
                     updated_at = excluded.updated_at
                 """,
                 (
@@ -145,7 +153,10 @@ class SqliteTribulationRepository:
                     int(profile.daily_guard_reward_count),
                     profile.daily_count_reset_at,
                     int(profile.sci_fi_intervention_level),
+                    1 if profile.sci_fi_apex_singularity else 0,
+                    1 if profile.sci_fi_apex_abyss_unity else 0,
                     1 if profile.sci_fi_apex_fate_solitude else 0,
+                    1 if profile.sci_fi_apex_resonance_summit else 0,
                     profile.updated_at,
                 ),
             )

@@ -340,8 +340,9 @@ class SciFiService:
     def get_resonance_d20_penalty(self, user_id: str) -> int:
         state = self.get_state(user_id)
         penalty = C.TEAM_BATTLE_D20_PENALTY.get(int(state.get("resonance_dampening_level", 0) or 0), 0)
-        if state.get("apex_protocol") == C.APEX_RESONANCE_SUMMIT:
-            penalty += 5
+        apex = state.get("apex_protocol")
+        if apex:
+            penalty += C.APEX_D20_PENALTY.get(apex, 0)
         return int(penalty)
 
     def has_apex_protocol(self, user_id: str, apex: str) -> bool:
@@ -352,12 +353,16 @@ class SciFiService:
     # ------------------------------------------------------------------
     def sync_external_state(self, user_id: str, state: Optional[Dict[str, Any]] = None) -> None:
         state = state or self.get_state(user_id)
+        apex = state.get("apex_protocol")
+
         try:
             self.cthulhu_repo.ensure_state(user_id)
             self.cthulhu_repo.update_state_fields(
                 user_id,
                 sci_fi_intervention_level=int(state.get("abyss_compression_level", 0) or 0),
-                sci_fi_apex_abyss_unity=1 if state.get("apex_protocol") == C.APEX_ABYSS_UNITY else 0,
+                sci_fi_apex_singularity=1 if apex == C.APEX_SINGULARITY else 0,
+                sci_fi_apex_abyss_unity=1 if apex == C.APEX_ABYSS_UNITY else 0,
+                sci_fi_apex_fate_solitude=1 if apex == C.APEX_FATE_SOLITUDE else 0,
             )
         except Exception as exc:
             logger.warning(f"[scifi] sync cthulhu failed for {user_id}: {exc}")
@@ -365,7 +370,10 @@ class SciFiService:
         try:
             profile = self.cultivation_service.get_or_create_profile(user_id)
             profile.sci_fi_intervention_level = int(state.get("fate_severance_level", 0) or 0)
-            profile.sci_fi_apex_fate_solitude = state.get("apex_protocol") == C.APEX_FATE_SOLITUDE
+            profile.sci_fi_apex_singularity = apex == C.APEX_SINGULARITY
+            profile.sci_fi_apex_abyss_unity = apex == C.APEX_ABYSS_UNITY
+            profile.sci_fi_apex_fate_solitude = apex == C.APEX_FATE_SOLITUDE
+            profile.sci_fi_apex_resonance_summit = apex == C.APEX_RESONANCE_SUMMIT
             self.cultivation_service.repo.upsert_profile(profile, _now_iso())
         except Exception as exc:
             logger.warning(f"[scifi] sync cultivation failed for {user_id}: {exc}")
