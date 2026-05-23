@@ -56,7 +56,7 @@ APEX_DISPLAY = {
 }
 
 APEX_SIDE_EFFECTS = {
-    APEX_SINGULARITY: "深渊偏移 +2 / 渡劫乘区 ×1.02 / 讨伐 d20 +1",
+    APEX_SINGULARITY: "深渊偏移 +2 / 渡劫乘区 ×0.98 / 讨伐 d20 +1",
     APEX_ABYSS_UNITY: "渡劫乘区 ×0.85 / 讨伐 d20 +3",
     APEX_FATE_SOLITUDE: "深渊偏移 +5 / 讨伐 d20 +3",
     APEX_RESONANCE_SUMMIT: "深渊偏移 +5 / 渡劫乘区 ×0.85",
