@@ -1,19 +1,6 @@
 -- Supplemental static seed that is not sourced from fish_db.xlsx.
 
 INSERT INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable", "icon_url", "effect_type", "effect_payload")
-VALUES (55, '深潜门票', '进入区域七时会被克苏鲁深潜系统自动消耗，用于开启当日深潜。', 6, '进入区域七开始钓鱼时自动消耗，开启一次当日深潜。', 0, 1, NULL, 'NONE', '{}')
-ON CONFLICT("item_id") DO UPDATE SET
-    "name" = excluded."name",
-    "description" = excluded."description",
-    "rarity" = excluded."rarity",
-    "effect_description" = excluded."effect_description",
-    "cost" = excluded."cost",
-    "is_consumable" = excluded."is_consumable",
-    "icon_url" = excluded."icon_url",
-    "effect_type" = excluded."effect_type",
-    "effect_payload" = excluded."effect_payload";
-
-INSERT INTO "items" ("item_id", "name", "description", "rarity", "effect_description", "cost", "is_consumable", "icon_url", "effect_type", "effect_payload")
 VALUES (56, '低语之露', '冰凉如夜潮的露滴，入口后理智会被勉强缝回一点。', 6, '使用后恢复 5 点 SAN，不会超过当前上限。', 0, 1, NULL, 'ADD_SAN', '{"amount": 5}')
 ON CONFLICT("item_id") DO UPDATE SET
     "name" = excluded."name",

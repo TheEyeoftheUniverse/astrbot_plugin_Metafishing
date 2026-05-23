@@ -116,17 +116,6 @@ def up(cursor):
 
     item_rows = [
         (
-            55,
-            "深潜门票",
-            "进入区域七时会被克苏鲁深潜系统自动消耗，用于开启当日深潜。",
-            6,
-            "进入区域七开始钓鱼时自动消耗，开启一次当日深潜。",
-            0,
-            1,
-            "NONE",
-            "{}",
-        ),
-        (
             56,
             "低语之露",
             "冰凉如夜潮的露滴，入口后理智会被勉强缝回一点。",
@@ -176,7 +165,7 @@ def down(cursor):
         DROP TABLE IF EXISTS cthulhu_authority;
         DROP TABLE IF EXISTS true_name_votes;
         DROP TABLE IF EXISTS true_names;
-        DELETE FROM items WHERE item_id IN (55, 56, 57);
+        DELETE FROM items WHERE item_id IN (56, 57);
         UPDATE fishing_zones SET required_item_id = 16, requires_pass = 1 WHERE id = 7;
         """
     )
