@@ -272,9 +272,9 @@ const APEX_NAMES = {
 };
 const APEX_SIDE_EFFECTS = {
     singularity: '深渊偏移 +2 / 渡劫乘区 ×1.02 / 讨伐 d20 +1',
-    abyss_unity: '渡劫乘区 ×1.15 / 讨伐 d20 +3',
+    abyss_unity: '渡劫乘区 ×0.85 / 讨伐 d20 +3',
     fate_solitude: '深渊偏移 +5 / 讨伐 d20 +3',
-    resonance_summit: '深渊偏移 +5 / 渡劫乘区 ×1.15',
+    resonance_summit: '深渊偏移 +5 / 渡劫乘区 ×0.85',
 };
 const REQ_NAMES = {
     abyss_compression: '深渊压缩',
@@ -408,7 +408,7 @@ function renderScifi() {
             <div class="${classes.join(' ')}" ${onclick}>
                 <div class="apex-name">${apex.name}</div>
                 <div class="apex-req">${formatRequirements(apex.requirements)} · +${(apex.append_rate_bp / 100).toFixed(2)}%</div>
-                <div class="apex-req" style="color: #ff8585;">副作用：${APEX_SIDE_EFFECTS[apex.id] || '无'}</div>
+                <div class="apex-req" style="color: #ff8585;">${APEX_SIDE_EFFECTS[apex.id] || ''}</div>
                 <div class="apex-req">${stateLabel}</div>
             </div>`;
     }).join('');

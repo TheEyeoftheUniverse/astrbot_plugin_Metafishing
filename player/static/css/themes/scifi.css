@@ -547,15 +547,23 @@ body.theme-scifi #notificationPanel.card { clip-path: none; backdrop-filter: non
    .player-wallet-summary 等同级 flex 项可能在科幻主题下高度撑高，
    覆盖到了相邻 nav-link 的上半区。给 nav-link 显式 position:relative
    + z-index，让它在 navbar 内独占点击层 === */
-body.theme-scifi .player-topbar .navbar-nav .nav-link {
+body.theme-scifi .player-topbar .navbar-nav {
     position: relative;
     z-index: 10000;
+}
+body.theme-scifi .player-topbar .navbar-nav .nav-link {
+    position: relative;
+    z-index: 10001;
     display: inline-flex;
     align-items: center;
 }
 body.theme-scifi .player-topbar .player-wallet-summary {
     position: relative;
     z-index: 1;
+}
+body.theme-scifi .player-topbar .navbar-collapse {
+    position: relative;
+    z-index: 10000;
 }
 body.theme-scifi .modal-header {
     border-bottom: 1px solid var(--hud-line);
