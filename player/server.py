@@ -2,7 +2,7 @@ import functools
 import asyncio
 import os
 import re
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import json
 import secrets
@@ -46,22 +46,23 @@ def inject_player_wallet():
     """为所有玩家页面提供导航栏钱包数据。"""
     user_id = session.get("user_id")
     if not user_id:
-        return {"nav_wallet": None}
+        return {"nav_wallet": None, "nav_zone_id": None}
 
     try:
         user_repo = current_app.config.get("USER_REPO")
         user = user_repo.get_by_id(user_id) if user_repo else None
         if not user:
-            return {"nav_wallet": None}
+            return {"nav_wallet": None, "nav_zone_id": None}
         return {
             "nav_wallet": {
                 "coins": int(getattr(user, "coins", 0) or 0),
                 "premium_currency": int(getattr(user, "premium_currency", 0) or 0),
-            }
+            },
+            "nav_zone_id": int(getattr(user, "fishing_zone_id", 1) or 1),
         }
     except Exception as e:
         logger.warning(f"获取导航栏钱包数据失败: {e}")
-        return {"nav_wallet": None}
+        return {"nav_wallet": None, "nav_zone_id": None}
 
 LINUXDO_AUTHORIZE_URL = "https://connect.linux.do/oauth2/authorize"
 LINUXDO_TOKEN_URL = "https://connect.linux.do/oauth2/token"
@@ -83,6 +84,87 @@ TAVERN_BOARD_SORT_LABELS = {
     "latest": "按最新",
     "likes": "按点赞数量",
 }
+SHOP_SCOPE_IDS = {
+    "general": [1, 2, 3],
+    "company_1": [1],
+    "company_2": [2],
+    "company_3": [3],
+    "expedition": [4],
+    "scifi": [5],
+    "xianhuan": [6],
+    "cthulhu": [7],
+    "magic": [8],
+}
+COMPANY_ZONE_META = {
+    1: {
+        "shop_scope": "company_1",
+        "shop_title": "入门渔具铺",
+        "shop_name": "鱼满离·入门渔具铺",
+        "tagline": "新人先把基础竿、鱼线和鱼饵补齐。",
+        "accent_class": "company-card-entry",
+    },
+    2: {
+        "shop_scope": "company_2",
+        "shop_title": "海岸直营店",
+        "shop_name": "鱼光临·海岸直营店",
+        "tagline": "海岸系直营补给，覆盖进阶装备路线。",
+        "accent_class": "company-card-coast",
+    },
+    3: {
+        "shop_scope": "company_3",
+        "shop_title": "特许回收部",
+        "shop_name": "鱼甄选·特许回收部",
+        "tagline": "特殊鱼货与稀有收购都从这里走。",
+        "accent_class": "company-card-recycle",
+    },
+}
+PLAYMODE_PORTAL_META = {
+    "expedition": {
+        "title": "考察入口",
+        "description": "从这里直达区域四，并打开海洋研究院商店。",
+        "icon": "fas fa-compass",
+        "zone_id": 4,
+        "shop_scope": "expedition",
+        "shop_label": "海洋研究院",
+        "theme_class": "portal-expedition",
+    },
+    "scifi": {
+        "title": "观测入口",
+        "description": "从这里直达区域五，并打开科幻主题商店。",
+        "icon": "fas fa-satellite-dish",
+        "zone_id": 5,
+        "shop_scope": "scifi",
+        "shop_label": "观测商店",
+        "theme_class": "portal-scifi",
+    },
+    "xianhuan": {
+        "title": "问道入口",
+        "description": "从这里直达区域六，并打开玄幻主题商店。",
+        "icon": "fas fa-yin-yang",
+        "zone_id": 6,
+        "shop_scope": "xianhuan",
+        "shop_label": "问道商店",
+        "theme_class": "portal-xianhuan",
+    },
+    "cthulhu": {
+        "title": "深潜入口",
+        "description": "从这里直达区域七，并打开克苏鲁主题商店。",
+        "icon": "fas fa-water",
+        "zone_id": 7,
+        "shop_scope": "cthulhu",
+        "shop_label": "深潜商店",
+        "theme_class": "portal-cthulhu",
+    },
+    "magic": {
+        "title": "讨伐入口",
+        "description": "从这里直达区域八，并打开魔幻主题商店。",
+        "icon": "fas fa-dragon",
+        "zone_id": 8,
+        "shop_scope": "magic",
+        "shop_label": "讨伐商店",
+        "theme_class": "portal-magic",
+    },
+}
 
 
 def _normalize_external_url(value: Any, default: str = "") -> str:
@@ -94,6 +176,226 @@ def _get_player_link_config() -> Dict[str, str]:
     return {
         "github_url": _normalize_external_url(current_app.config.get("PLAYER_GITHUB_URL"), DEFAULT_GITHUB_URL),
         "apk_download_url": _normalize_external_url(current_app.config.get("PLAYER_APK_DOWNLOAD_URL"), DEFAULT_APK_DOWNLOAD_URL),
+    }
+
+
+def _build_user_shop_inventory(user_id: str) -> tuple[Any, Dict[str, Any]]:
+    user_repo = current_app.config.get("USER_REPO")
+    inventory_repo = current_app.config.get("INVENTORY_REPO")
+    item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
+    aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
+
+    user = user_repo.get_by_id(user_id) if user_repo else None
+    if user is None:
+        raise ValueError("user_not_found")
+
+    inventory = {
+        "coins": int(user.coins or 0),
+        "premium": int(user.premium_currency or 0),
+        "items": inventory_repo.get_user_item_inventory(user_id) if inventory_repo else {},
+        "fish": {},
+        "rods": {},
+        "accessories": {},
+        "baits": inventory_repo.get_user_bait_inventory(user_id) if inventory_repo else {},
+    }
+
+    if inventory_repo:
+        for fish in inventory_repo.get_fish_inventory(user_id):
+            key = (fish.fish_id, fish.quality_level)
+            inventory["fish"][key] = inventory["fish"].get(key, 0) + fish.quantity
+
+        if aquarium_service:
+            aquarium_result = aquarium_service.get_user_aquarium(user_id)
+            for fish in aquarium_result.get("fishes", []):
+                key = (fish["fish_id"], fish["quality_level"])
+                inventory["fish"][key] = inventory["fish"].get(key, 0) + fish["quantity"]
+
+        for rod in inventory_repo.get_user_rod_instances(user_id):
+            inventory["rods"][rod.rod_id] = inventory["rods"].get(rod.rod_id, 0) + 1
+
+        for accessory in inventory_repo.get_user_accessory_instances(user_id):
+            inventory["accessories"][accessory.accessory_id] = inventory["accessories"].get(accessory.accessory_id, 0) + 1
+
+    return user, inventory
+
+
+def _decorate_shop_items_for_user(user_id: str, shop_details: Dict[str, Any], user_inventory: Dict[str, Any], shop_service: Any) -> List[Dict[str, Any]]:
+    items = shop_details.get("items", [])
+    for item_data in items:
+        item = item_data.get("item", {})
+        for cost in item_data.get("costs", []):
+            cost_type = cost.get("cost_type")
+            cost_item_id = cost.get("cost_item_id")
+            cost_amount = int(cost.get("cost_amount", 0) or 0)
+            quality_level = int(cost.get("quality_level", 0) or 0)
+
+            satisfied = False
+            if cost_type == "coins":
+                satisfied = user_inventory["coins"] >= cost_amount
+            elif cost_type == "premium":
+                satisfied = user_inventory["premium"] >= cost_amount
+            elif cost_type == "item":
+                satisfied = user_inventory["items"].get(cost_item_id, 0) >= cost_amount
+            elif cost_type == "fish":
+                satisfied = user_inventory["fish"].get((cost_item_id, quality_level), 0) >= cost_amount
+            elif cost_type == "rod":
+                satisfied = user_inventory["rods"].get(cost_item_id, 0) >= cost_amount
+            elif cost_type == "accessory":
+                satisfied = user_inventory["accessories"].get(cost_item_id, 0) >= cost_amount
+            elif cost_type == "bait":
+                satisfied = user_inventory["baits"].get(cost_item_id, 0) >= cost_amount
+            cost["satisfied"] = satisfied
+
+        valid_costs = [
+            cost for cost in item_data.get("costs", [])
+            if cost.get("cost_type") and int(cost.get("cost_amount", 0) or 0) > 0
+        ]
+        cost_groups = {}
+        for cost in valid_costs:
+            group_id = cost.get("group_id") or 0
+            cost_groups.setdefault(group_id, []).append(cost)
+
+        can_pay = True
+        for group_costs in cost_groups.values():
+            relation = str(group_costs[0].get("cost_relation", "and") or "and").lower()
+            if relation == "or" and len(group_costs) > 1:
+                group_ok = any(cost.get("satisfied") for cost in group_costs)
+            else:
+                group_ok = all(cost.get("satisfied") for cost in group_costs)
+            if not group_ok:
+                can_pay = False
+                break
+
+        can_purchase = can_pay
+        disabled_reason = "" if can_pay else "资源不足"
+        stock_total = item.get("stock_total")
+        if stock_total is not None and int(item.get("stock_sold", 0) or 0) >= int(stock_total or 0):
+            can_purchase = False
+            disabled_reason = "库存不足"
+
+        per_user_limit = item.get("per_user_limit")
+        if can_purchase and per_user_limit is not None:
+            purchased_total = shop_service.shop_repo.get_user_purchased_count(user_id, item.get("item_id"))
+            if purchased_total >= int(per_user_limit or 0):
+                can_purchase = False
+                disabled_reason = "已达限购"
+
+        per_user_daily_limit = item.get("per_user_daily_limit")
+        if can_purchase and per_user_daily_limit is not None and int(per_user_daily_limit or 0) > 0:
+            now_utc = datetime.now(timezone.utc)
+            now_local = now_utc.astimezone(timezone(timedelta(hours=8)))
+            local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            start_of_day_utc = local_midnight.astimezone(timezone.utc).replace(tzinfo=None)
+            purchased_today = shop_service.shop_repo.get_user_purchased_count(
+                user_id,
+                item.get("item_id"),
+                since=start_of_day_utc,
+            )
+            if purchased_today >= int(per_user_daily_limit or 0):
+                can_purchase = False
+                disabled_reason = "今日已达限购"
+
+        item_data["can_purchase"] = can_purchase
+        item_data["purchase_disabled_reason"] = disabled_reason
+    return items
+
+
+def _build_shop_catalog(user_id: str, scope: str) -> Dict[str, Any]:
+    scope = scope if scope in SHOP_SCOPE_IDS else "general"
+    shop_service = current_app.config.get("SHOP_SERVICE")
+    if shop_service is None:
+        raise ValueError("shop_service_unavailable")
+
+    user, user_inventory = _build_user_shop_inventory(user_id)
+    allowed_ids = set(SHOP_SCOPE_IDS[scope])
+    shops_result = shop_service.get_shops()
+    shops = []
+    for shop in shops_result.get("shops", []):
+        if int(shop.get("shop_id", 0) or 0) not in allowed_ids:
+            continue
+        details = shop_service.get_shop_details(shop["shop_id"])
+        if not details.get("success"):
+            continue
+        shops.append(
+            {
+                "shop_id": shop["shop_id"],
+                "name": shop["name"],
+                "description": shop.get("description"),
+                "item_list": _decorate_shop_items_for_user(user_id, details, user_inventory, shop_service),
+            }
+        )
+
+    return {
+        "success": True,
+        "scope": scope,
+        "wallet": {
+            "coins": int(user.coins or 0),
+            "premium_currency": int(user.premium_currency or 0),
+        },
+        "shops": shops,
+    }
+
+
+def _build_playmode_portal(user_id: str, portal_key: str) -> Dict[str, Any]:
+    meta = PLAYMODE_PORTAL_META[portal_key]
+    user_repo = current_app.config.get("USER_REPO")
+    inventory_repo = current_app.config.get("INVENTORY_REPO")
+    item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
+    user = user_repo.get_by_id(user_id) if user_repo else None
+    zone = inventory_repo.get_zone_by_id(meta["zone_id"]) if inventory_repo else None
+    required_pass_name = None
+    if zone and getattr(zone, "requires_pass", False) and getattr(zone, "required_item_id", None):
+        item_template = item_template_repo.get_item_by_id(zone.required_item_id) if item_template_repo else None
+        required_pass_name = item_template.name if item_template else f"道具#{zone.required_item_id}"
+    return {
+        **meta,
+        "zone_name": zone.name if zone else f"区域 {meta['zone_id']}",
+        "zone_description": zone.description if zone else "",
+        "description": (zone.description if zone and getattr(zone, "description", None) else meta.get("description", "")),
+        "zone_cost": int(getattr(zone, "fishing_cost", 0) or 0),
+        "required_pass_name": required_pass_name,
+        "is_current_zone": bool(user and zone and user.fishing_zone_id == zone.id),
+    }
+
+
+# 玩法页统一使用的 company-zone-card 数据（与 fishing_zones.html zone 1/2/3 卡片结构一致）
+PLAYMODE_COMPANY_ZONE_META = {
+    "expedition": {"zone_id": 4, "shop_scope": "expedition", "shop_name": "鱼寻思·海洋研究院",    "accent_class": "company-card-expedition"},
+    "scifi":      {"zone_id": 5, "shop_scope": "scifi",      "shop_name": "鱼观测·科幻补给站",    "accent_class": "company-card-scifi"},
+    "xianhuan":   {"zone_id": 6, "shop_scope": "xianhuan",   "shop_name": "鱼问道·玄幻仙肆",      "accent_class": "company-card-xianhuan"},
+    "cthulhu":    {"zone_id": 7, "shop_scope": "cthulhu",    "shop_name": "鱼深潜·深渊密铺",      "accent_class": "company-card-cthulhu"},
+    "magic":      {"zone_id": 8, "shop_scope": "magic",      "shop_name": "鱼讨伐·魔幻军械所",    "accent_class": "company-card-magic"},
+}
+
+
+def _build_company_zone_card(user_id: str, playmode_key: str) -> Optional[Dict[str, Any]]:
+    """构造与 fishing_zones.html company_zones 一致结构的区域卡片数据。"""
+    meta = PLAYMODE_COMPANY_ZONE_META.get(playmode_key)
+    if not meta:
+        return None
+    inventory_repo = current_app.config.get("INVENTORY_REPO")
+    item_template_repo = current_app.config.get("ITEM_TEMPLATE_REPO")
+    user_repo = current_app.config.get("USER_REPO")
+    if not inventory_repo:
+        return None
+    zone = inventory_repo.get_zone_by_id(meta["zone_id"])
+    if not zone:
+        return None
+    required_pass_name = None
+    if getattr(zone, "requires_pass", False) and getattr(zone, "required_item_id", None):
+        item_template = item_template_repo.get_item_by_id(zone.required_item_id) if item_template_repo else None
+        required_pass_name = item_template.name if item_template else f"道具ID{zone.required_item_id}"
+    current_user = user_repo.get_by_id(user_id) if user_repo else None
+    return {
+        "id": zone.id,
+        "name": zone.name,
+        "description": zone.description,
+        "required_pass": required_pass_name,
+        "is_current": bool(current_user and current_user.fishing_zone_id == zone.id),
+        "fishing_cost": int(getattr(zone, "fishing_cost", 0) or 0),
+        "shop_scope": meta["shop_scope"],
+        "shop_name": meta["shop_name"],
+        "accent_class": meta["accent_class"],
     }
 
 
@@ -490,8 +792,11 @@ def _get_client_ip() -> str:
 
 
 def ensure_initial_password(user_id: str) -> str:
-    """兼容旧调用：新版本不再生成明文初始密码。"""
-    return ""
+    """兼容旧调用：直接生成并下发新的 WebUI 初始密码。"""
+    account_service = _get_account_service()
+    if not account_service:
+        return ""
+    return account_service.issue_new_webui_password(user_id)
 
 
 def verify_user_password(user_id: str, password: str) -> bool:
@@ -506,11 +811,11 @@ def set_user_password(user_id: str, new_password: str) -> None:
 
 
 def reset_user_password_to_new_initial(user_id: str) -> str:
-    """兼容旧调用：清空密码，等待用户下次登录时重新设置。"""
+    """兼容旧调用：直接重置并生成新的 WebUI 初始密码。"""
     account_service = _get_account_service()
-    if account_service:
-        account_service.clear_user_password(user_id)
-    return ""
+    if not account_service:
+        return ""
+    return account_service.issue_new_webui_password(user_id)
 
 
 def _get_next_pond_upgrade(inventory_service, current_capacity: int) -> Dict[str, Any] | None:
@@ -1328,10 +1633,7 @@ async def login():
         if not result.get("success"):
             message = result.get("message", "登录失败")
             await flash(message, "warning" if "钓鱼佬" in message else "danger")
-            return await _render_login_page(
-                first_login=bool(result.get("first_login")),
-                user_id=result.get("login_user_id", login_user_id),
-            )
+            return await _render_login_page(user_id=result.get("login_user_id", login_user_id))
 
         user = result.get("user")
         _login_player_session(user, auth_provider="webui")
@@ -1743,6 +2045,13 @@ async def api_buy_shop_item():
             return jsonify({"success": False, "message": "参数无效"}), 400
         
         result = shop_service.purchase_item(user_id, item_id, quantity)
+        if result.get("success"):
+            user_repo = current_app.config.get("USER_REPO")
+            user = user_repo.get_by_id(user_id) if user_repo else None
+            result["wallet"] = {
+                "coins": int(getattr(user, "coins", 0) or 0),
+                "premium_currency": int(getattr(user, "premium_currency", 0) or 0),
+            }
         status_code = 200 if result.get("success", False) else 400
         return jsonify(result), status_code
     except (TypeError, ValueError):
@@ -3663,153 +3972,19 @@ async def market():
 @player_bp.route("/shop")
 @login_required
 async def shop():
-    """商店页面"""
+    """旧商店页已并入地图页。"""
+    return redirect(url_for("player_bp.fishing"))
+
+
+@player_bp.route("/api/shops/catalog")
+@login_required
+async def api_shop_catalog():
     user_id = session.get("user_id")
-    shop_service = current_app.config.get("SHOP_SERVICE")
-    user_repo = current_app.config.get("USER_REPO")
-    inventory_repo = current_app.config.get("INVENTORY_REPO")
-    
-    # 获取用户信息
-    user = user_repo.get_by_id(user_id)
-    
-    # 获取用户库存用于检查购买条件
-    user_inventory = {
-        "coins": user.coins,
-        "premium": user.premium_currency,
-        "items": {},
-        "fish": {},
-        "rods": {},
-        "accessories": {},
-        "baits": {}
-    }
-    
-    # 获取道具库存（inventory_repo返回的是字典 {item_id: quantity}）
-    user_inventory["items"] = inventory_repo.get_user_item_inventory(user_id)
-    
-    # 获取鱼类库存（鱼塘 + 水族箱）
-    for fish in inventory_repo.get_fish_inventory(user_id):
-        key = (fish.fish_id, fish.quality_level)
-        user_inventory["fish"][key] = user_inventory["fish"].get(key, 0) + fish.quantity
-    
-    from ..core.services.aquarium_service import AquariumService
-    aquarium_service = current_app.config.get("AQUARIUM_SERVICE")
-    if aquarium_service:
-        aquarium_result = aquarium_service.get_user_aquarium(user_id)
-        for fish in aquarium_result.get("fishes", []):
-            key = (fish["fish_id"], fish["quality_level"])
-            user_inventory["fish"][key] = user_inventory["fish"].get(key, 0) + fish["quantity"]
-    
-    # 获取鱼竿库存
-    for rod in inventory_repo.get_user_rod_instances(user_id):
-        user_inventory["rods"][rod.rod_id] = user_inventory["rods"].get(rod.rod_id, 0) + 1
-    
-    # 获取饰品库存
-    for accessory in inventory_repo.get_user_accessory_instances(user_id):
-        user_inventory["accessories"][accessory.accessory_id] = user_inventory["accessories"].get(accessory.accessory_id, 0) + 1
-    
-    # 获取鱼饵库存（inventory_repo返回的是字典 {bait_id: quantity}）
-    user_inventory["baits"] = inventory_repo.get_user_bait_inventory(user_id)
-    
-    # 获取所有商店
-    shops_result = shop_service.get_shops()
-    shops_list = shops_result.get("shops", [])
-    
-    # 为每个商店获取详细信息
-    shops_with_items = []
-    for shop in shops_list:
-        shop_details = shop_service.get_shop_details(shop["shop_id"])
-        if shop_details.get("success"):
-            # 为每个商品的成本检查是否满足
-            for item_data in shop_details.get("items", []):
-                item = item_data.get("item", {})
-                for cost in item_data.get("costs", []):
-                    cost_type = cost.get("cost_type")
-                    cost_item_id = cost.get("cost_item_id")
-                    cost_amount = cost.get("cost_amount", 0)
-                    quality_level = cost.get("quality_level", 0)
-                    
-                    # 检查是否满足
-                    satisfied = False
-                    if cost_type == "coins":
-                        satisfied = user_inventory["coins"] >= cost_amount
-                    elif cost_type == "premium":
-                        satisfied = user_inventory["premium"] >= cost_amount
-                    elif cost_type == "item":
-                        satisfied = user_inventory["items"].get(cost_item_id, 0) >= cost_amount
-                    elif cost_type == "fish":
-                        key = (cost_item_id, quality_level)
-                        satisfied = user_inventory["fish"].get(key, 0) >= cost_amount
-                    elif cost_type == "rod":
-                        satisfied = user_inventory["rods"].get(cost_item_id, 0) >= cost_amount
-                    elif cost_type == "accessory":
-                        satisfied = user_inventory["accessories"].get(cost_item_id, 0) >= cost_amount
-                    elif cost_type == "bait":
-                        satisfied = user_inventory["baits"].get(cost_item_id, 0) >= cost_amount
-                    
-                    cost["satisfied"] = satisfied
-
-                valid_costs = [
-                    cost for cost in item_data.get("costs", [])
-                    if cost.get("cost_type") and int(cost.get("cost_amount", 0) or 0) > 0
-                ]
-                cost_groups = {}
-                for cost in valid_costs:
-                    group_id = cost.get("group_id") or 0
-                    cost_groups.setdefault(group_id, []).append(cost)
-
-                can_pay = True
-                for group_costs in cost_groups.values():
-                    relation = str(group_costs[0].get("cost_relation", "and") or "and").lower()
-                    if relation == "or" and len(group_costs) > 1:
-                        group_ok = any(cost.get("satisfied") for cost in group_costs)
-                    else:
-                        group_ok = all(cost.get("satisfied") for cost in group_costs)
-                    if not group_ok:
-                        can_pay = False
-                        break
-
-                can_purchase = can_pay
-                disabled_reason = "" if can_pay else "资源不足"
-                stock_total = item.get("stock_total")
-                if stock_total is not None and int(item.get("stock_sold", 0) or 0) >= int(stock_total or 0):
-                    can_purchase = False
-                    disabled_reason = "库存不足"
-
-                per_user_limit = item.get("per_user_limit")
-                if can_purchase and per_user_limit is not None:
-                    purchased_total = shop_service.shop_repo.get_user_purchased_count(user_id, item.get("item_id"))
-                    if purchased_total >= int(per_user_limit or 0):
-                        can_purchase = False
-                        disabled_reason = "已达限购"
-
-                per_user_daily_limit = item.get("per_user_daily_limit")
-                if can_purchase and per_user_daily_limit is not None and int(per_user_daily_limit or 0) > 0:
-                    now_utc = datetime.now(timezone.utc)
-                    now_local = now_utc.astimezone(timezone(timedelta(hours=8)))
-                    local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-                    start_of_day_utc = local_midnight.astimezone(timezone.utc).replace(tzinfo=None)
-                    purchased_today = shop_service.shop_repo.get_user_purchased_count(
-                        user_id,
-                        item.get("item_id"),
-                        since=start_of_day_utc,
-                    )
-                    if purchased_today >= int(per_user_daily_limit or 0):
-                        can_purchase = False
-                        disabled_reason = "今日已达限购"
-
-                item_data["can_purchase"] = can_purchase
-                item_data["purchase_disabled_reason"] = disabled_reason
-            
-            shops_with_items.append({
-                "shop_id": shop["shop_id"],
-                "name": shop["name"],
-                "description": shop.get("description"),
-                "item_list": shop_details.get("items", [])
-            })
-    
-    return await render_template("shop.html", 
-                                  user=user,
-                                  shops=shops_with_items)
+    scope = str(request.args.get("scope", "general") or "general").strip().lower()
+    try:
+        return jsonify(_build_shop_catalog(user_id, scope))
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
 
 @player_bp.route("/exchange")
 @login_required
@@ -4083,7 +4258,7 @@ async def tavern():
 @player_bp.route("/fishing")
 @login_required
 async def fishing():
-    """钓鱼区域管理页面"""
+    """地图公司页面"""
     user_id = session.get("user_id")
     user_repo = current_app.config.get("USER_REPO")
     fishing_service = current_app.config.get("FISHING_SERVICE")
@@ -4105,6 +4280,7 @@ async def fishing():
     
     # 构建所有区域列表
     all_zones = []
+    company_zones = []
     for zone in fishing_zones:
         # 获取通行证道具名称
         required_pass_name = None
@@ -4121,9 +4297,16 @@ async def fishing():
             "is_active": zone.is_active,
             "fishing_cost": zone.fishing_cost,
         }
-        
+
         all_zones.append(zone_info)
-        
+
+        company_meta = COMPANY_ZONE_META.get(zone.id)
+        if company_meta:
+            company_zones.append({
+                **zone_info,
+                **company_meta,
+            })
+
         # 设置当前区域信息
         if zone.id == current_zone_id:
             current_zone = zone_info
@@ -4138,9 +4321,12 @@ async def fishing():
         except Exception as exc:
             logger.warning(f"加载区域七深潜视图失败: {exc}")
     
+    company_zones.sort(key=lambda z: z["id"])
+
     return await render_template("fishing_zones.html",
                                   current_zone=current_zone,
                                   all_zones=all_zones,
+                                  company_zones=company_zones,
                                   cthulhu_view=cthulhu_view)
 
 
@@ -4163,7 +4349,12 @@ async def expedition_page():
     else:
         logger.warning("expedition_service未初始化")
 
-    return await render_template("expedition.html", expeditions=active_expeditions)
+    return await render_template(
+        "expedition.html",
+        expeditions=active_expeditions,
+        expedition_zone_card=_build_company_zone_card(user_id, "expedition"),
+        portal=_build_playmode_portal(user_id, "expedition"),
+    )
 
 
 @player_bp.route("/cthulhu")
@@ -4174,7 +4365,12 @@ async def cthulhu_page():
     if not cthulhu_service:
         return "克苏鲁深潜服务未启用。", 503
     view = cthulhu_service.get_state_view(user_id)
-    return await render_template("cthulhu.html", initial_view=view)
+    return await render_template(
+        "cthulhu.html",
+        initial_view=view,
+        zone_card=_build_company_zone_card(user_id, "cthulhu"),
+        portal=_build_playmode_portal(user_id, "cthulhu"),
+    )
 
 
 @player_bp.route("/scifi")
@@ -4185,7 +4381,12 @@ async def scifi_page():
     if not scifi_service:
         return "科幻干预服务未启用。", 503
     view = scifi_service.get_state_view(user_id)
-    return await render_template("scifi.html", initial_view=view)
+    return await render_template(
+        "scifi.html",
+        initial_view=view,
+        zone_card=_build_company_zone_card(user_id, "scifi"),
+        portal=_build_playmode_portal(user_id, "scifi"),
+    )
 
 
 @player_bp.route("/api/scifi/state/me")
@@ -4254,17 +4455,6 @@ async def scifi_api_leaderboard():
         return jsonify({"success": False, "message": "service unavailable"}), 503
     limit = request.args.get("limit", 50, type=int)
     return jsonify(scifi_service.get_leaderboard(limit=limit))
-
-
-@player_bp.route("/api/scifi/event_log/me")
-@login_required
-async def scifi_api_event_log():
-    user_id = session["user_id"]
-    scifi_service = current_app.config.get("SCIFI_SERVICE")
-    if not scifi_service:
-        return jsonify({"success": False, "message": "service unavailable"}), 503
-    limit = request.args.get("limit", 50, type=int)
-    return jsonify(scifi_service.list_event_logs(user_id, limit=limit))
 
 
 @player_bp.route("/api/cthulhu/state/me")
@@ -4410,6 +4600,8 @@ async def tribulation_page():
         eligible_items=eligible_items,
         active_events=active_events,
         own_active=own_active,
+        zone_card=_build_company_zone_card(user_id, "xianhuan"),
+        portal=_build_playmode_portal(user_id, "xianhuan"),
     )
 
 
@@ -4515,7 +4707,12 @@ async def team_battle_page():
         return "魔幻团战服务未启用。", 503
 
     view = team_battle_service.get_player_view(user_id)
-    return await render_template("team_battle.html", view=view)
+    return await render_template(
+        "team_battle.html",
+        view=view,
+        zone_card=_build_company_zone_card(user_id, "magic"),
+        portal=_build_playmode_portal(user_id, "magic"),
+    )
 
 
 @player_bp.route("/api/team_battle/state")

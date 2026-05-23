@@ -1,0 +1,467 @@
+/* ============================================================
+   问道·水墨主题（玄幻区域全站皮肤）
+   触发：body.theme-wendao（玩家所在区域=6 时由 layout 自动添加）
+   优先级：低于 .has-cthulhu-pollution（克苏鲁污染会移除 theme-wendao）
+   字体：思源宋体 Regular 单字重（chinese-simplified subset, ~1.5MB）
+   ============================================================ */
+
+@font-face {
+    font-family: "Wendao Serif";
+    src: url("../../vendor/fonts/noto-serif-sc-regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+body.theme-wendao {
+    --wendao-paper: #f5f1e8;
+    --wendao-paper-soft: #ede8db;
+    --wendao-paper-deep: #dcd4c1;
+    --wendao-ink: #1c1b18;
+    --wendao-ink-soft: #4a4640;
+    --wendao-muted: #6e6a60;
+    --wendao-hairline: rgba(28, 27, 24, 0.18);
+    --wendao-hairline-strong: rgba(28, 27, 24, 0.4);
+    --wendao-shadow: 0 8px 24px rgba(28, 27, 24, 0.08);
+    --wendao-cinnabar: #a0392e;
+
+    color: var(--wendao-ink);
+    font-family: "Wendao Serif", "STSong", "SimSun", "Noto Serif CJK SC", "Songti SC", serif;
+    letter-spacing: 0.02em;
+    background: transparent;
+}
+
+/* zone-6 全屏底图 + 水墨纸色叠加（强制显示） */
+body.theme-wendao::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        /* 顶层：纸色柔和过渡（保证文字可读） */
+        linear-gradient(180deg, rgba(250, 246, 236, 0.55) 0%, rgba(237, 232, 219, 0.55) 50%, rgba(220, 212, 193, 0.62) 100%),
+        /* 朱印淡色一抹 */
+        radial-gradient(ellipse 40% 30% at 80% 10%, rgba(160, 57, 46, 0.10), transparent 70%),
+        /* 月光淡晕 */
+        radial-gradient(ellipse 60% 40% at 30% 90%, rgba(28, 27, 24, 0.08), transparent 75%),
+        /* 底图：zone-6 */
+        url("../../img/zones/zone-6.png");
+    background-size: cover, cover, cover, cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    opacity: 1;
+}
+
+/* 云纹覆盖层 */
+body.theme-wendao::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'><g fill='none' stroke='%231c1b18' stroke-width='1.2' opacity='0.5'><path d='M30 100 Q55 70 80 95 T130 100 Q150 80 170 100'/><path d='M40 110 Q60 95 85 108 T130 112'/><path d='M180 220 Q205 195 230 215 T280 220 Q295 205 310 220'/><path d='M190 230 Q210 215 235 228 T280 232'/><path d='M70 240 Q90 220 115 235 T160 240'/><path d='M210 70 Q230 50 255 65 T300 70'/></g></svg>");
+    background-size: 320px 320px;
+    opacity: 0.07;
+}
+
+body.theme-wendao .container-fluid,
+body.theme-wendao .container,
+body.theme-wendao main,
+body.theme-wendao section { position: relative; z-index: 1; }
+
+/* ============================================================
+   顶栏
+   ============================================================ */
+body.theme-wendao .player-topbar {
+    background: rgba(245, 241, 232, 0.94) !important;
+    border-bottom: 1px solid var(--wendao-hairline-strong);
+    backdrop-filter: blur(6px);
+}
+body.theme-wendao .player-topbar.navbar-light .navbar-brand,
+body.theme-wendao .player-topbar.navbar-light .navbar-nav .nav-link,
+body.theme-wendao .player-topbar.navbar-light .nav-link.dropdown-toggle,
+body.theme-wendao .player-topbar .navbar-brand,
+body.theme-wendao .player-topbar .navbar-nav .nav-link {
+    color: var(--wendao-ink) !important;
+    font-family: "Wendao Serif", "STKaiti", "KaiTi", serif;
+    letter-spacing: 0.08em;
+}
+body.theme-wendao .player-topbar.navbar-light .navbar-brand:hover,
+body.theme-wendao .player-topbar.navbar-light .navbar-nav .nav-link:hover,
+body.theme-wendao .player-topbar.navbar-light .navbar-nav .nav-link.show {
+    color: var(--wendao-cinnabar) !important;
+}
+body.theme-wendao .player-topbar .navbar-toggler {
+    border-color: var(--wendao-hairline-strong);
+}
+body.theme-wendao .player-topbar .dropdown-menu {
+    background: var(--wendao-paper);
+    border: 1px solid var(--wendao-hairline-strong);
+    border-radius: 2px;
+    box-shadow: var(--wendao-shadow);
+}
+body.theme-wendao .player-topbar .dropdown-menu .dropdown-item {
+    color: var(--wendao-ink);
+    letter-spacing: 0.06em;
+}
+body.theme-wendao .player-topbar .dropdown-menu .dropdown-item:hover,
+body.theme-wendao .player-topbar .dropdown-menu .dropdown-item:focus {
+    background: var(--wendao-paper-soft);
+    color: var(--wendao-cinnabar);
+}
+body.theme-wendao .player-topbar .dropdown-menu .dropdown-item.text-danger {
+    color: var(--wendao-cinnabar) !important;
+}
+body.theme-wendao .player-topbar .dropdown-menu .dropdown-divider {
+    border-top-color: var(--wendao-hairline);
+}
+body.theme-wendao .player-topbar .player-wallet-pill,
+body.theme-wendao .player-topbar .player-account-trigger {
+    background: rgba(28, 27, 24, 0.04) !important;
+    border-color: var(--wendao-hairline-strong) !important;
+    color: var(--wendao-ink) !important;
+    font-family: "Wendao Serif", serif;
+}
+
+/* ============================================================
+   卡片与正文容器
+   ============================================================ */
+body.theme-wendao .card {
+    background: var(--wendao-paper);
+    border: 1px solid var(--wendao-hairline);
+    box-shadow: var(--wendao-shadow);
+    border-radius: 4px;
+    color: var(--wendao-ink);
+}
+body.theme-wendao .card.border-info,
+body.theme-wendao .card.border-warning,
+body.theme-wendao .card.border-primary,
+body.theme-wendao .card.border-secondary,
+body.theme-wendao .card.border-success,
+body.theme-wendao .card.border-danger {
+    border-color: var(--wendao-hairline-strong) !important;
+}
+body.theme-wendao .card-header {
+    background: transparent !important;
+    color: var(--wendao-ink) !important;
+    border-bottom: 1px solid var(--wendao-hairline);
+    font-family: "Wendao Serif", "STKaiti", "KaiTi", serif;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+}
+body.theme-wendao .card-header.bg-info,
+body.theme-wendao .card-header.bg-warning,
+body.theme-wendao .card-header.bg-primary,
+body.theme-wendao .card-header.bg-secondary,
+body.theme-wendao .card-header.bg-success,
+body.theme-wendao .card-header.bg-danger {
+    background: var(--wendao-paper-soft) !important;
+    color: var(--wendao-ink) !important;
+}
+
+/* ============================================================
+   按钮
+   ============================================================ */
+body.theme-wendao .btn-primary,
+body.theme-wendao .btn-info,
+body.theme-wendao .btn-warning,
+body.theme-wendao .btn-success {
+    background: var(--wendao-ink) !important;
+    border-color: var(--wendao-ink) !important;
+    color: var(--wendao-paper) !important;
+    font-family: "Wendao Serif", serif;
+    letter-spacing: 0.1em;
+    border-radius: 2px;
+}
+body.theme-wendao .btn-primary:hover,
+body.theme-wendao .btn-info:hover,
+body.theme-wendao .btn-warning:hover,
+body.theme-wendao .btn-success:hover {
+    background: #000 !important;
+    border-color: #000 !important;
+    box-shadow: 0 4px 12px rgba(28, 27, 24, 0.22);
+}
+body.theme-wendao .btn-secondary {
+    background: transparent !important;
+    border: 1px solid var(--wendao-ink) !important;
+    color: var(--wendao-ink) !important;
+    font-family: "Wendao Serif", serif;
+    letter-spacing: 0.1em;
+    border-radius: 2px;
+}
+body.theme-wendao .btn-secondary:hover {
+    background: var(--wendao-ink) !important;
+    color: var(--wendao-paper) !important;
+}
+body.theme-wendao .btn-danger {
+    background: var(--wendao-cinnabar) !important;
+    border-color: var(--wendao-cinnabar) !important;
+    color: var(--wendao-paper) !important;
+    border-radius: 2px;
+}
+body.theme-wendao .btn-outline-primary,
+body.theme-wendao .btn-outline-info,
+body.theme-wendao .btn-outline-warning,
+body.theme-wendao .btn-outline-secondary,
+body.theme-wendao .btn-outline-success {
+    background: transparent !important;
+    border: 1px solid var(--wendao-hairline-strong) !important;
+    color: var(--wendao-ink) !important;
+    border-radius: 2px;
+}
+body.theme-wendao .btn-outline-primary:hover,
+body.theme-wendao .btn-outline-info:hover,
+body.theme-wendao .btn-outline-warning:hover,
+body.theme-wendao .btn-outline-secondary:hover,
+body.theme-wendao .btn-outline-success:hover {
+    background: var(--wendao-ink) !important;
+    color: var(--wendao-paper) !important;
+    border-color: var(--wendao-ink) !important;
+}
+
+/* ============================================================
+   alert
+   ============================================================ */
+body.theme-wendao .alert {
+    background: var(--wendao-paper-soft);
+    border: 1px solid var(--wendao-hairline-strong);
+    color: var(--wendao-ink);
+    border-radius: 2px;
+}
+body.theme-wendao .alert-info,
+body.theme-wendao .alert-warning,
+body.theme-wendao .alert-secondary,
+body.theme-wendao .alert-success,
+body.theme-wendao .alert-primary {
+    background: var(--wendao-paper-soft) !important;
+    border-color: var(--wendao-hairline-strong) !important;
+    color: var(--wendao-ink) !important;
+}
+body.theme-wendao .alert-danger {
+    background: rgba(160, 57, 46, 0.06) !important;
+    border-color: var(--wendao-cinnabar) !important;
+    color: var(--wendao-cinnabar) !important;
+}
+
+/* ============================================================
+   进度条（修为/灵蕴/卷轴展开效果）
+   ============================================================ */
+body.theme-wendao .progress {
+    background: var(--wendao-paper-deep) !important;
+    border: 1px solid var(--wendao-hairline-strong);
+    border-radius: 2px;
+    height: 22px;
+}
+body.theme-wendao .progress-bar {
+    background: linear-gradient(90deg, var(--wendao-ink) 0%, var(--wendao-ink-soft) 100%) !important;
+    color: var(--wendao-paper) !important;
+    font-family: "Wendao Serif", serif;
+    letter-spacing: 0.06em;
+}
+body.theme-wendao .progress-bar-striped {
+    background-image: linear-gradient(
+        45deg,
+        rgba(245, 241, 232, 0.12) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(245, 241, 232, 0.12) 50%,
+        rgba(245, 241, 232, 0.12) 75%,
+        transparent 75%,
+        transparent
+    ) !important;
+}
+
+/* ============================================================
+   badge / 标签
+   ============================================================ */
+body.theme-wendao .badge {
+    background: transparent !important;
+    color: var(--wendao-ink) !important;
+    border: 1px solid var(--wendao-hairline-strong);
+    border-radius: 2px;
+    font-family: "Wendao Serif", serif;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+}
+body.theme-wendao .badge.bg-danger {
+    background: var(--wendao-cinnabar) !important;
+    color: var(--wendao-paper) !important;
+    border-color: var(--wendao-cinnabar);
+}
+
+/* ============================================================
+   表格
+   ============================================================ */
+body.theme-wendao .table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(28, 27, 24, 0.03);
+    --bs-table-hover-bg: rgba(28, 27, 24, 0.06);
+    --bs-table-border-color: var(--wendao-hairline);
+    color: var(--wendao-ink);
+}
+body.theme-wendao .table thead th {
+    border-bottom: 2px solid var(--wendao-ink);
+    font-family: "Wendao Serif", "STKaiti", "KaiTi", serif;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--wendao-ink);
+}
+body.theme-wendao .table > :not(caption) > * > * {
+    background-color: transparent;
+    border-color: var(--wendao-hairline);
+}
+
+/* ============================================================
+   utility 颜色压制（防止 bg-*/text-* 残留彩色）
+   ============================================================ */
+body.theme-wendao .bg-info,
+body.theme-wendao .bg-warning,
+body.theme-wendao .bg-primary,
+body.theme-wendao .bg-secondary,
+body.theme-wendao .bg-success {
+    background-color: var(--wendao-ink) !important;
+    color: var(--wendao-paper) !important;
+}
+body.theme-wendao .bg-light {
+    background-color: var(--wendao-paper-soft) !important;
+    color: var(--wendao-ink) !important;
+}
+body.theme-wendao .text-muted { color: var(--wendao-muted) !important; }
+body.theme-wendao .text-info,
+body.theme-wendao .text-primary,
+body.theme-wendao .text-warning,
+body.theme-wendao .text-success { color: var(--wendao-ink) !important; }
+body.theme-wendao .text-danger { color: var(--wendao-cinnabar) !important; }
+body.theme-wendao .text-white { color: var(--wendao-paper) !important; }
+body.theme-wendao .border-info,
+body.theme-wendao .border-warning,
+body.theme-wendao .border-primary,
+body.theme-wendao .border-secondary,
+body.theme-wendao .border-success {
+    border-color: var(--wendao-hairline-strong) !important;
+}
+body.theme-wendao .border-danger { border-color: var(--wendao-cinnabar) !important; }
+
+/* ============================================================
+   form 控件
+   ============================================================ */
+body.theme-wendao .form-control,
+body.theme-wendao .form-select {
+    background: var(--wendao-paper);
+    border: 1px solid var(--wendao-hairline-strong);
+    color: var(--wendao-ink);
+    border-radius: 2px;
+    font-family: "Wendao Serif", serif;
+}
+body.theme-wendao .form-control:focus,
+body.theme-wendao .form-select:focus {
+    background: #fff;
+    border-color: var(--wendao-ink);
+    box-shadow: 0 0 0 0.15rem rgba(28, 27, 24, 0.12);
+    color: var(--wendao-ink);
+}
+body.theme-wendao .form-label,
+body.theme-wendao .form-text {
+    color: var(--wendao-ink);
+    font-family: "Wendao Serif", serif;
+}
+
+/* ============================================================
+   portal-xianhuan 入口卡（玄幻问道入口）
+   ============================================================ */
+body.theme-wendao .portal-xianhuan .playmode-portal-shell {
+    background:
+        radial-gradient(circle at top left, rgba(28, 27, 24, 0.05), transparent 38%),
+        linear-gradient(135deg, var(--wendao-paper) 0%, var(--wendao-paper-soft) 100%) !important;
+    border: 1px solid var(--wendao-hairline-strong);
+}
+body.theme-wendao .playmode-portal-kicker { color: var(--wendao-ink); }
+body.theme-wendao .shop-chip {
+    background: var(--wendao-paper);
+    border: 1px solid var(--wendao-hairline-strong);
+    color: var(--wendao-ink);
+    border-radius: 2px;
+    font-family: "Wendao Serif", serif;
+}
+
+/* ============================================================
+   editorial-footer（页脚）
+   ============================================================ */
+body.theme-wendao .editorial-footer {
+    background: transparent !important;
+    border-top: 1px solid var(--wendao-hairline);
+    color: var(--wendao-muted);
+    font-family: "Wendao Serif", serif;
+}
+body.theme-wendao .editorial-footer a { color: var(--wendao-ink); }
+
+/* ============================================================
+   toast / modal
+   ============================================================ */
+body.theme-wendao #playerToastStack .toast {
+    background: var(--wendao-paper);
+    color: var(--wendao-ink);
+    border: 1px solid var(--wendao-hairline-strong);
+    border-radius: 2px;
+}
+body.theme-wendao .modal-content {
+    background: var(--wendao-paper);
+    color: var(--wendao-ink);
+    border: 1px solid var(--wendao-hairline-strong);
+    border-radius: 2px;
+}
+body.theme-wendao .modal-header,
+body.theme-wendao .modal-footer {
+    border-color: var(--wendao-hairline);
+}
+
+/* ============================================================
+   问道页专属：卷轴标题 + 朱印
+   ============================================================ */
+.wendao-scroll-title {
+    /* 该 class 仅在 body.theme-wendao 作用域内显形，
+       默认主题下保持普通 h2 样式（不影响） */
+}
+body.theme-wendao .wendao-scroll-title {
+    position: relative;
+    padding: 1.1rem 0 1.1rem 0;
+    margin: 0 0 0.5rem 0;
+    border-top: 2px solid var(--wendao-ink);
+    border-bottom: 1px solid var(--wendao-ink);
+    text-align: center;
+    font-family: "Wendao Serif", "STKaiti", "KaiTi", serif;
+    font-weight: 600;
+    letter-spacing: 0.4em;
+    color: var(--wendao-ink);
+}
+body.theme-wendao .wendao-scroll-title::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    transform: translateX(-50%);
+    width: 28px;
+    height: 2px;
+    background: var(--wendao-cinnabar);
+}
+body.theme-wendao .wendao-scroll-title::after {
+    content: "印";
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--wendao-cinnabar);
+    border: 2px solid var(--wendao-cinnabar);
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7em;
+    font-family: "Wendao Serif", "STKaiti", "KaiTi", serif;
+    letter-spacing: 0;
+    line-height: 1;
+}
+body.theme-wendao .wendao-scroll-title i {
+    color: var(--wendao-cinnabar);
+    margin-right: 0.5em;
+    font-size: 0.85em;
+}

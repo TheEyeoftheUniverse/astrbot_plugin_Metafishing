@@ -1,0 +1,36 @@
+<section class="playmode-portal {{ portal.theme_class }} mb-4">
+    <div class="playmode-portal-shell">
+        <div class="playmode-portal-copy">
+            <div class="playmode-portal-kicker">
+                <i class="{{ portal.icon }}"></i> {{ portal.title }}
+            </div>
+            <h3 class="mb-2">{{ portal.zone_name }}</h3>
+            <p class="text-muted mb-0">{{ portal.description }}</p>
+        </div>
+        <div class="playmode-portal-actions">
+            <div class="playmode-portal-meta">
+                <span class="shop-chip reward">钓鱼消耗 {{ "{:,}".format(portal.zone_cost) }} 金币/次</span>
+                {% if portal.required_pass_name %}
+                <span class="shop-chip">需要 {{ portal.required_pass_name }}</span>
+                {% else %}
+                <span class="shop-chip is-ok">无需通行证</span>
+                {% endif %}
+                {% if portal.is_current_zone %}
+                <span class="shop-chip is-ok">当前已驻留</span>
+                {% endif %}
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                {% if portal.is_current_zone %}
+                <button class="btn btn-outline-secondary" type="button" disabled>已在此区域</button>
+                {% else %}
+                <button class="btn btn-primary" type="button" onclick='goToPortalZone({{ portal.zone_id }}, {{ portal.zone_name|tojson }})'>
+                    进入区域
+                </button>
+                {% endif %}
+                <button class="btn btn-warning" type="button" onclick='openShopCatalog({{ portal.shop_scope|tojson }}, {{ portal.shop_label|tojson }})'>
+                    打开{{ portal.shop_label }}
+                </button>
+            </div>
+        </div>
+    </div>
+</section>

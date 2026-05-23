@@ -1,369 +1,74 @@
 {% extends "layout.html" %}
 
-{% block title %}商店 - MetaFishing！{% endblock %}
+{% block title %}商店地图 - MetaFishing！{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
     <div class="col-12">
-        <h2 class="mb-0">
-            <i class="fas fa-store"></i> 商店
-        </h2>
-        <p class="text-muted mt-2">购买游戏道具、装备和鱼饵</p>
+        <h2 class="mb-0"><i class="fas fa-map-location-dot"></i> 商店地图</h2>
+        <p class="text-muted mt-2">总商店保留通用货品，四个玩法商店分流到各自风格入口，并统一通过弹窗连续购买。</p>
     </div>
 </div>
 
-<!-- 用户信息 -->
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card bg-primary text-white">
+<section class="shop-map-board mb-4">
+    <div class="shop-map-backdrop">
+        <div class="shop-map-intro">
+            <div class="editorial-kicker"><i class="fas fa-compass"></i> 地图式入口</div>
+            <h3>选择你要进入的商路</h3>
+            <p class="text-muted mb-0">每个点位对应一个商店弹窗。购买后只刷新当前弹窗状态，不会打断你的浏览。</p>
+        </div>
+
+        <button class="shop-map-node node-general" type="button" onclick="openShopCatalog('general', '总商店')">
+            <span class="shop-map-label">总商店</span>
+            <small>通用补给</small>
+        </button>
+
+        <button class="shop-map-node node-scifi" type="button" onclick="openShopCatalog('scifi', '观测商店')">
+            <span class="shop-map-label">观测商店</span>
+            <small>科幻货架</small>
+        </button>
+
+        <button class="shop-map-node node-xianhuan" type="button" onclick="openShopCatalog('xianhuan', '问道商店')">
+            <span class="shop-map-label">问道商店</span>
+            <small>玄幻货架</small>
+        </button>
+
+        <button class="shop-map-node node-cthulhu" type="button" onclick="openShopCatalog('cthulhu', '深潜商店')">
+            <span class="shop-map-label">深潜商店</span>
+            <small>克苏鲁货架</small>
+        </button>
+
+        <button class="shop-map-node node-magic" type="button" onclick="openShopCatalog('magic', '讨伐商店')">
+            <span class="shop-map-label">讨伐商店</span>
+            <small>魔幻货架</small>
+        </button>
+    </div>
+</section>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-coins"></i> 我的金币</h5>
-                <h2 class="mb-0">{{ user.coins or 0 }}</h2>
+                <h5>总商店</h5>
+                <p class="text-muted mb-0">聚合非玩法专属商品，只保留通用补给与基础升级路线。</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5>玩法商店</h5>
+                <p class="text-muted mb-0">科幻、玄幻、克苏鲁、魔幻各自保留独立入口，并同步出现在对应玩法首页顶部。</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5>连续购买</h5>
+                <p class="text-muted mb-0">弹窗不会在单次购买后关闭；余额、库存和按钮状态会在弹窗内局部刷新。</p>
             </div>
         </div>
     </div>
 </div>
-
-<!-- 商店列表 -->
-{% if shops %}
-    {% for shop in shops %}
-    <div class="card mb-4">
-        <div class="card-header bg-info text-white" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#shop-{{ shop.shop_id }}-collapse">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h4 class="mb-0">
-                        <i class="fas fa-shop"></i> {{ shop.name }}
-                    </h4>
-                    {% if shop.description %}
-                    <small>{{ shop.description }}</small>
-                    {% endif %}
-                </div>
-                <i class="fas fa-chevron-down"></i>
-            </div>
-        </div>
-        <div class="collapse shop-collapse" id="shop-{{ shop.shop_id }}-collapse">
-        <div class="card-body">
-            <!-- 商品网格 -->
-            <div class="row g-3" id="shop-{{ shop.shop_id }}">
-                {% if shop.item_list %}
-                    {% for item_data in shop.item_list %}
-                    {% set item = item_data.item %}
-                    {% set costs = item_data.costs %}
-                    {% set rewards = item_data.rewards %}
-
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card h-100 shop-item-card {% if not item_data.can_purchase %}shop-item-disabled{% endif %}">
-                            <div class="card-header shop-item-title">
-                                <div>
-                                    <h5 class="mb-0">{{ item.name }}</h5>
-                                    {% if item.stock_total %}
-                                    <div class="small text-muted mt-1">库存 {{ item.stock_total - (item.stock_sold or 0) }}</div>
-                                    {% endif %}
-                                </div>
-                                <div class="card-icon-actions shop-item-actions">
-                                    <button class="btn btn-sm {% if item_data.can_purchase %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                                            title="{% if item_data.can_purchase %}购买{% else %}{{ item_data.purchase_disabled_reason or '无法购买' }}{% endif %}"
-                                            data-item-id="{{ item.item_id }}"
-                                            data-item-name="{{ item.name|e }}"
-                                            data-shop-id="{{ shop.shop_id }}"
-                                            onclick="buyShopItemFromButton(this)"
-                                            {% if not item_data.can_purchase %}disabled{% endif %}>
-                                        <i class="fas fa-shopping-cart"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="card-body d-flex flex-column">
-                                <div class="shop-item-intro">
-                                    <p class="card-text text-muted small mb-0 shop-item-description" data-full-text="{{ (item.description or '暂无描述')|e }}">
-                                        <span class="shop-description-text"></span>
-                                        <button type="button" class="shop-description-toggle d-none" onclick="toggleShopDescription(this)">展开</button>
-                                    </p>
-                                </div>
-
-                                <hr class="card-section-divider shop-item-divider">
-
-                                <!-- 成本显示 -->
-                                <div class="mb-2">
-                                    {# 先过滤掉无效的消耗项 #}
-                                    {% set valid_costs = [] %}
-                                    {% for cost in costs %}
-                                        {% if cost.cost_type and cost.cost_amount and cost.cost_amount > 0 %}
-                                            {% set _ = valid_costs.append(cost) %}
-                                        {% endif %}
-                                    {% endfor %}
-
-                                    {# 检测是否有or逻辑 #}
-                                    {% set has_or = namespace(value=False) %}
-                                    {% for cost in valid_costs %}
-                                        {% if cost.cost_relation == 'or' %}
-                                            {% set has_or.value = True %}
-                                        {% endif %}
-                                    {% endfor %}
-
-                                    <strong class="small">所需{% if has_or.value %}（满足任一条件即可）{% endif %}:</strong>
-                                    <div class="small">
-                                        {% for cost in valid_costs %}
-                                            <div>
-                                                {% if cost.cost_type == 'coins' %}
-                                                    <i class="fas fa-coins text-warning"></i> {{ cost.cost_amount }} 金币
-                                                {% elif cost.cost_type == 'premium' %}
-                                                    <i class="fas fa-gem text-info"></i> {{ cost.cost_amount }} 钻石
-                                                {% elif cost.cost_type == 'item' %}
-                                                    <i class="fas fa-cube"></i> {{ cost.cost_item_name or '道具' }} x{{ cost.cost_amount }}
-                                                {% elif cost.cost_type == 'fish' %}
-                                                    <i class="fas fa-fish"></i> {{ cost.cost_item_name or '鱼类' }} x{{ cost.cost_amount }}
-                                                {% elif cost.cost_type == 'bait' %}
-                                                    <i class="fas fa-cookie-bite"></i> {{ cost.cost_item_name or '鱼饵' }} x{{ cost.cost_amount }}
-                                                {% elif cost.cost_type == 'rod' %}
-                                                    <span class="icon-fishing-rod" aria-hidden="true"></span> {{ cost.cost_item_name or '鱼竿' }} x{{ cost.cost_amount }}
-                                                {% elif cost.cost_type == 'accessory' %}
-                                                    <i class="fas fa-ring"></i> {{ cost.cost_item_name or '饰品' }} x{{ cost.cost_amount }}
-                                                {% endif %}
-                                                {% if cost.satisfied %}
-                                                    <i class="fas fa-check-circle text-success" style="font-size: 0.8em;"></i>
-                                                {% endif %}
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-
-                                <!-- 奖励显示 -->
-                                <div class="mb-2">
-                                    <strong class="small">获得:</strong>
-                                    <div class="small text-success">
-                                        {% for reward in rewards %}
-                                        <div>
-                                            {% if reward.reward_type == 'coins' %}
-                                                <i class="fas fa-coins"></i> {{ reward.reward_quantity or reward.reward_amount or 0 }} 金币
-                                            {% elif reward.reward_type == 'premium' %}
-                                                <i class="fas fa-gem"></i> {{ reward.reward_quantity or reward.reward_amount or 0 }} 钻石
-                                            {% elif reward.reward_type == 'item' %}
-                                                <i class="fas fa-cube"></i> {{ reward.reward_item_name or '道具' }} x{{ reward.reward_quantity or reward.reward_amount or 1 }}
-                                            {% elif reward.reward_type == 'rod' %}
-                                                <span class="icon-fishing-rod" aria-hidden="true"></span> {{ reward.reward_item_name or '鱼竿' }}
-                                                {% if reward.reward_refine_level and reward.reward_refine_level > 0 %}
-                                                    <span class="star-inline">+{{ reward.reward_refine_level }}</span>
-                                                {% endif %}
-                                                {% if reward.attributes %}
-                                                    <div class="text-muted" style="font-size: 0.85em;">{{ reward.attributes }}</div>
-                                                {% endif %}
-                                            {% elif reward.reward_type == 'accessory' %}
-                                                <i class="fas fa-ring"></i> {{ reward.reward_item_name or '饰品' }}
-                                                {% if reward.reward_refine_level and reward.reward_refine_level > 0 %}
-                                                    <span class="star-inline">+{{ reward.reward_refine_level }}</span>
-                                                {% endif %}
-                                                {% if reward.attributes %}
-                                                    <div class="text-muted" style="font-size: 0.85em;">{{ reward.attributes }}</div>
-                                                {% endif %}
-                                            {% elif reward.reward_type == 'bait' %}
-                                                <i class="fas fa-cookie-bite"></i> {{ reward.reward_item_name or '鱼饵' }} x{{ reward.reward_quantity or reward.reward_amount or 1 }}
-                                                {% if reward.attributes %}
-                                                    <div class="text-muted" style="font-size: 0.85em;">{{ reward.attributes }}</div>
-                                                {% endif %}
-                                            {% elif reward.reward_type == 'fish' %}
-                                                <i class="fas fa-fish"></i> {{ reward.reward_item_name or '鱼类' }} x{{ reward.reward_quantity or reward.reward_amount or 1 }}
-                                            {% endif %}
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-
-                                <!-- 限购信息 -->
-                                {% if item.per_user_limit or item.per_user_daily_limit %}
-                                <div class="small text-muted mb-2">
-                                    {% if item.per_user_limit %}
-                                    <div><i class="fas fa-exclamation-circle"></i> 限购 {{ item.per_user_limit }} 个</div>
-                                    {% endif %}
-                                    {% if item.per_user_daily_limit %}
-                                    <div><i class="fas fa-calendar"></i> 每日限购 {{ item.per_user_daily_limit }} 个</div>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-
-                                <div class="mt-auto"></div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                <div class="col-12">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> 该商店暂无商品
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        </div>
-    </div>
-    {% endfor %}
-{% else %}
-<div class="alert alert-warning">
-    <i class="fas fa-exclamation-triangle"></i> 暂无可用商店
-</div>
-{% endif %}
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    requestAnimationFrame(initializeShopDescriptionToggles);
-    document.querySelectorAll('.shop-collapse').forEach(collapseEl => {
-        collapseEl.addEventListener('shown.bs.collapse', () => requestAnimationFrame(initializeShopDescriptionToggles));
-    });
-
-    const openShopId = sessionStorage.getItem('openShopAfterPurchase');
-    if (!openShopId) return;
-    sessionStorage.removeItem('openShopAfterPurchase');
-    const collapseEl = document.getElementById(`shop-${openShopId}-collapse`);
-    if (collapseEl) {
-        new bootstrap.Collapse(collapseEl, {toggle: true});
-        collapseEl.scrollIntoView({block: 'start'});
-    }
-});
-
-function initializeShopDescriptionToggles() {
-    document.querySelectorAll('.shop-item-description').forEach(description => {
-        const textEl = description.querySelector('.shop-description-text');
-        const toggle = description.querySelector('.shop-description-toggle');
-        if (!textEl || !toggle) return;
-
-        description.dataset.fullText = description.dataset.fullText || '';
-        description.dataset.expanded = description.dataset.expanded || 'false';
-        renderShopDescription(description);
-    });
-}
-
-function createShopDescriptionMeasurer(description) {
-    const measurer = description.cloneNode(false);
-    measurer.classList.add('shop-description-measurer');
-    measurer.removeAttribute('data-expanded');
-    measurer.style.width = `${description.clientWidth || 260}px`;
-
-    const textEl = document.createElement('span');
-    textEl.className = 'shop-description-text';
-    const toggle = description.querySelector('.shop-description-toggle').cloneNode(true);
-    toggle.classList.remove('d-none');
-
-    measurer.appendChild(textEl);
-    measurer.appendChild(toggle);
-    document.body.appendChild(measurer);
-
-    return {measurer, textEl, toggle};
-}
-
-function getCollapsedShopDescriptionText(description, fullText) {
-    const width = description.clientWidth || description.parentElement?.clientWidth || 260;
-    if (width <= 0) return fullText;
-
-    const {measurer, textEl} = createShopDescriptionMeasurer(description);
-    const computedStyle = window.getComputedStyle(description);
-    const lineHeight = parseFloat(computedStyle.lineHeight) || 20;
-    const maxHeight = lineHeight * 2 + 1;
-
-    let low = 0;
-    let high = fullText.length;
-    let best = fullText;
-
-    while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        const candidate = fullText.slice(0, mid).trimEnd();
-        textEl.textContent = `${candidate}... `;
-        if (measurer.offsetHeight <= maxHeight) {
-            best = candidate;
-            low = mid + 1;
-        } else {
-            high = mid - 1;
-        }
-    }
-
-    document.body.removeChild(measurer);
-    return best;
-}
-
-function renderShopDescription(description) {
-    const textEl = description.querySelector('.shop-description-text');
-    const toggle = description.querySelector('.shop-description-toggle');
-    if (!textEl || !toggle) return;
-
-    const fullText = description.dataset.fullText || '';
-    const expanded = description.dataset.expanded === 'true';
-    const collapsedText = getCollapsedShopDescriptionText(description, fullText);
-    const shouldCollapse = collapsedText.length < fullText.length;
-
-    if (!shouldCollapse) {
-        textEl.textContent = fullText;
-        toggle.classList.add('d-none');
-        description.dataset.expanded = 'false';
-        description.removeAttribute('data-expanded');
-        return;
-    }
-
-    toggle.classList.remove('d-none');
-    if (expanded) {
-        textEl.textContent = fullText + ' ';
-        toggle.textContent = '收起';
-        toggle.setAttribute('aria-expanded', 'true');
-        description.setAttribute('data-expanded', 'true');
-    } else {
-        textEl.textContent = collapsedText + '... ';
-        toggle.textContent = '展开';
-        toggle.setAttribute('aria-expanded', 'false');
-        description.setAttribute('data-expanded', 'false');
-    }
-}
-
-function toggleShopDescription(button) {
-    const description = button.closest('.shop-item-description');
-    if (!description) return;
-    description.dataset.expanded = description.dataset.expanded === 'true' ? 'false' : 'true';
-    renderShopDescription(description);
-}
-
-window.addEventListener('resize', () => requestAnimationFrame(initializeShopDescriptionToggles));
-
-function buyShopItemFromButton(button) {
-    const itemId = Number(button.dataset.itemId || 0);
-    const itemName = button.dataset.itemName || '商品';
-    const shopId = Number(button.dataset.shopId || 0);
-    buyShopItem(itemId, itemName, shopId);
-}
-
-async function buyShopItem(itemId, itemName, shopId) {
-    const quantity = await webuiPrompt(`请输入购买【${itemName}】的数量。`, {
-        title: '购买商品',
-        defaultValue: '1',
-        inputType: 'number',
-        min: '1',
-        step: '1',
-        confirmText: '购买'
-    });
-    if (!quantity || quantity <= 0) return;
-
-    const qty = parseInt(quantity);
-    if (isNaN(qty) || qty <= 0) {
-        showToast('数量无效', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch('{{ url_for("player_bp.api_buy_shop_item") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ item_id: itemId, quantity: qty })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            sessionStorage.setItem('openShopAfterPurchase', String(shopId));
-            await showToast(data.message, 'success');
-            location.reload();
-        } else {
-            showToast(data.message, 'error');
-        }
-    } catch (error) {
-        showToast('网络错误，请稍后重试', 'error');
-    }
-}
-</script>
 {% endblock %}

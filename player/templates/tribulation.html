@@ -1,33 +1,174 @@
 {% extends "layout.html" %}
 
-{% block title %}玄幻渡劫 - MetaFishing！{% endblock %}
+{% block title %}问道 - MetaFishing！{% endblock %}
+{% block body_class %}theme-wendao{% endblock %}
+
+{% block extra_css %}
+<style>
+.wendao-page-title {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+}
+.wendao-page-title .ink-subtitle {
+    font-size: 0.95rem;
+    color: var(--wendao-ink-soft, #7a6c58);
+    font-family: "FangSong", "STKaiti", "KaiTi", serif;
+    letter-spacing: 0.04em;
+}
+
+.wendao-status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+.wendao-status-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.82rem;
+    font-family: "FangSong", "STKaiti", "KaiTi", serif;
+    color: var(--wendao-ink-soft, #7a6c58);
+}
+.wendao-status-meta .meta-key { opacity: 0.7; margin-right: 0.3em; }
+.wendao-status-meta .meta-val { font-weight: 700; color: var(--wendao-cinnabar, #b22d3f); }
+
+.wendao-realm-block {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+.wendao-realm-name {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--wendao-jade, #4d7a5e);
+    font-family: "FangSong", "STKaiti", serif;
+    letter-spacing: 0.05em;
+}
+.wendao-realm-name small {
+    color: var(--wendao-ink-soft, #7a6c58);
+    font-weight: normal;
+    font-size: 0.85rem;
+}
+.wendao-realm-flavor {
+    font-style: italic;
+    color: var(--wendao-ink-soft, #7a6c58);
+    font-family: "FangSong", "STKaiti", "KaiTi", serif;
+    font-size: 0.88rem;
+    letter-spacing: 0.02em;
+    flex: 1 1 280px;
+    min-width: 0;
+    border-left: 2px solid var(--wendao-cinnabar, #b22d3f);
+    padding-left: 0.7rem;
+}
+
+.wendao-public-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    font-family: "FangSong", "STKaiti", "KaiTi", serif;
+    font-size: 1.05rem;
+    color: var(--wendao-ink-soft, #7a6c58);
+    font-style: italic;
+    letter-spacing: 0.06em;
+}
+</style>
+{% endblock %}
 
 {% block content %}
+{% set realms = {'lianqi':'炼气','zhuji':'筑基','jindan':'金丹','yuanying':'元婴','huashen':'化神'} %}
+{% set qualities = {'fanxue':'凡蜕','lingyun':'灵蕴','zhenyi':'真一','tiancheng':'天成'} %}
+{% set realm_flavors = {
+    'lianqi':   '吐纳天地灵息，以肉胎初承大道之一缕，根骨是器，亦是茧。',
+    'zhuji':    '灵机入骨，蜕凡为基，自此身躯不再朽于风霜寒暑。',
+    'jindan':   '百炼成丹，一缕道意凝于内府，呼吸之间已是雷霆。',
+    'yuanying': '婴儿现于丹海，身外有身，生死之间多了一线可退之路。',
+    'huashen':  '神识漫游天地，寿与山河同长，然天道亦自此俯瞰于汝。',
+} %}
+
 <div class="row mb-4">
     <div class="col-12">
-        <h2 class="mb-0">
-            <i class="fas fa-yin-yang"></i> 玄幻渡劫
+        <h2 class="wendao-page-title wendao-scroll-title mb-0">
+            <span><i class="fas fa-yin-yang"></i> 问道</span>
+            <small class="ink-subtitle">鱼可修行，渔夫亦可修行；劫雷昭昭，尽人事，听天命，天下同渡。</small>
         </h2>
-        <p class="text-muted mt-2">区域6 钓鱼累积修为；修满后投入渡劫品发起渡劫。</p>
     </div>
 </div>
 
-<!-- 修行状态 -->
+{% if zone_card %}
+{% set zone = zone_card %}
+<div class="company-zones-stack mb-4">
+    <div class="card company-zone-card {{ zone.accent_class }} {% if zone.is_current %}border-primary{% endif %}">
+        <div class="card-body">
+            <div class="company-zone-shell">
+                <div class="company-zone-copy">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h4 class="mb-0">{{ zone.name }}</h4>
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-coins"></i> {{ "{:,}".format(zone.fishing_cost) }} 金币/次
+                        </span>
+                        {% if zone.required_pass %}
+                        <span class="badge text-bg-warning-subtle border border-warning-subtle text-warning-emphasis">
+                            <i class="fas fa-ticket-alt"></i> 需要：{{ zone.required_pass }}
+                        </span>
+                        {% else %}
+                        <span class="badge text-bg-success">
+                            <i class="fas fa-unlock"></i> 自由进入
+                        </span>
+                        {% endif %}
+                        {% if zone.is_current %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis">
+                            <i class="fas fa-check-circle"></i> 当前驻留
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p class="company-zone-description text-muted mb-3">{{ zone.description }}</p>
+                </div>
+                <div class="company-zone-actions">
+                    <button class="btn btn-warning company-shop-button" type="button" onclick='openShopCatalog({{ zone.shop_scope|tojson }}, {{ zone.shop_name|tojson }})'>
+                        <i class="fas fa-store"></i> {{ zone.shop_name }}
+                    </button>
+                    {% if zone.is_current %}
+                    <button class="btn btn-secondary" type="button" disabled>
+                        <i class="fas fa-check"></i> 已在此区域
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary" type="button" onclick='goToPortalZone({{ zone.id }}, {{ zone.name|tojson }})'>
+                        <i class="fas fa-arrow-right"></i> 进入区域
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row mb-4">
     <div class="col-12">
         <div class="card border-info">
-            <div class="card-header bg-info text-white">
-                <i class="fas fa-mountain"></i> 修行状态
+            <div class="card-header bg-info text-white wendao-status-header">
+                <span><i class="fas fa-mountain"></i> 修行状态</span>
+                <span class="wendao-status-meta">
+                    <span><span class="meta-key">劫痕未消</span><span class="meta-val">{{ summary.consecutive_failures }} 层</span></span>
+                    <span><span class="meta-key">今日护法</span><span class="meta-val">{{ summary.daily_guard_reward_count }} / 3</span></span>
+                    <span><span class="meta-key">今日观道</span><span class="meta-val">{{ summary.daily_observer_reward_count }} / 3</span></span>
+                </span>
             </div>
             <div class="card-body">
-                {% set realms = {'lianqi':'炼气','zhuji':'筑基','jindan':'金丹','yuanying':'元婴','huashen':'化神'} %}
-                {% set qualities = {'fanxue':'凡蜕','lingyun':'灵蕴','zhenyi':'真一','tiancheng':'天成'} %}
-                <h4 class="mb-2">
-                    {% if summary.current_realm_quality %}{{ qualities.get(summary.current_realm_quality, '') }}{% endif %}{{ realms.get(summary.current_realm, summary.current_realm) }}
-                    {% if summary.lowest_quality and summary.lowest_quality != summary.current_realm_quality %}
-                    <small class="text-muted">（对外展示：{{ qualities.get(summary.lowest_quality, '') }}{{ realms.get(summary.current_realm, '') }}）</small>
-                    {% endif %}
-                </h4>
+                <div class="wendao-realm-block">
+                    <span class="wendao-realm-name">
+                        {% if summary.current_realm_quality %}{{ qualities.get(summary.current_realm_quality, '') }}{% endif %}{{ realms.get(summary.current_realm, summary.current_realm) }}
+                        {% if summary.lowest_quality and summary.lowest_quality != summary.current_realm_quality %}
+                        <small>（对外展示：{{ qualities.get(summary.lowest_quality, '') }}{{ realms.get(summary.current_realm, '') }}）</small>
+                        {% endif %}
+                    </span>
+                    <span class="wendao-realm-flavor">{{ realm_flavors.get(summary.current_realm, '') }}</span>
+                </div>
                 <div class="progress mb-3" style="height: 24px;">
                     {% set ratio = (summary.accumulated_xiuwei / summary.xiuwei_cap * 100) if summary.xiuwei_cap > 0 else 0 %}
                     <div class="progress-bar progress-bar-striped {% if summary.is_full %}bg-success{% else %}bg-info{% endif %}"
@@ -35,17 +176,6 @@
                          style="width: {{ ratio }}%;">
                         {{ summary.accumulated_xiuwei }} / {{ summary.xiuwei_cap }} 修为
                         {% if summary.is_full %}（已圆满，可渡劫）{% endif %}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-4">
-                        <strong>劫痕未消：</strong>{{ summary.consecutive_failures }} 层
-                    </div>
-                    <div class="col-md-4">
-                        <strong>今日护法奖励：</strong>{{ summary.daily_guard_reward_count }} / 3
-                    </div>
-                    <div class="col-md-4">
-                        <strong>今日观道奖励：</strong>{{ summary.daily_observer_reward_count }} / 3
                     </div>
                 </div>
                 {% if summary.tiancheng_protection %}
@@ -69,7 +199,6 @@
     </div>
 </div>
 
-<!-- 我的渡劫 -->
 {% if own_active %}
 <div class="row mb-4">
     <div class="col-12">
@@ -81,7 +210,6 @@
 </div>
 {% endif %}
 
-<!-- 发起渡劫 -->
 {% if not own_active and summary.is_full %}
 <div class="row mb-4">
     <div class="col-12">
@@ -118,19 +246,12 @@
         </div>
     </div>
 </div>
-{% elif not summary.is_full %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="alert alert-secondary">修为未圆满，无法渡劫。请前往区域 6 钓鱼。</div>
-    </div>
-</div>
 {% endif %}
 
-<!-- 公示中的渡劫 -->
 <div class="row">
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><i class="fas fa-broadcast-tower"></i> 公示中的渡劫</div>
+            <div class="card-header"><i class="fas fa-broadcast-tower"></i> 何方道友在此渡劫？</div>
             <div class="card-body">
                 {% if active_events %}
                 <table class="table table-sm">
@@ -152,7 +273,7 @@
                     </tbody>
                 </table>
                 {% else %}
-                <p class="text-muted mb-0">当前无公示中的渡劫。</p>
+                <p class="wendao-public-empty mb-0">天气晴朗，无人有劫。</p>
                 {% endif %}
             </div>
         </div>

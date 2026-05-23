@@ -1,222 +1,575 @@
 {% extends "layout.html" %}
 
-{% block title %}魔幻团战 - MetaFishing！{% endblock %}
+{% block title %}讨伐 - MetaFishing！{% endblock %}
+{% block body_class %}theme-magic theme-mahuan{% endblock %}
+
+{% block extra_css %}
+<style>
+.mahuan-page-title {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+}
+.mahuan-page-title .epic-whisper {
+    font-size: 0.95rem;
+    color: var(--mahuan-gold, #f0d6a0);
+    opacity: 0.85;
+    font-family: "Georgia", "STKaiti", "KaiTi", serif;
+    font-style: italic;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 8px rgba(240, 214, 160, 0.3);
+}
+
+.mahuan-boss-stage {
+    max-width: 920px;
+    margin: 2rem auto 2.5rem;
+    text-align: center;
+    position: relative;
+}
+.mahuan-boss-stage::before,
+.mahuan-boss-stage::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--mahuan-gold, #f0d6a0) 30%,
+        var(--mahuan-blood, #b22838) 50%,
+        var(--mahuan-gold, #f0d6a0) 70%,
+        transparent
+    );
+}
+.mahuan-boss-stage::before { top: -1rem; }
+.mahuan-boss-stage::after  { bottom: -1rem; }
+
+.mahuan-boss-name {
+    font-family: "Georgia", "STKaiti", "KaiTi", serif;
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--mahuan-gold, #f0d6a0);
+    text-shadow:
+        0 0 8px rgba(240, 214, 160, 0.5),
+        0 0 24px rgba(178, 40, 56, 0.4),
+        0 2px 0 #000;
+    margin-bottom: 0.4rem;
+    animation: mahuan-boss-glow 4s ease-in-out infinite;
+}
+@keyframes mahuan-boss-glow {
+    0%, 100% { text-shadow: 0 0 8px rgba(240,214,160,0.5), 0 0 24px rgba(178,40,56,0.4), 0 2px 0 #000; }
+    50%      { text-shadow: 0 0 14px rgba(240,214,160,0.85), 0 0 36px rgba(178,40,56,0.65), 0 2px 0 #000; }
+}
+
+.mahuan-boss-meta {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    font-family: "Georgia", serif;
+    font-size: 0.95rem;
+    color: var(--mahuan-bone, #c5b18a);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.12em;
+}
+.mahuan-boss-meta .stars {
+    color: #ffb000;
+    text-shadow: 0 0 8px rgba(255, 176, 0, 0.6);
+    letter-spacing: 0.05em;
+}
+.mahuan-boss-meta .region-tag {
+    padding: 2px 12px;
+    border: 1px solid var(--mahuan-blood, #b22838);
+    border-radius: 999px;
+    color: var(--mahuan-blood, #b22838);
+    background: rgba(178, 40, 56, 0.1);
+    letter-spacing: 0.16em;
+    font-size: 0.8rem;
+}
+
+.mahuan-boss-quote {
+    font-family: "Georgia", "STKaiti", serif;
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--mahuan-bone, #c5b18a);
+    margin: 1.4rem auto 0.6rem;
+    max-width: 720px;
+    line-height: 1.7;
+    text-shadow: 0 0 6px rgba(240, 214, 160, 0.18);
+    position: relative;
+}
+.mahuan-boss-quote::before {
+    content: "❝";
+    color: var(--mahuan-blood, #b22838);
+    font-size: 2rem;
+    margin-right: 0.4em;
+    vertical-align: -0.3em;
+    opacity: 0.7;
+}
+.mahuan-boss-quote::after {
+    content: "❞";
+    color: var(--mahuan-blood, #b22838);
+    font-size: 2rem;
+    margin-left: 0.3em;
+    vertical-align: -0.3em;
+    opacity: 0.7;
+}
+.mahuan-boss-story {
+    font-family: "Georgia", "STKaiti", serif;
+    color: var(--mahuan-bone, #c5b18a);
+    opacity: 0.78;
+    max-width: 720px;
+    margin: 0.4rem auto 1.2rem;
+    line-height: 1.7;
+    font-size: 0.92rem;
+}
+
+.mahuan-boss-portrait {
+    display: block;
+    margin: 1.2rem auto;
+    max-width: 360px;
+    max-height: 360px;
+    border: 1px solid var(--mahuan-gold, #f0d6a0);
+    box-shadow:
+        0 0 0 1px rgba(178, 40, 56, 0.3),
+        0 0 36px rgba(178, 40, 56, 0.35),
+        inset 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+.mahuan-boss-hp-wrap { max-width: 720px; margin: 1.6rem auto 0; }
+.mahuan-boss-hp-wrap .hp-text {
+    display: flex;
+    justify-content: space-between;
+    font-family: "Georgia", monospace;
+    font-size: 0.82rem;
+    color: var(--mahuan-bone, #c5b18a);
+    margin-bottom: 4px;
+    letter-spacing: 0.08em;
+}
+.mahuan-boss-hp-wrap .hp-bar {
+    height: 18px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--mahuan-blood, #b22838);
+    box-shadow: inset 0 0 12px rgba(178, 40, 56, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+.mahuan-boss-hp-wrap .hp-bar-fill {
+    height: 100%;
+    background: linear-gradient(180deg, #d92e44 0%, #8b1a25 50%, #5a0d18 100%);
+    box-shadow: 0 0 12px rgba(217, 46, 68, 0.7);
+    transition: width 0.5s;
+    position: relative;
+}
+.mahuan-boss-hp-wrap .hp-bar-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent 0 6px,
+        rgba(255, 255, 255, 0.06) 6px 12px
+    );
+    animation: mahuan-hp-stripes 1.6s linear infinite;
+}
+@keyframes mahuan-hp-stripes {
+    from { transform: translateX(0); }
+    to   { transform: translateX(20px); }
+}
+.mahuan-boss-stages {
+    display: flex;
+    justify-content: center;
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+    font-family: "Georgia", monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+}
+.mahuan-boss-stages .stage {
+    padding: 2px 10px;
+    border: 1px solid rgba(197, 177, 138, 0.3);
+    color: rgba(197, 177, 138, 0.5);
+}
+.mahuan-boss-stages .stage.is-triggered {
+    border-color: var(--mahuan-gold, #f0d6a0);
+    color: var(--mahuan-gold, #f0d6a0);
+    text-shadow: 0 0 6px rgba(240, 214, 160, 0.5);
+    background: rgba(240, 214, 160, 0.08);
+}
+
+.mahuan-boss-empty {
+    max-width: 720px;
+    margin: 3rem auto;
+    text-align: center;
+    font-family: "Georgia", "STKaiti", serif;
+    font-style: italic;
+    color: var(--mahuan-gold, #f0d6a0);
+    opacity: 0.6;
+    font-size: 1.05rem;
+    letter-spacing: 0.12em;
+    line-height: 1.8;
+}
+
+.mahuan-twin-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.4rem;
+    margin-bottom: 2rem;
+}
+@media (max-width: 991px) {
+    .mahuan-twin-row { grid-template-columns: 1fr; }
+}
+
+.mahuan-panel {
+    background:
+        radial-gradient(ellipse at top, rgba(60, 18, 24, 0.4), transparent 70%),
+        rgba(12, 8, 10, 0.55);
+    border: 1px solid rgba(240, 214, 160, 0.22);
+    box-shadow:
+        0 0 0 1px rgba(178, 40, 56, 0.1),
+        0 12px 28px rgba(0, 0, 0, 0.5);
+    padding: 1.2rem;
+    position: relative;
+}
+.mahuan-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px dashed rgba(240, 214, 160, 0.25);
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.8rem;
+    font-family: "Georgia", "STKaiti", serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.2em;
+    color: var(--mahuan-gold, #f0d6a0);
+    text-shadow: 0 0 8px rgba(240, 214, 160, 0.3);
+}
+.mahuan-panel-header .badge-count {
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    padding: 2px 10px;
+    border: 1px solid var(--mahuan-blood, #b22838);
+    color: var(--mahuan-blood, #b22838);
+    background: rgba(178, 40, 56, 0.08);
+    border-radius: 999px;
+}
+
+.mahuan-rank-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.mahuan-rank-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 6px 0;
+    border-bottom: 1px dotted rgba(240, 214, 160, 0.12);
+    font-family: "Georgia", serif;
+    font-size: 0.9rem;
+    color: var(--mahuan-bone, #c5b18a);
+}
+.mahuan-rank-list li:last-child { border-bottom: none; }
+.mahuan-rank-list .rank-no {
+    font-family: "Georgia", monospace;
+    font-weight: 700;
+    min-width: 2.4rem;
+    text-align: center;
+    color: var(--mahuan-gold, #f0d6a0);
+}
+.mahuan-rank-list li.is-top1 .rank-no { color: #ffb000; text-shadow: 0 0 8px rgba(255,176,0,0.6); }
+.mahuan-rank-list li.is-top2 .rank-no { color: #d9d9d9; }
+.mahuan-rank-list li.is-top3 .rank-no { color: #cd7f32; }
+.mahuan-rank-list .rank-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mahuan-rank-list .rank-leader { color: #ffb000; font-size: 0.85rem; }
+.mahuan-rank-list .rank-damage {
+    font-family: "Georgia", monospace;
+    color: var(--mahuan-blood, #b22838);
+    font-weight: 700;
+    text-shadow: 0 0 6px rgba(178, 40, 56, 0.3);
+}
+.mahuan-rank-list li.is-me {
+    background: rgba(240, 214, 160, 0.08);
+    border-left: 3px solid var(--mahuan-gold, #f0d6a0);
+    padding-left: 0.5rem;
+}
+.mahuan-rank-foot {
+    margin-top: 0.6rem;
+    font-size: 0.78rem;
+    font-style: italic;
+    color: rgba(197, 177, 138, 0.6);
+    text-align: center;
+}
+
+.mahuan-reward-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.mahuan-reward-list li {
+    padding: 6px 8px;
+    border-bottom: 1px dotted rgba(240, 214, 160, 0.12);
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: 0.6rem;
+    align-items: center;
+    font-family: "Georgia", serif;
+    font-size: 0.86rem;
+    color: var(--mahuan-bone, #c5b18a);
+}
+.mahuan-reward-list li:last-child { border-bottom: none; }
+.mahuan-reward-list .reward-type {
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--mahuan-gold, #f0d6a0);
+    text-align: center;
+    opacity: 0.7;
+}
+.mahuan-reward-list .reward-stage {
+    font-size: 0.72rem;
+    color: rgba(178, 40, 56, 0.7);
+    font-family: monospace;
+}
+.mahuan-reward-empty,
+.mahuan-rank-empty {
+    text-align: center;
+    color: rgba(197, 177, 138, 0.5);
+    font-style: italic;
+    padding: 1.6rem 0;
+    font-family: "Georgia", "STKaiti", serif;
+}
+
+.mahuan-claim-btn {
+    background: linear-gradient(180deg, #5a0d18, #2d060c);
+    border: 1px solid var(--mahuan-gold, #f0d6a0);
+    color: var(--mahuan-gold, #f0d6a0);
+    padding: 6px 18px;
+    font-size: 0.82rem;
+    letter-spacing: 0.16em;
+    font-family: "Georgia", "STKaiti", serif;
+    cursor: pointer;
+    transition: all .3s;
+}
+.mahuan-claim-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #b22838, #5a0d18);
+    box-shadow: 0 0 16px rgba(178, 40, 56, 0.6);
+    color: #fff;
+}
+.mahuan-claim-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.mahuan-history-card .card-header {
+    font-family: "Georgia", "STKaiti", serif;
+    letter-spacing: 0.2em;
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-3">
     <div class="col-12">
-        <h2 class="mb-0">
-            <i class="fas fa-skull-crossbones"></i> 魔幻团战 · 战报开奖
+        <h2 class="mahuan-page-title mb-0">
+            <span><i class="fas fa-dragon"></i> 讨伐</span>
+            <small class="epic-whisper">磨砺爪牙！齐心协力！讨伐巨大敌人，获得珍贵宝箱。</small>
         </h2>
-        <p class="text-muted mt-2">签到 + 水族箱 6+ 星鱼自动参战；区域 8 内有团长则推进 Boss。每日结算开奖。</p>
     </div>
 </div>
 
-{% if view.has_active_boss %}
-{% set boss = view.boss %}
-<!-- Boss 卡 -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-dark">
-            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-dragon"></i> 当前 Boss</span>
-                <span>
-                    <span class="badge bg-warning text-dark">⭐{{ boss.boss_star }}</span>
-                    <span class="badge bg-info">
-                        {% if boss.region_key == "sci_fi" %}科幻
-                        {% elif boss.region_key == "xianhuan" %}玄幻
-                        {% elif boss.region_key == "cthulhu" %}克苏鲁
-                        {% else %}魔幻{% endif %}
-                    </span>
-                </span>
-            </div>
-            <div class="card-body">
-                <h4 class="card-title">{{ boss.boss_name }}</h4>
-                {% if boss.intro_quote %}
-                <p class="text-muted fst-italic">“{{ boss.intro_quote }}”</p>
-                {% endif %}
-                {% if boss.intro_story %}
-                <p class="text-secondary">{{ boss.intro_story }}</p>
-                {% endif %}
-
-                <div class="mt-3">
-                    {% set hp_ratio = (boss.current_hp / boss.max_hp * 100) | round(2) %}
-                    <div class="d-flex justify-content-between small text-muted">
-                        <span>当前 HP {{ "{:,}".format(boss.current_hp) }} / {{ "{:,}".format(boss.max_hp) }}</span>
-                        <span>{{ hp_ratio }}%</span>
+{% if zone_card %}
+{% set zone = zone_card %}
+<div class="company-zones-stack mb-3">
+    <div class="card company-zone-card {{ zone.accent_class }} {% if zone.is_current %}border-primary{% endif %}">
+        <div class="card-body">
+            <div class="company-zone-shell">
+                <div class="company-zone-copy">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h4 class="mb-0">{{ zone.name }}</h4>
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-coins"></i> {{ "{:,}".format(zone.fishing_cost) }} 金币/次
+                        </span>
+                        {% if zone.required_pass %}
+                        <span class="badge text-bg-warning-subtle border border-warning-subtle text-warning-emphasis">
+                            <i class="fas fa-ticket-alt"></i> 需要：{{ zone.required_pass }}
+                        </span>
+                        {% else %}
+                        <span class="badge text-bg-success">
+                            <i class="fas fa-unlock"></i> 自由进入
+                        </span>
+                        {% endif %}
+                        {% if zone.is_current %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis">
+                            <i class="fas fa-check-circle"></i> 当前驻留
+                        </span>
+                        {% endif %}
                     </div>
-                    <div class="progress mt-1" style="height: 24px;">
-                        <div class="progress-bar bg-danger" role="progressbar"
-                             style="width: {{ hp_ratio }}%;">{{ hp_ratio }}%</div>
-                    </div>
-                    <div class="mt-2 small">
-                        阶段达成：
-                        {% for stage in ["75","50","25","kill"] %}
-                            {% if stage in (boss.stages_triggered or []) %}
-                                <span class="badge bg-success me-1">{{ stage }}{% if stage == "kill" %}（击杀）{% else %}%{% endif %}</span>
-                            {% else %}
-                                <span class="badge bg-light text-muted me-1">{{ stage }}{% if stage == "kill" %}（击杀）{% else %}%{% endif %}</span>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
+                    <p class="company-zone-description text-muted mb-3">{{ zone.description }}</p>
+                </div>
+                <div class="company-zone-actions">
+                    <button class="btn btn-warning company-shop-button" type="button" onclick='openShopCatalog({{ zone.shop_scope|tojson }}, {{ zone.shop_name|tojson }})'>
+                        <i class="fas fa-store"></i> {{ zone.shop_name }}
+                    </button>
+                    {% if zone.is_current %}
+                    <button class="btn btn-secondary" type="button" disabled>
+                        <i class="fas fa-check"></i> 已在此区域
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary" type="button" onclick='goToPortalZone({{ zone.id }}, {{ zone.name|tojson }})'>
+                        <i class="fas fa-arrow-right"></i> 进入区域
+                    </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<!-- 召集者开篇 -->
-{% if view.opening_text %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-secondary">
-            <div class="card-body bg-light">
-                <i class="fas fa-quote-left text-muted me-2"></i>
-                <span>{{ view.opening_text }}</span>
-            </div>
-        </div>
-    </div>
-</div>
 {% endif %}
 
-<!-- 排行 -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-primary">
-            <div class="card-header bg-primary text-white">
-                <i class="fas fa-trophy"></i> 当前 Boss 伤害排行
-                <span class="badge bg-light text-dark ms-2">{{ view.rank_all_count }} 名玩家有效伤害</span>
-            </div>
-            <div class="card-body p-0">
-                {% if view.rank_top10 %}
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 60px;">#</th>
-                            <th>玩家</th>
-                            <th style="width: 80px;">团长</th>
-                            <th class="text-end">累计伤害</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in view.rank_top10 %}
-                        <tr {% if row.user_id == session.user_id %}class="table-warning fw-bold"{% endif %}>
-                            <td>
-                                {% set idx = loop.index %}
-                                {% if idx <= 3 %}<span class="badge bg-warning text-dark">{{ idx }}</span>
-                                {% elif idx <= 10 %}<span class="badge bg-info">{{ idx }}</span>
-                                {% else %}<span class="badge bg-light text-muted">{{ idx }}</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="cthulhu-player-name" data-cthulhu-name="{{ row.user_id }}">{{ row.user_id }}</span></td>
-                            <td>{% if row.is_leader_at_last_settle %}👑{% endif %}</td>
-                            <td class="text-end">{{ "{:,}".format(row.total_damage) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="p-3 text-center text-muted">暂无有效伤害记录</div>
-                {% endif %}
-            </div>
-            <div class="card-footer small text-muted">
-                {% if view.my_rank %}
-                我的排名：<strong>第 {{ view.my_rank }} 名</strong>，伤害 {{ "{:,}".format(view.my_damage) }}
-                {% else %}
-                我尚未对当前 Boss 造成有效伤害
-                {% endif %}
-            </div>
+{% if view.has_active_boss %}
+{% set boss = view.boss %}
+{% set region_label = {"sci_fi":"科幻","xianhuan":"玄幻","cthulhu":"克苏鲁","magic":"魔幻"}.get(boss.region_key, boss.region_key) %}
+<div class="mahuan-boss-stage">
+    <div class="mahuan-boss-name">{{ boss.boss_name }}</div>
+    <div class="mahuan-boss-meta">
+        <span class="stars">{% for _ in range(boss.boss_star|int) %}★{% endfor %}</span>
+        <span class="region-tag">{{ region_label }}</span>
+    </div>
+
+    {% if boss.intro_quote %}
+    <div class="mahuan-boss-quote">{{ boss.intro_quote }}</div>
+    {% else %}
+    <div class="mahuan-boss-quote">空气在它的注视下变得粘稠，远方的传说终于走到了你的面前。</div>
+    {% endif %}
+
+    {% if boss.intro_story %}
+    <div class="mahuan-boss-story">{{ boss.intro_story }}</div>
+    {% else %}
+    <div class="mahuan-boss-story">这是它第一次踏入此地的喧嚣，也是你与它命运纠缠的开端。</div>
+    {% endif %}
+
+    {% if boss.image_path %}
+    <img class="mahuan-boss-portrait" src="{{ boss.image_path }}" alt="{{ boss.boss_name }}" onerror="this.style.display='none'">
+    {% endif %}
+
+    <div class="mahuan-boss-hp-wrap">
+        {% set hp_ratio = (boss.current_hp / boss.max_hp * 100) | round(2) %}
+        <div class="hp-text">
+            <span>HP {{ "{:,}".format(boss.current_hp) }} / {{ "{:,}".format(boss.max_hp) }}</span>
+            <span>{{ hp_ratio }}%</span>
+        </div>
+        <div class="hp-bar">
+            <div class="hp-bar-fill" style="width: {{ hp_ratio }}%"></div>
+        </div>
+        <div class="mahuan-boss-stages">
+            {% for stage in ["75","50","25","kill"] %}
+            <span class="stage {% if stage in (boss.stages_triggered or []) %}is-triggered{% endif %}">
+                {% if stage == "kill" %}KILL{% else %}{{ stage }}%{% endif %}
+            </span>
+            {% endfor %}
         </div>
     </div>
 </div>
 {% else %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="alert alert-secondary">
-            <i class="fas fa-cloud"></i> 当前没有活跃 Boss。每日刷新点会自动诞生新 Boss，期间可继续钓鱼囤积 6+ 星水族箱。
-        </div>
-    </div>
+<div class="mahuan-boss-empty">
+    云霭散尽，山河暂得安宁——<br>下一头巨敌正自远方苏醒。
 </div>
 {% endif %}
 
-<!-- 未领奖励 -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-success">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-gift"></i> 待领取奖励</span>
-                {% if view.unclaimed %}
-                <button id="claim-all-btn" class="btn btn-sm btn-light">一键领取（{{ view.unclaimed|length }} 项）</button>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                {% if view.unclaimed %}
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>类型</th>
-                            <th>物品 ID</th>
-                            <th>数量</th>
-                            <th>来源阶段</th>
-                            <th>说明</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in view.unclaimed %}
-                        <tr>
-                            <td>{{ r.reward_type }}</td>
-                            <td>{{ r.item_id }}</td>
-                            <td>{{ r.quantity }}</td>
-                            <td>{{ r.source_stage }}</td>
-                            <td>{{ r.source_label or "" }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p class="text-muted mb-0">暂无待领取奖励</p>
-                {% endif %}
-            </div>
+<div class="mahuan-twin-row">
+    <div class="mahuan-panel">
+        <div class="mahuan-panel-header">
+            <span><i class="fas fa-trophy"></i> 伤害排行</span>
+            {% if view.has_active_boss %}
+            <span class="badge-count">{{ view.rank_all_count }} 名</span>
+            {% endif %}
         </div>
+        {% if view.has_active_boss and view.rank_top10 %}
+        <ul class="mahuan-rank-list">
+            {% for row in view.rank_top10 %}
+            <li class="{% if loop.index == 1 %}is-top1{% elif loop.index == 2 %}is-top2{% elif loop.index == 3 %}is-top3{% endif %} {% if row.user_id == session.user_id %}is-me{% endif %}">
+                <span class="rank-no">{{ loop.index }}</span>
+                <span class="rank-name cthulhu-player-name" data-cthulhu-name="{{ row.user_id }}">{{ row.user_id }}</span>
+                {% if row.is_leader_at_last_settle %}<span class="rank-leader">👑</span>{% endif %}
+                <span class="rank-damage">{{ "{:,}".format(row.total_damage) }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="mahuan-rank-foot">
+            {% if view.my_rank %}
+            我的排名：第 {{ view.my_rank }} 名 · 伤害 {{ "{:,}".format(view.my_damage) }}
+            {% else %}
+            尚未对当前敌人造成有效伤害
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="mahuan-rank-empty">尚无有效伤害记录。</div>
+        {% endif %}
+    </div>
+
+    <div class="mahuan-panel">
+        <div class="mahuan-panel-header">
+            <span><i class="fas fa-gift"></i> 待领奖励</span>
+            {% if view.unclaimed %}
+            <button id="claim-all-btn" class="mahuan-claim-btn">一键领取（{{ view.unclaimed|length }}）</button>
+            {% endif %}
+        </div>
+        {% if view.unclaimed %}
+        <ul class="mahuan-reward-list">
+            {% for r in view.unclaimed %}
+            <li>
+                <span class="reward-type">{{ r.reward_type }}</span>
+                <span>{{ r.source_label or r.item_id }} ×{{ r.quantity }}</span>
+                <span class="reward-stage">{{ r.source_stage }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="mahuan-reward-empty">暂无待领取的战利品。</div>
+        {% endif %}
     </div>
 </div>
 
-<!-- 历史 10 星击杀 -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-warning">
-            <div class="card-header bg-warning">
-                <i class="fas fa-history"></i> 10 星击杀史册
-            </div>
-            <div class="card-body">
-                {% if view.history_kills %}
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>风格区</th>
-                            <th>Boss 名</th>
-                            <th>击杀者</th>
-                            <th>时间</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for h in view.history_kills %}
-                        <tr>
-                            <td>{{ {"sci_fi": "科幻", "xianhuan": "玄幻", "cthulhu": "克苏鲁", "magic": "魔幻"}.get(h.region_key, h.region_key) }}</td>
-                            <td><strong>{{ h.boss_name }}</strong></td>
-                            <td>{% if h.finisher_user_id %}<span class="cthulhu-player-name" data-cthulhu-name="{{ h.finisher_user_id }}">{{ h.finisher_user_id }}</span>{% else %}—{% endif %}</td>
-                            <td><small>{{ h.killed_at[:16].replace("T", " ") }}</small></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p class="text-muted mb-0">尚未有 10 星 Boss 被击杀。</p>
-                {% endif %}
-            </div>
-        </div>
+{% if view.history_kills %}
+<div class="card mahuan-history-card">
+    <div class="card-header">
+        <i class="fas fa-history"></i> 十星击杀史册
+    </div>
+    <div class="card-body">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>风格区</th>
+                    <th>巨敌之名</th>
+                    <th>终结者</th>
+                    <th>时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in view.history_kills %}
+                <tr>
+                    <td>{{ {"sci_fi": "科幻", "xianhuan": "玄幻", "cthulhu": "克苏鲁", "magic": "魔幻"}.get(h.region_key, h.region_key) }}</td>
+                    <td><strong>{{ h.boss_name }}</strong></td>
+                    <td>{% if h.finisher_user_id %}<span class="cthulhu-player-name" data-cthulhu-name="{{ h.finisher_user_id }}">{{ h.finisher_user_id }}</span>{% else %}—{% endif %}</td>
+                    <td><small>{{ h.killed_at[:16].replace("T", " ") }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
+{% endif %}
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -224,7 +577,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!btn) return;
     btn.addEventListener("click", async function () {
         btn.disabled = true;
-        btn.innerText = "正在领取...";
+        const original = btn.innerText;
+        btn.innerText = "正在领取……";
         try {
             const resp = await fetch("/player/api/team_battle/claim_all", {
                 method: "POST",
@@ -232,17 +586,17 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             const data = await resp.json();
             if (data.success) {
-                alert(`已领取 ${data.granted_count} 项奖励，刷新页面查看背包`);
-                location.reload();
+                showToast(`已领取 ${data.granted_count} 项战利品`, 'success');
+                setTimeout(() => location.reload(), 600);
             } else {
-                alert("领取失败：" + (data.message || "未知"));
+                showToast("领取失败：" + (data.message || "未知"), 'error');
                 btn.disabled = false;
-                btn.innerText = "一键领取";
+                btn.innerText = original;
             }
         } catch (e) {
-            alert("网络错误：" + e);
+            showToast("网络错误：" + e, 'error');
             btn.disabled = false;
-            btn.innerText = "一键领取";
+            btn.innerText = original;
         }
     });
 });

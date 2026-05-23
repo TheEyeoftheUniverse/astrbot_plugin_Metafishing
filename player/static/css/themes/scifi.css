@@ -1,0 +1,599 @@
+/* ============================================================
+   SCIFI HUD 全局主题
+   触发：body.theme-scifi（玩家所在区域=5 时由 layout 自动添加，
+   或观测页强制添加）
+   优先级：低于 .has-cthulhu-pollution（克苏鲁污染会移除 theme-scifi）
+   ============================================================ */
+
+body.theme-scifi {
+    --hud-cyan: #00dcff;
+    --hud-cyan-soft: rgba(0, 220, 255, 0.45);
+    --hud-cyan-glow: rgba(0, 220, 255, 0.18);
+    --hud-magenta: #b061ff;
+    --hud-text: #d8f6ff;
+    --hud-text-dim: #6f8fa3;
+    --hud-bg-card: rgba(8, 18, 32, 0.62);
+    --hud-line: rgba(0, 220, 255, 0.35);
+
+    color: var(--hud-text);
+    font-family: "Rajdhani", "Orbitron", "Segoe UI", "Microsoft YaHei", sans-serif;
+    letter-spacing: 0.02em;
+    background: transparent;
+}
+
+/* zone-5 全屏底图 + 科技青光多层叠加（强制显示，与 data-zone-id 解耦） */
+body.theme-scifi::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        /* 顶层：青色聚光 */
+        radial-gradient(ellipse 65% 50% at 50% 30%, rgba(0, 220, 255, 0.16), transparent 60%),
+        /* 紫色侧光 */
+        radial-gradient(ellipse 50% 60% at 80% 85%, rgba(176, 97, 255, 0.14), transparent 65%),
+        /* 整体冷压色 */
+        linear-gradient(180deg, rgba(2, 6, 13, 0.55) 0%, rgba(5, 10, 24, 0.65) 60%, rgba(3, 6, 15, 0.78) 100%),
+        /* 底图：zone-5 */
+        url("../../img/zones/zone-5.png");
+    background-size: cover, cover, cover, cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    opacity: 1;
+    animation: scifi-pulse 8s ease-in-out infinite;
+}
+@keyframes scifi-pulse {
+    0%, 100% { filter: brightness(0.92) saturate(1.05); }
+    50%      { filter: brightness(1.04) saturate(1.18); }
+}
+
+/* 全局网格地板 */
+body.theme-scifi .player-main::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+        linear-gradient(to right, rgba(0, 220, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 220, 255, 0.05) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+}
+
+/* 扫描线 */
+body.theme-scifi .player-main::after {
+    content: "";
+    position: fixed;
+    left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--hud-cyan-soft), transparent);
+    pointer-events: none;
+    z-index: 1;
+    animation: hud-scan 6s linear infinite;
+    opacity: 0.55;
+}
+@keyframes hud-scan {
+    0%   { top: -2%; opacity: 0; }
+    10%  { opacity: 0.6; }
+    100% { top: 102%; opacity: 0; }
+}
+
+body.theme-scifi .player-main > * { position: relative; z-index: 2; }
+
+/* ============================================================
+   顶栏
+   ============================================================ */
+body.theme-scifi .player-topbar {
+    background: rgba(2, 6, 13, 0.88) !important;
+    border-bottom: 1px solid rgba(0, 220, 255, 0.35);
+    backdrop-filter: blur(10px);
+}
+body.theme-scifi .player-topbar.navbar-light .navbar-brand,
+body.theme-scifi .player-topbar.navbar-light .navbar-nav .nav-link,
+body.theme-scifi .player-topbar.navbar-light .nav-link.dropdown-toggle,
+body.theme-scifi .player-topbar .navbar-brand,
+body.theme-scifi .player-topbar .navbar-nav .nav-link {
+    color: #d8f6ff !important;
+}
+body.theme-scifi .player-topbar.navbar-light .navbar-brand:hover,
+body.theme-scifi .player-topbar.navbar-light .navbar-nav .nav-link:hover,
+body.theme-scifi .player-topbar.navbar-light .navbar-nav .nav-link.show,
+body.theme-scifi .player-topbar .navbar-nav .nav-link:focus {
+    color: #00dcff !important;
+    text-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
+}
+body.theme-scifi .player-topbar .navbar-toggler {
+    border-color: rgba(0, 220, 255, 0.35);
+}
+body.theme-scifi .player-topbar .navbar-toggler-icon {
+    filter: invert(1) hue-rotate(180deg) brightness(1.2);
+}
+body.theme-scifi .player-topbar .dropdown-menu {
+    background: rgba(2, 6, 13, 0.96);
+    border: 1px solid rgba(0, 220, 255, 0.35);
+    border-radius: 0;
+    box-shadow: 0 0 20px rgba(0, 220, 255, 0.15);
+}
+body.theme-scifi .player-topbar .dropdown-menu .dropdown-item {
+    color: #d8f6ff;
+    letter-spacing: 0.06em;
+}
+body.theme-scifi .player-topbar .dropdown-menu .dropdown-item:hover,
+body.theme-scifi .player-topbar .dropdown-menu .dropdown-item:focus {
+    background: rgba(0, 220, 255, 0.15);
+    color: #00dcff;
+}
+body.theme-scifi .player-topbar .dropdown-menu .dropdown-item.text-danger {
+    color: #ff8585 !important;
+}
+body.theme-scifi .player-topbar .dropdown-menu .dropdown-item.text-danger:hover {
+    background: rgba(255, 100, 100, 0.18);
+    color: #ffb3b3 !important;
+}
+body.theme-scifi .player-topbar .dropdown-menu .dropdown-divider {
+    border-top-color: rgba(0, 220, 255, 0.2);
+}
+body.theme-scifi .player-topbar .player-wallet-pill,
+body.theme-scifi .player-topbar .player-account-trigger {
+    background: rgba(0, 220, 255, 0.06) !important;
+    border-color: rgba(0, 220, 255, 0.35) !important;
+    color: #d8f6ff !important;
+    border-radius: 0 !important;
+}
+body.theme-scifi .player-topbar .player-wallet-pill:hover,
+body.theme-scifi .player-topbar .player-account-trigger:hover {
+    background: rgba(0, 220, 255, 0.16) !important;
+    color: #00dcff !important;
+}
+body.theme-scifi .editorial-footer {
+    background: transparent;
+    color: var(--hud-text-dim);
+}
+
+/* ============================================================
+   观测页专属标题区（仅 .hud-title-bar 时生效）
+   ============================================================ */
+body.theme-scifi .hud-title-bar {
+    border-left: 4px solid var(--hud-cyan);
+    padding: 12px 16px;
+    margin-bottom: 28px;
+    background: linear-gradient(90deg, rgba(0, 220, 255, 0.10), transparent 60%);
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+}
+body.theme-scifi .hud-title-bar h2 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--hud-cyan);
+    text-shadow: 0 0 12px var(--hud-cyan-glow);
+}
+body.theme-scifi .hud-title-bar .hud-subtitle {
+    margin-top: 6px;
+    color: var(--hud-text-dim);
+    font-size: 0.88rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+body.theme-scifi .hud-title-bar .hud-title-meta {
+    position: absolute;
+    right: 18px;
+    top: 12px;
+    font-size: 0.72rem;
+    color: var(--hud-text-dim);
+    letter-spacing: 0.2em;
+}
+body.theme-scifi .hud-title-bar .blink-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--hud-cyan);
+    box-shadow: 0 0 8px var(--hud-cyan);
+    margin-right: 6px;
+    vertical-align: middle;
+    animation: hud-blink 1.4s ease-in-out infinite;
+}
+@keyframes hud-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* ============================================================
+   通用标题 h1/h2/h3 在科幻主题下的发光感
+   ============================================================ */
+body.theme-scifi .player-main h1,
+body.theme-scifi .player-main h2,
+body.theme-scifi .player-main h3,
+body.theme-scifi .player-main h4,
+body.theme-scifi .player-main h5,
+body.theme-scifi .player-main h6 {
+    color: var(--hud-text);
+    letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   卡片
+   ============================================================ */
+body.theme-scifi .card {
+    background: var(--hud-bg-card) !important;
+    border: 1px solid var(--hud-line) !important;
+    border-radius: 0 !important;
+    color: var(--hud-text);
+    backdrop-filter: blur(10px);
+    box-shadow:
+        0 0 0 1px rgba(0, 220, 255, 0.08),
+        0 0 24px rgba(0, 220, 255, 0.08),
+        inset 0 0 40px rgba(0, 220, 255, 0.03);
+    transition: box-shadow .25s ease, border-color .25s ease;
+    clip-path: polygon(
+        0 16px, 16px 0,
+        calc(100% - 28px) 0, 100% 28px,
+        100% calc(100% - 16px), calc(100% - 16px) 100%,
+        28px 100%, 0 calc(100% - 28px)
+    );
+}
+body.theme-scifi .card:hover {
+    border-color: var(--hud-cyan-soft) !important;
+    box-shadow:
+        0 0 0 1px rgba(0, 220, 255, 0.20),
+        0 0 32px rgba(0, 220, 255, 0.20),
+        inset 0 0 60px rgba(0, 220, 255, 0.06);
+}
+
+body.theme-scifi .card-header {
+    background: linear-gradient(90deg, rgba(0, 220, 255, 0.14), rgba(0, 220, 255, 0.02)) !important;
+    border-bottom: 1px solid var(--hud-line) !important;
+    color: var(--hud-cyan) !important;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 0.92rem;
+    padding: 10px 18px;
+}
+body.theme-scifi .card-header::before {
+    content: "";
+    display: inline-block;
+    width: 10px; height: 10px;
+    background: var(--hud-cyan);
+    transform: rotate(45deg);
+    margin-right: 12px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px var(--hud-cyan);
+}
+body.theme-scifi .card-header i.fas,
+body.theme-scifi .card-header i.fa {
+    color: var(--hud-cyan);
+    margin-right: 8px;
+    text-shadow: 0 0 6px var(--hud-cyan-glow);
+}
+
+body.theme-scifi .card-body {
+    color: var(--hud-text);
+    padding: 18px;
+}
+
+/* 卡片体内的次级条目 */
+body.theme-scifi .card-body .border.rounded {
+    background: rgba(0, 220, 255, 0.04) !important;
+    border: 1px solid var(--hud-line) !important;
+    border-left: 3px solid var(--hud-cyan) !important;
+    border-radius: 0 !important;
+    color: var(--hud-text);
+    padding: 14px !important;
+    transition: background .2s ease, border-color .2s ease;
+}
+body.theme-scifi .card-body .border.rounded:hover {
+    background: rgba(0, 220, 255, 0.08) !important;
+    border-color: var(--hud-cyan-soft) !important;
+}
+body.theme-scifi .card-body .border.rounded h5,
+body.theme-scifi .card-body .border.rounded strong {
+    color: var(--hud-text);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+body.theme-scifi .text-muted,
+body.theme-scifi .card-body .text-muted {
+    color: var(--hud-text-dim) !important;
+}
+
+/* 数据行 */
+body.theme-scifi .card-body > .d-flex.justify-content-between {
+    padding: 8px 12px;
+    border-bottom: 1px dashed rgba(0, 220, 255, 0.15);
+    margin-bottom: 0 !important;
+}
+body.theme-scifi .card-body > .d-flex.justify-content-between:last-child {
+    border-bottom: none;
+}
+body.theme-scifi .card-body > .d-flex.justify-content-between strong {
+    color: var(--hud-cyan);
+    font-family: "Orbitron", "Rajdhani", monospace;
+    text-shadow: 0 0 6px var(--hud-cyan-glow);
+    font-weight: 600;
+}
+
+/* ============================================================
+   Badge
+   ============================================================ */
+body.theme-scifi .badge {
+    background: transparent !important;
+    border: 1px solid var(--hud-cyan-soft);
+    color: var(--hud-cyan) !important;
+    border-radius: 0;
+    padding: 4px 10px;
+    font-family: "Orbitron", monospace;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+}
+body.theme-scifi .badge.bg-primary { border-color: var(--hud-cyan); color: var(--hud-cyan) !important; }
+body.theme-scifi .badge.bg-success { border-color: #46f5a0; color: #46f5a0 !important; }
+body.theme-scifi .badge.bg-secondary { border-color: var(--hud-text-dim); color: var(--hud-text-dim) !important; }
+body.theme-scifi .badge.bg-dark { border-color: var(--hud-magenta); color: var(--hud-magenta) !important; }
+body.theme-scifi .badge.bg-danger { border-color: #ff8585; color: #ff8585 !important; }
+body.theme-scifi .badge.bg-warning { border-color: #ffb347; color: #ffb347 !important; }
+body.theme-scifi .badge.bg-info { border-color: var(--hud-cyan); color: var(--hud-cyan) !important; }
+body.theme-scifi .badge.bg-light { border-color: var(--hud-text-dim); color: var(--hud-text) !important; background: rgba(255,255,255,0.05) !important; }
+
+/* ============================================================
+   按钮
+   ============================================================ */
+body.theme-scifi .btn {
+    border-radius: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 6px 16px;
+    transition: all .2s;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+body.theme-scifi .btn-primary,
+body.theme-scifi .btn-outline-primary {
+    background: rgba(0, 220, 255, 0.10);
+    border: 1px solid var(--hud-cyan-soft);
+    color: var(--hud-cyan);
+}
+body.theme-scifi .btn-primary:hover:not(:disabled),
+body.theme-scifi .btn-outline-primary:hover:not(:disabled) {
+    background: rgba(0, 220, 255, 0.22);
+    border-color: var(--hud-cyan);
+    color: #fff;
+    box-shadow: 0 0 16px var(--hud-cyan-glow);
+}
+body.theme-scifi .btn-success,
+body.theme-scifi .btn-outline-success {
+    background: rgba(70, 245, 160, 0.10);
+    border: 1px solid rgba(70, 245, 160, 0.5);
+    color: #46f5a0;
+}
+body.theme-scifi .btn-success:hover:not(:disabled),
+body.theme-scifi .btn-outline-success:hover:not(:disabled) {
+    background: rgba(70, 245, 160, 0.22);
+    box-shadow: 0 0 16px rgba(70, 245, 160, 0.3);
+    color: #fff;
+}
+body.theme-scifi .btn-danger,
+body.theme-scifi .btn-outline-danger {
+    background: rgba(255, 100, 100, 0.10);
+    border: 1px solid rgba(255, 100, 100, 0.5);
+    color: #ff8585;
+}
+body.theme-scifi .btn-danger:hover:not(:disabled),
+body.theme-scifi .btn-outline-danger:hover:not(:disabled) {
+    background: rgba(255, 100, 100, 0.22);
+    box-shadow: 0 0 16px rgba(255, 100, 100, 0.3);
+    color: #fff;
+}
+body.theme-scifi .btn-warning,
+body.theme-scifi .btn-outline-warning {
+    background: rgba(255, 179, 71, 0.10);
+    border: 1px solid rgba(255, 179, 71, 0.5);
+    color: #ffb347;
+}
+body.theme-scifi .btn-secondary,
+body.theme-scifi .btn-outline-secondary {
+    background: rgba(176, 97, 255, 0.10);
+    border: 1px solid rgba(176, 97, 255, 0.5);
+    color: var(--hud-magenta);
+}
+body.theme-scifi .btn-secondary:hover:not(:disabled),
+body.theme-scifi .btn-outline-secondary:hover:not(:disabled) {
+    background: rgba(176, 97, 255, 0.22);
+    box-shadow: 0 0 16px rgba(176, 97, 255, 0.3);
+    color: #fff;
+}
+body.theme-scifi .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+body.theme-scifi .btn-close {
+    filter: invert(1) hue-rotate(180deg) brightness(1.2);
+}
+
+/* ============================================================
+   list-group / list-group-item
+   ============================================================ */
+body.theme-scifi .list-group,
+body.theme-scifi .list-group-item {
+    background: transparent !important;
+    color: var(--hud-text);
+    border: none !important;
+}
+body.theme-scifi .list-group-item {
+    border-bottom: 1px dashed rgba(0, 220, 255, 0.15) !important;
+    padding: 10px 12px;
+}
+body.theme-scifi .list-group-item:hover { background: rgba(0, 220, 255, 0.05) !important; }
+body.theme-scifi .list-group-item-success { background: rgba(70, 245, 160, 0.08) !important; color: #d6f5e3 !important; }
+body.theme-scifi .list-group-item-danger { background: rgba(255, 100, 100, 0.08) !important; color: #f5d6d6 !important; }
+body.theme-scifi .list-group-item-warning { background: rgba(255, 179, 71, 0.08) !important; color: #f5e6d0 !important; }
+body.theme-scifi .list-group-item-info { background: rgba(0, 220, 255, 0.08) !important; color: var(--hud-text) !important; }
+
+/* ============================================================
+   HUD 分隔条
+   ============================================================ */
+body.theme-scifi .hud-divider {
+    height: 14px;
+    margin: 18px 0;
+    position: relative;
+    background:
+        linear-gradient(90deg,
+            transparent 0%,
+            var(--hud-cyan-soft) 8%,
+            var(--hud-cyan-soft) 35%,
+            transparent 38%,
+            transparent 60%,
+            var(--hud-cyan-soft) 62%,
+            var(--hud-cyan-soft) 92%,
+            transparent 100%
+        ) center / 100% 1px no-repeat;
+}
+body.theme-scifi .hud-divider::before,
+body.theme-scifi .hud-divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    width: 8px; height: 8px;
+    background: var(--hud-cyan);
+    box-shadow: 0 0 6px var(--hud-cyan);
+}
+body.theme-scifi .hud-divider::before { left: 38%; }
+body.theme-scifi .hud-divider::after  { left: 60%; }
+
+/* ============================================================
+   表单 / 输入框
+   ============================================================ */
+body.theme-scifi .form-control,
+body.theme-scifi .form-select {
+    background: rgba(0, 220, 255, 0.06);
+    border: 1px solid var(--hud-line);
+    color: var(--hud-text);
+    border-radius: 0;
+}
+body.theme-scifi .form-control:focus,
+body.theme-scifi .form-select:focus {
+    background: rgba(0, 220, 255, 0.10);
+    border-color: var(--hud-cyan);
+    color: var(--hud-text);
+    box-shadow: 0 0 0 0.2rem var(--hud-cyan-glow);
+}
+body.theme-scifi .form-control::placeholder { color: var(--hud-text-dim); }
+body.theme-scifi .form-label,
+body.theme-scifi label { color: var(--hud-text); }
+
+/* ============================================================
+   表格
+   ============================================================ */
+body.theme-scifi .table {
+    color: var(--hud-text);
+    border-color: var(--hud-line);
+}
+body.theme-scifi .table > :not(caption) > * > * {
+    background-color: transparent;
+    border-bottom-color: rgba(0, 220, 255, 0.15);
+    color: var(--hud-text);
+}
+body.theme-scifi .table thead th {
+    background: rgba(0, 220, 255, 0.12) !important;
+    color: var(--hud-cyan) !important;
+    border-bottom: 1px solid var(--hud-line) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+}
+body.theme-scifi .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: rgba(0, 220, 255, 0.03) !important;
+}
+body.theme-scifi .table-hover > tbody > tr:hover > * {
+    background-color: rgba(0, 220, 255, 0.08) !important;
+}
+
+/* ============================================================
+   Modal（确认弹窗 / 商店弹窗 / Toast）
+   ============================================================ */
+body.theme-scifi .modal-content {
+    background: rgba(2, 6, 13, 0.95);
+    border: 1px solid var(--hud-cyan-soft);
+    border-radius: 0;
+    color: var(--hud-text);
+    box-shadow: 0 0 30px rgba(0, 220, 255, 0.25);
+}
+/* === 弹窗交互修复：去掉 modal 内任何会切掉点击区域的 clip-path === */
+body.theme-scifi .modal .btn,
+body.theme-scifi .modal .btn-close { clip-path: none; }
+body.theme-scifi .modal .card { clip-path: none; }
+body.theme-scifi .modal,
+body.theme-scifi .toast-container { pointer-events: auto; }
+/* 通知面板（body 末尾的 fixed 卡片）也去掉 clip-path/backdrop-filter，
+   避免和 modal 形成 stacking 干扰 */
+body.theme-scifi #notificationPanel.card { clip-path: none; backdrop-filter: none; }
+
+/* === 顶栏 nav-link hover 死区修复：
+   .player-wallet-summary 等同级 flex 项可能在科幻主题下高度撑高，
+   覆盖到了相邻 nav-link 的上半区。给 nav-link 显式 position:relative
+   + z-index，让它在 navbar 内独占点击层 === */
+body.theme-scifi .player-topbar .navbar-nav .nav-link {
+    position: relative;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+}
+body.theme-scifi .player-topbar .player-wallet-summary {
+    position: relative;
+    z-index: 1;
+}
+body.theme-scifi .modal-header {
+    border-bottom: 1px solid var(--hud-line);
+    background: linear-gradient(90deg, rgba(0, 220, 255, 0.12), transparent 70%);
+}
+body.theme-scifi .modal-title { color: var(--hud-cyan); letter-spacing: 0.1em; }
+body.theme-scifi .modal-footer { border-top: 1px solid var(--hud-line); }
+body.theme-scifi .toast { background: rgba(2, 6, 13, 0.92); border: 1px solid var(--hud-cyan-soft); border-radius: 0; color: var(--hud-text); }
+body.theme-scifi .toast-header { background: rgba(0, 220, 255, 0.10); color: var(--hud-cyan); border-bottom: 1px solid var(--hud-line); }
+
+/* 通知面板 (#notificationPanel) */
+body.theme-scifi #notificationPanel .card-header { cursor: pointer; }
+body.theme-scifi #notificationBody { background: transparent; }
+
+/* ============================================================
+   alert
+   ============================================================ */
+body.theme-scifi .alert {
+    background: rgba(0, 220, 255, 0.08);
+    border: 1px solid var(--hud-cyan-soft);
+    color: var(--hud-text);
+    border-radius: 0;
+}
+body.theme-scifi .alert-danger { background: rgba(255, 100, 100, 0.12); border-color: rgba(255, 100, 100, 0.5); color: #ffc8c8; }
+body.theme-scifi .alert-warning { background: rgba(255, 179, 71, 0.12); border-color: rgba(255, 179, 71, 0.5); color: #ffe0b3; }
+body.theme-scifi .alert-success { background: rgba(70, 245, 160, 0.12); border-color: rgba(70, 245, 160, 0.5); color: #c8f5dd; }
+body.theme-scifi .alert-info { background: rgba(0, 220, 255, 0.12); border-color: var(--hud-cyan-soft); color: var(--hud-text); }
+
+/* ============================================================
+   段落 / 通用文字
+   ============================================================ */
+body.theme-scifi p, body.theme-scifi span:not(.badge):not(.btn span) { color: inherit; }
+body.theme-scifi a { color: var(--hud-cyan); }
+body.theme-scifi a:hover { color: #aef0ff; text-shadow: 0 0 6px var(--hud-cyan-glow); }
+body.theme-scifi hr { border-color: var(--hud-line); opacity: 0.6; }
+
+/* ============================================================
+   响应式：移动端
+   ============================================================ */
+@media (max-width: 768px) {
+    body.theme-scifi .hud-title-bar h2 { font-size: 1.2rem; letter-spacing: 0.08em; }
+    body.theme-scifi .hud-title-bar .hud-title-meta { display: none; }
+    body.theme-scifi .card { clip-path: polygon(0 10px, 10px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 18px 100%, 0 calc(100% - 10px)); }
+    body.theme-scifi .card-header { font-size: 0.82rem; letter-spacing: 0.08em; padding: 8px 12px; }
+    body.theme-scifi .card-body { padding: 12px; }
+    body.theme-scifi .btn { font-size: 0.78rem; padding: 5px 12px; letter-spacing: 0.08em; }
+}
+
+/* ============================================================
+   动画偏好
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    body.theme-scifi .player-main::after,
+    body.theme-scifi .blink-dot { animation: none; }
+}

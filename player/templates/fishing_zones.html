@@ -1,128 +1,61 @@
 {% extends "layout.html" %}
 
-{% block title %}钓鱼区域 - MetaFishing！{% endblock %}
+{% block title %}公司调度台 - MetaFishing！{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
     <div class="col-12">
-        <h2 class="mb-0">
-            <i class="fas fa-map-marked-alt"></i> 钓鱼区域管理
+        <h2 class="company-dispatch-title mb-0">
+            <i class="fas fa-building"></i> 公司调度台
         </h2>
-        <p class="text-muted mt-2">切换到不同的钓鱼区域，探索更多鱼类</p>
+        <p class="text-muted mt-2 mb-0">欢迎光临鱼光临！请您务必在营业部准备的三个练手区域内证明自己，通行证也务必在公司里买哦！</p>
     </div>
 </div>
-
-<!-- 当前区域信息 -->
-{% if current_zone %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-primary">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="fas fa-location-arrow"></i> 当前区域</h5>
-            </div>
-            <div class="card-body">
-                <h4>{{ current_zone.name }}</h4>
-                <p class="text-muted mb-2">{{ current_zone.description }}</p>
-                {% if current_zone.required_pass %}
-                    <div class="alert alert-info mb-0">
-                        <i class="fas fa-ticket-alt"></i> 需要通行证：<strong>{{ current_zone.required_pass }}</strong>
-                    </div>
-                {% else %}
-                    <div class="alert alert-success mb-0">
-                        <i class="fas fa-check-circle"></i> 无需通行证，自由进入
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-{% else %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> 您当前没有在任何钓鱼区域
-        </div>
-    </div>
-</div>
-{% endif %}
 
 {% if cthulhu_view and current_zone and current_zone.id == 7 %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-danger-subtle">
-            <div class="card-header bg-danger-subtle">
-                <h5 class="mb-0"><i class="fas fa-water"></i> 深潜待抉择</h5>
-            </div>
-            <div class="card-body">
-                {% if cthulhu_view.pending_event %}
-                    <h5>{{ cthulhu_view.pending_event.title }}</h5>
-                    <p class="text-muted">{{ cthulhu_view.pending_event.scene_text }}</p>
-                    <div class="d-flex flex-wrap gap-2 mb-3">
-                        {% for choice in cthulhu_view.pending_event.choices %}
-                            <button class="btn btn-outline-danger btn-sm" onclick="chooseDeepdive('{{ choice.choice_id }}')">
-                                {{ choice.choice_id }}. {{ choice.label }}
-                            </button>
-                        {% endfor %}
-                    </div>
-                    <p class="mb-0">当前选择：{{ cthulhu_view.pending_choice or "未选择" }}</p>
-                {% else %}
-                    <p class="mb-2">当前没有待抉择事件。</p>
-                    <p class="text-muted mb-0">切入区域七时会立即尝试开启一次当日深潜；当前版本在门票来源未接入时会走兼容免票逻辑。</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+{# 深潜待抉择卡片已移至深潜玩法页（/cthulhu） #}
 {% endif %}
 
-<!-- 所有可用区域 -->
-<div class="row mb-4">
-    <div class="col-12">
-        <h4><i class="fas fa-globe"></i> 所有钓鱼区域</h4>
-    </div>
-</div>
-
-<div class="row g-4">
-    {% for zone in all_zones %}
-    <div class="col-md-6 col-lg-4">
-        <div class="card h-100 {% if zone.is_current %}border-primary{% endif %} d-flex flex-column">
-            <div class="card-header {% if zone.is_current %}bg-primary text-white{% else %}bg-secondary text-white{% endif %}">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">{{ zone.name }}</h5>
-                    <div class="d-flex flex-column align-items-end gap-1">
+<div class="company-zones-stack mb-4">
+    {% for zone in company_zones %}
+    <div class="card company-zone-card {{ zone.accent_class }} {% if zone.is_current %}border-primary{% endif %}">
+        <div class="card-body">
+            <div class="company-zone-shell">
+                <div class="company-zone-copy">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h4 class="mb-0">{{ zone.name }}</h4>
                         <span class="badge bg-warning text-dark">
                             <i class="fas fa-coins"></i> {{ "{:,}".format(zone.fishing_cost) }} 金币/次
                         </span>
+                        {% if zone.required_pass %}
+                        <span class="badge text-bg-warning-subtle border border-warning-subtle text-warning-emphasis">
+                            <i class="fas fa-ticket-alt"></i> 需要：{{ zone.required_pass }}
+                        </span>
+                        {% else %}
+                        <span class="badge text-bg-success">
+                            <i class="fas fa-unlock"></i> 自由进入
+                        </span>
+                        {% endif %}
                         {% if zone.is_current %}
-                            <span class="badge bg-light text-primary">
-                                <i class="fas fa-check-circle"></i> 当前
-                            </span>
+                        <span class="badge bg-primary-subtle text-primary-emphasis">
+                            <i class="fas fa-check-circle"></i> 当前驻留
+                        </span>
                         {% endif %}
                     </div>
+                    <p class="company-zone-description text-muted mb-0">{{ zone.description }}</p>
                 </div>
-            </div>
-            <div class="card-body d-flex flex-column">
-                <p class="card-text" style="min-height: 60px;">{{ zone.description }}</p>
-
-                <div class="mt-auto">
-                    {% if zone.required_pass %}
-                        <div class="alert alert-warning small mb-3">
-                            <i class="fas fa-ticket-alt"></i> 需要：{{ zone.required_pass }}
-                        </div>
-                    {% else %}
-                        <div class="alert alert-success small mb-3">
-                            <i class="fas fa-unlock"></i> 自由进入
-                        </div>
-                    {% endif %}
-
+                <div class="company-zone-actions">
+                    <button class="btn btn-warning company-shop-button" type="button" onclick='openShopCatalog({{ zone.shop_scope|tojson }}, {{ zone.shop_name|tojson }})'>
+                        <i class="fas fa-store"></i> {{ zone.shop_name }}
+                    </button>
                     {% if zone.is_current %}
-                        <button class="btn btn-secondary w-100" disabled>
-                            <i class="fas fa-check"></i> 已在此区域
-                        </button>
+                    <button class="btn btn-secondary" type="button" disabled>
+                        <i class="fas fa-check"></i> 已在此区域
+                    </button>
                     {% else %}
-                        <button class="btn btn-primary w-100" onclick="changeZone({{ zone.id }}, '{{ zone.name }}')">
-                            <i class="fas fa-arrow-right"></i> 前往此区域
-                        </button>
+                    <button class="btn btn-primary" type="button" onclick='goToPortalZone({{ zone.id }}, {{ zone.name|tojson }})'>
+                        <i class="fas fa-arrow-right"></i> 进入区域
+                    </button>
                     {% endif %}
                 </div>
             </div>
@@ -137,10 +70,11 @@
         <div class="alert alert-info">
             <h5><i class="fas fa-info-circle"></i> 温馨提示</h5>
             <ul class="mb-0">
-                <li>需要门票的区域往往能钓到更高级的鱼</li>
-                <li>特定通行证可在商店获取</li>
-                <li>一次性通行证可驻留下一个0：00，自动续票</li>
-                <li>永久通行证可任意进入对应区域</li>
+                <li>区域 4 为科学考察入口；区域 5~8 请从各自玩法页进入。</li>
+                <li>需要门票的区域往往能钓到更高级的鱼。</li>
+                <li>特定通行证可在对应商店内获取。</li>
+                <li>一次性通行证可驻留下一个 0：00，自动续票。</li>
+                <li>永久通行证可任意进入对应区域。</li>
             </ul>
         </div>
     </div>
@@ -148,45 +82,4 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-async function changeZone(zoneId, zoneName) {
-    const formData = new FormData();
-    formData.append('zone_id', zoneId);
-
-    try {
-        const response = await fetch('{{ url_for("player_bp.change_zone") }}', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            await showToast(data.message, 'success');
-            location.reload();
-        } else {
-            showToast(data.message, 'error');
-        }
-    } catch (error) {
-        showToast('网络错误，请稍后重试', 'error');
-    }
-}
-
-async function chooseDeepdive(choiceId) {
-    try {
-        const response = await fetch('{{ url_for("player_bp.cthulhu_api_choose") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({choice_id: choiceId})
-        });
-        const data = await response.json();
-        showToast(data.message || (data.success ? '选择成功' : '选择失败'), data.success ? 'success' : 'error');
-        if (data.success) {
-            location.reload();
-        }
-    } catch (error) {
-        showToast('网络错误，请稍后重试', 'error');
-    }
-}
-</script>
 {% endblock %}

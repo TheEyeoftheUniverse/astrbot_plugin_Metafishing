@@ -1,66 +1,284 @@
 {% extends "layout.html" %}
-{% block title %}科幻干预 - MetaFishing！{% endblock %}
+{% block title %}观测 - MetaFishing！{% endblock %}
+{% block body_class %}theme-scifi{% endblock %}
+
+{% block extra_css %}
+<style>
+.scifi-hud-meta {
+    font-family: "Orbitron", "Rajdhani", ui-monospace, monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    color: var(--hud-cyan, #00dcff);
+    text-shadow: 0 0 8px var(--hud-cyan-glow, rgba(0,220,255,0.6));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.6rem;
+    align-items: center;
+    margin-left: 1rem;
+}
+.scifi-hud-meta .stat-key { opacity: 0.65; margin-right: 0.4em; }
+.scifi-hud-meta .stat-val { font-weight: 700; }
+
+.skill-tree-grid {
+    display: grid;
+    grid-template-columns: 200px repeat(5, 1fr) 240px;
+    gap: 12px;
+    align-items: stretch;
+    margin-top: 4px;
+}
+.skill-tree-row-label {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 14px 12px;
+    border-left: 3px solid var(--hud-cyan, #00dcff);
+    background: linear-gradient(90deg, rgba(0,220,255,0.08), rgba(0,220,255,0.0));
+    font-family: "Orbitron", "Rajdhani", monospace;
+    letter-spacing: 0.1em;
+}
+.skill-tree-row-label .branch-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--hud-cyan, #00dcff);
+    text-shadow: 0 0 6px var(--hud-cyan-glow, rgba(0,220,255,0.6));
+}
+.skill-tree-row-label .branch-target {
+    font-size: 0.72rem;
+    color: var(--hud-text-dim, #5a8a9b);
+    margin-top: 2px;
+}
+.skill-tree-row-label .branch-rate {
+    font-size: 0.78rem;
+    color: var(--hud-text, #c8e6f0);
+    margin-top: 6px;
+    font-family: "Orbitron", monospace;
+}
+
+.skill-node {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    min-height: 110px;
+    background: rgba(0, 220, 255, 0.04);
+    border: 1px solid var(--hud-line, rgba(0, 220, 255, 0.18));
+    color: var(--hud-text, #c8e6f0);
+    padding: 8px 6px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s ease;
+    clip-path: polygon(
+        0 8px, 8px 0,
+        calc(100% - 12px) 0, 100% 12px,
+        100% calc(100% - 8px), calc(100% - 8px) 100%,
+        12px 100%, 0 calc(100% - 12px)
+    );
+    font-family: "Orbitron", "Rajdhani", ui-monospace, monospace;
+}
+.skill-node:hover:not(.is-disabled):not(.is-max) {
+    border-color: var(--hud-cyan-soft, rgba(0,220,255,0.5));
+    background: rgba(0, 220, 255, 0.08);
+    box-shadow: 0 0 14px rgba(0,220,255,0.25), inset 0 0 14px rgba(0,220,255,0.08);
+}
+.skill-node .node-lv {
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    color: var(--hud-text-dim, #5a8a9b);
+}
+.skill-node .node-effect {
+    font-size: 0.72rem;
+    line-height: 1.2;
+    color: var(--hud-text, #c8e6f0);
+    text-shadow: 0 0 6px rgba(0,220,255,0.18);
+}
+.skill-node .node-cost {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    color: var(--hud-cyan, #00dcff);
+}
+.skill-node.is-active {
+    background: rgba(0, 220, 255, 0.16);
+    border-color: var(--hud-cyan, #00dcff);
+    box-shadow:
+        0 0 0 1px rgba(0, 220, 255, 0.35),
+        0 0 18px rgba(0, 220, 255, 0.4),
+        inset 0 0 14px rgba(0, 220, 255, 0.14);
+}
+.skill-node.is-active .node-lv { color: var(--hud-cyan, #00dcff); }
+.skill-node.is-current {
+    border-color: var(--hud-cyan, #00dcff);
+    background: rgba(0, 220, 255, 0.22);
+    box-shadow:
+        0 0 0 2px var(--hud-cyan, #00dcff),
+        0 0 24px rgba(0, 220, 255, 0.6),
+        inset 0 0 18px rgba(0, 220, 255, 0.22);
+}
+.skill-node.is-disabled { opacity: 0.45; cursor: not-allowed; }
+.skill-node.is-max { cursor: default; }
+.skill-node.is-max .node-cost { color: #ffb000; text-shadow: 0 0 6px rgba(255,176,0,0.5); }
+
+.apex-node-stack {
+    grid-row: 1 / span 3;
+    grid-column: 7;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--hud-magenta, #ff3b81);
+    background: linear-gradient(180deg, rgba(255,59,129,0.08), rgba(255,59,129,0.02));
+    clip-path: polygon(
+        0 12px, 12px 0,
+        calc(100% - 12px) 0, 100% 12px,
+        100% calc(100% - 12px), calc(100% - 12px) 100%,
+        12px 100%, 0 calc(100% - 12px)
+    );
+    box-shadow: 0 0 0 1px rgba(255,59,129,0.2), 0 0 24px rgba(255,59,129,0.18);
+}
+.apex-node-stack .apex-title {
+    font-family: "Orbitron", monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    color: var(--hud-magenta, #ff3b81);
+    text-shadow: 0 0 8px rgba(255,59,129,0.6);
+    text-align: center;
+    margin-bottom: 4px;
+}
+.apex-option {
+    padding: 6px 8px;
+    border: 1px solid rgba(255,59,129,0.3);
+    background: rgba(255,59,129,0.05);
+    cursor: pointer;
+    transition: all .2s;
+    font-size: 0.78rem;
+    color: var(--hud-text, #c8e6f0);
+}
+.apex-option:hover:not(.is-locked):not(.is-selected) {
+    border-color: var(--hud-magenta, #ff3b81);
+    background: rgba(255,59,129,0.12);
+}
+.apex-option.is-selected {
+    background: rgba(255,59,129,0.22);
+    border-color: var(--hud-magenta, #ff3b81);
+    box-shadow: 0 0 0 1px rgba(255,59,129,0.4), 0 0 14px rgba(255,59,129,0.4);
+}
+.apex-option.is-locked { opacity: 0.4; cursor: not-allowed; }
+.apex-option .apex-name { font-weight: 700; letter-spacing: 0.08em; color: var(--hud-magenta, #ff3b81); }
+.apex-option .apex-req { font-size: 0.66rem; color: var(--hud-text-dim, #5a8a9b); margin-top: 2px; }
+
+.apex-reset-row { grid-column: 1 / -1; margin-top: 8px; text-align: right; }
+.apex-reset-row .btn {
+    font-family: "Orbitron", monospace;
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+}
+
+@media (max-width: 1199px) {
+    .skill-tree-grid { grid-template-columns: 1fr; }
+    .apex-node-stack { grid-row: auto; grid-column: 1 / -1; }
+    .skill-tree-row-label { border-left: none; border-top: 3px solid var(--hud-cyan, #00dcff); }
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row g-4">
-    <div class="col-12 col-lg-4">
-        <div class="card shadow-sm">
-            <div class="card-header"><i class="fas fa-satellite-dish"></i> 科技总览</div>
-            <div class="card-body" id="scifiSummaryCard"></div>
+<div class="hud-title-bar">
+    <div class="hud-title-meta"><span class="blink-dot"></span>SECTOR-05 // ONLINE</div>
+    <h2 style="display:flex; align-items:baseline; gap: 0.5rem; flex-wrap: wrap;">
+        <span>观测</span>
+        <small class="hud-subtitle" style="font-size: 0.95rem; letter-spacing: 0.06em;">计算、假设、重分配。</small>
+    </h2>
+</div>
+
+{% if zone_card %}
+{% set zone = zone_card %}
+<div class="company-zones-stack mb-4">
+    <div class="card company-zone-card {{ zone.accent_class }} {% if zone.is_current %}border-primary{% endif %}">
+        <div class="card-body">
+            <div class="company-zone-shell">
+                <div class="company-zone-copy">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h4 class="mb-0">{{ zone.name }}</h4>
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-coins"></i> {{ "{:,}".format(zone.fishing_cost) }} 金币/次
+                        </span>
+                        {% if zone.required_pass %}
+                        <span class="badge text-bg-warning-subtle border border-warning-subtle text-warning-emphasis">
+                            <i class="fas fa-ticket-alt"></i> 需要：{{ zone.required_pass }}
+                        </span>
+                        {% else %}
+                        <span class="badge text-bg-success">
+                            <i class="fas fa-unlock"></i> 自由进入
+                        </span>
+                        {% endif %}
+                        {% if zone.is_current %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis">
+                            <i class="fas fa-check-circle"></i> 当前驻留
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p class="company-zone-description text-muted mb-3">{{ zone.description }}</p>
+                </div>
+                <div class="company-zone-actions">
+                    <button class="btn btn-warning company-shop-button" type="button" onclick='openShopCatalog({{ zone.shop_scope|tojson }}, {{ zone.shop_name|tojson }})'>
+                        <i class="fas fa-store"></i> {{ zone.shop_name }}
+                    </button>
+                    {% if zone.is_current %}
+                    <button class="btn btn-secondary" type="button" disabled>
+                        <i class="fas fa-check"></i> 已在此区域
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary" type="button" onclick='goToPortalZone({{ zone.id }}, {{ zone.name|tojson }})'>
+                        <i class="fas fa-arrow-right"></i> 进入区域
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
-    <div class="col-12 col-lg-8">
-        <div class="card shadow-sm">
-            <div class="card-header"><i class="fas fa-project-diagram"></i> 分支加点</div>
-            <div class="card-body" id="scifiBranchCard"></div>
-        </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+    <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap: wrap;">
+        <span><i class="fas fa-project-diagram"></i> 协议技能树</span>
+        <span class="scifi-hud-meta" id="scifiHudMeta"></span>
     </div>
-    <div class="col-12 col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header"><i class="fas fa-bolt"></i> 觉醒协议</div>
-            <div class="card-body" id="scifiApexCard"></div>
-        </div>
-    </div>
-    <div class="col-12 col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-header"><i class="fas fa-trophy"></i> 科技榜</div>
-            <div class="card-body" id="scifiBoardCard"></div>
-        </div>
-    </div>
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header"><i class="fas fa-history"></i> 最近日志</div>
-            <div class="card-body" id="scifiLogCard"></div>
+    <div class="card-body">
+        <div class="skill-tree-grid" id="skillTreeGrid"></div>
+        <div class="apex-reset-row">
+            <button class="btn btn-sm btn-outline-danger" id="apexResetBtn" onclick="resetApex()" disabled>
+                消耗重写芯 重置觉醒协议
+            </button>
         </div>
     </div>
 </div>
 
 <script id="scifiInitialData" type="application/json">{{ initial_view|tojson }}</script>
+{% endblock %}
+
+{% block extra_js %}
 <script>
 let scifiView = JSON.parse(document.getElementById('scifiInitialData').textContent);
-let scifiBoard = [];
-let scifiLogs = [];
+
+const APEX_NAMES = {
+    singularity: '奇点协议',
+    abyss_unity: '深渊归一',
+    fate_solitude: '天命独行',
+    resonance_summit: '共振之巅',
+};
+const REQ_NAMES = {
+    abyss_compression: '深渊压缩',
+    fate_severance: '天命截断',
+    resonance_dampening: '共振拑鋭',
+};
 
 async function refreshScifiState() {
     const response = await fetch('{{ url_for("player_bp.scifi_api_state") }}');
     scifiView = await response.json();
     renderScifi();
 }
-
-async function refreshScifiBoard() {
-    const response = await fetch('{{ url_for("player_bp.scifi_api_leaderboard") }}?limit=10');
-    const payload = await response.json();
-    scifiBoard = payload.leaderboard || [];
-    renderBoard();
-}
-
-async function refreshScifiLogs() {
-    const response = await fetch('{{ url_for("player_bp.scifi_api_event_log") }}?limit=20');
-    const payload = await response.json();
-    scifiLogs = payload.logs || [];
-    renderLogs();
-}
-
 async function postScifi(url, payload = {}) {
     const response = await fetch(url, {
         method: 'POST',
@@ -69,27 +287,16 @@ async function postScifi(url, payload = {}) {
     });
     return await response.json();
 }
-
 async function levelUpBranch(branchId) {
     const result = await postScifi('{{ url_for("player_bp.scifi_api_level_up") }}', {branch: branchId, count: 1});
     showToast(result.message || (result.success ? '加点成功' : '加点失败'), result.success ? 'success' : 'danger');
-    if (result.success) {
-        await refreshScifiState();
-        await refreshScifiBoard();
-        await refreshScifiLogs();
-    }
+    if (result.success) await refreshScifiState();
 }
-
 async function selectApex(apexId) {
     const result = await postScifi('{{ url_for("player_bp.scifi_api_apex_select") }}', {apex: apexId});
     showToast(result.message || (result.success ? '觉醒成功' : '觉醒失败'), result.success ? 'success' : 'danger');
-    if (result.success) {
-        await refreshScifiState();
-        await refreshScifiBoard();
-        await refreshScifiLogs();
-    }
+    if (result.success) await refreshScifiState();
 }
-
 async function resetApex() {
     const confirmed = await webuiConfirm('将消耗 1 个协议重写芯并清空当前觉醒协议，是否继续？', {
         title: '重写协议',
@@ -99,122 +306,113 @@ async function resetApex() {
     if (!confirmed) return;
     const result = await postScifi('{{ url_for("player_bp.scifi_api_apex_reset") }}');
     showToast(result.message || (result.success ? '重写成功' : '重写失败'), result.success ? 'success' : 'danger');
-    if (result.success) {
-        await refreshScifiState();
-        await refreshScifiBoard();
-        await refreshScifiLogs();
-    }
+    if (result.success) await refreshScifiState();
+}
+
+const LEVEL_EFFECT = {
+    abyss_compression: [
+        '0',
+        '6+星概率 +0.02%\n深渊偏移 -1',
+        '6+星概率 +0.05%\n深渊偏移 -2',
+        '6+星概率 +0.08%\n深渊偏移 -4',
+        '6+星概率 +0.12%\n深渊偏移 -7',
+        '6+星概率 +0.17%\n深渊偏移 -10',
+    ],
+    fate_severance: [
+        '0',
+        '追加率 +0.02%\n渡劫乘区 ×0.99',
+        '追加率 +0.05%\n渡劫乘区 ×0.98',
+        '追加率 +0.08%\n渡劫乘区 ×0.95',
+        '追加率 +0.12%\n渡劫乘区 ×0.90',
+        '追加率 +0.17%\n渡劫乘区 ×0.86',
+    ],
+    resonance_dampening: [
+        '0',
+        '追加率 +0.02%\n讨伐 d20 -0',
+        '追加率 +0.05%\n讨伐 d20 -0',
+        '追加率 +0.08%\n讨伐 d20 -1',
+        '追加率 +0.12%\n讨伐 d20 -3',
+        '追加率 +0.17%\n讨伐 d20 -5',
+    ],
+};
+
+function formatRequirements(requirements) {
+    return Object.entries(requirements || {})
+        .map(([key, value]) => `${REQ_NAMES[key] || key} Lv.${value}`)
+        .join(' / ');
 }
 
 function renderScifi() {
     const state = scifiView.state || {};
     const append = scifiView.append_rate || {};
-    document.getElementById('scifiSummaryCard').innerHTML = `
-        <div class="d-flex justify-content-between mb-2"><span>科研点</span><strong>${state.research_points ?? 0}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span>总等级</span><strong>${scifiView.total_level ?? 0}</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span>总追加率</span><strong>${append.total_append_rate_bp ?? 0} bp</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span>等价百分比</span><strong>${(append.total_append_rate_percent ?? 0).toFixed(2)}%</strong></div>
-        <div class="d-flex justify-content-between mb-2"><span>觉醒协议</span><strong>${state.apex_protocol ? apexName(state.apex_protocol) : '未选择'}</strong></div>
-        <div class="d-flex justify-content-between"><span>协议重写芯</span><strong>${scifiView.chip_count ?? 0}</strong></div>
-    `;
-
     const branches = scifiView.branches || [];
-    document.getElementById('scifiBranchCard').innerHTML = branches.map(branch => `
-        <div class="border rounded p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-                <div>
-                    <h5 class="mb-1">${branch.name}</h5>
-                    <div class="text-muted small">影响：${branch.target}</div>
-                </div>
-                <span class="badge bg-primary">Lv.${branch.level}</span>
-            </div>
-            <div class="small text-muted mb-2">当前追加率：${branch.append_rate_bp} bp</div>
-            ${branch.cthulhu_offset !== null ? `<div class="small text-muted mb-1">克苏鲁大失败阈值偏移：-${branch.cthulhu_offset}</div>` : ''}
-            ${branch.tribulation_multiplier !== null ? `<div class="small text-muted mb-1">渡劫成功率乘区：×${branch.tribulation_multiplier.toFixed(2)}</div>` : ''}
-            ${branch.team_battle_penalty !== null ? `<div class="small text-muted mb-1">团战 d20 惩罚：-${branch.team_battle_penalty}</div>` : ''}
-            <button class="btn btn-sm btn-outline-primary mt-2" ${branch.level >= branch.max_level ? 'disabled' : ''} onclick="levelUpBranch('${branch.id}')">
-                升 1 级${branch.level < branch.max_level ? ` (${branch.next_level_cost} 点)` : ''}
-            </button>
-        </div>
-    `).join('');
-
     const apexUnlocks = scifiView.apex_unlocks || [];
-    document.getElementById('scifiApexCard').innerHTML = `
-        <div class="mb-3">当前协议：<strong>${state.apex_protocol ? apexName(state.apex_protocol) : '未选择'}</strong></div>
-        ${apexUnlocks.map(apex => `
-            <div class="border rounded p-3 mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <strong>${apex.name}</strong>
-                    <span class="badge ${apex.selected ? 'bg-success' : (apex.unlocked ? 'bg-primary' : 'bg-secondary')}">
-                        ${apex.selected ? '已持有' : (apex.unlocked ? '可选择' : '未解锁')}
-                    </span>
-                </div>
-                <div class="small text-muted mb-2">追加加成：+${apex.append_rate_bp} bp</div>
-                <div class="small text-muted mb-2">条件：${formatRequirements(apex.requirements)}</div>
-                <button class="btn btn-sm btn-outline-success" ${(!apex.unlocked || state.apex_protocol) ? 'disabled' : ''} onclick="selectApex('${apex.id}')">选择协议</button>
-            </div>
-        `).join('')}
-        <button class="btn btn-sm btn-outline-danger" ${!state.apex_protocol ? 'disabled' : ''} onclick="resetApex()">消耗重写芯重置协议</button>
+
+    document.getElementById('scifiHudMeta').innerHTML = `
+        <span><span class="stat-key">科研点</span><span class="stat-val">${state.research_points ?? 0}</span></span>
+        <span><span class="stat-key">总等级</span><span class="stat-val">${scifiView.total_level ?? 0}</span></span>
+        <span><span class="stat-key">追加率</span><span class="stat-val">${append.total_append_rate_bp ?? 0} bp · ${(append.total_append_rate_percent ?? 0).toFixed(2)}%</span></span>
+        <span><span class="stat-key">觉醒</span><span class="stat-val">${state.apex_protocol ? APEX_NAMES[state.apex_protocol] : '未选择'}</span></span>
+        <span><span class="stat-key">重写芯</span><span class="stat-val">${scifiView.chip_count ?? 0}</span></span>
     `;
-}
 
-function renderBoard() {
-    document.getElementById('scifiBoardCard').innerHTML = scifiBoard.length ? `
-        <div class="list-group list-group-flush">
-            ${scifiBoard.map(row => `
-                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-                    <div>
-                        <div>#${row.rank} ${row.nickname}</div>
-                        <div class="small text-muted">总等级 ${row.total_level} · 科研累计 ${row.total_research_points_earned}</div>
-                    </div>
-                    <span class="badge bg-dark">${row.append_rate_bp} bp</span>
-                </div>
-            `).join('')}
-        </div>
-    ` : '<p class="text-muted mb-0">暂无排行数据。</p>';
-}
+    const grid = document.getElementById('skillTreeGrid');
+    let html = '';
+    branches.forEach((branch) => {
+        const currentLv = branch.level;
+        const maxLv = branch.max_level;
+        html += `
+            <div class="skill-tree-row-label">
+                <span class="branch-name">${branch.name}</span>
+                <span class="branch-target">${branch.target}</span>
+                <span class="branch-rate">当前追加 ${branch.append_rate_bp} bp</span>
+            </div>`;
+        for (let lv = 1; lv <= maxLv; lv++) {
+            const isActive = lv <= currentLv;
+            const isCurrent = lv === currentLv;
+            const isNext = lv === currentLv + 1;
+            const isReachable = lv <= currentLv + 1;
+            const isMax = lv === maxLv && isActive;
+            const effectText = (LEVEL_EFFECT[branch.id] || [])[lv] || '';
+            const classes = ['skill-node'];
+            if (isActive) classes.push('is-active');
+            if (isCurrent) classes.push('is-current');
+            if (!isReachable) classes.push('is-disabled');
+            if (isMax) classes.push('is-max');
+            const onclick = isNext ? `onclick="levelUpBranch('${branch.id}')"` : '';
+            const costText = isMax ? '✦ MAX' : isNext ? `升级 · ${branch.next_level_cost ?? '?'}点` : isActive ? '已激活' : '未达成';
+            html += `
+                <div class="${classes.join(' ')}" ${onclick} title="${branch.name} Lv.${lv}">
+                    <div class="node-lv">LV.${lv}</div>
+                    <div class="node-effect">${effectText.replace(/\n/g, '<br>')}</div>
+                    <div class="node-cost">${costText}</div>
+                </div>`;
+        }
+    });
 
-function renderLogs() {
-    document.getElementById('scifiLogCard').innerHTML = scifiLogs.length ? `
-        <div class="list-group list-group-flush">
-            ${scifiLogs.map(log => `
-                <div class="list-group-item px-0">
-                    <div class="d-flex justify-content-between">
-                        <strong>${log.event_type}</strong>
-                        <span class="small text-muted">${log.occurred_at}</span>
-                    </div>
-                    <div class="small text-muted">${formatEventDetail(log.event_detail || {})}</div>
-                </div>
-            `).join('')}
-        </div>
-    ` : '<p class="text-muted mb-0">暂无事件日志。</p>';
-}
+    const apexHtml = apexUnlocks.map((apex) => {
+        const classes = ['apex-option'];
+        if (apex.selected) classes.push('is-selected');
+        if (!apex.unlocked) classes.push('is-locked');
+        const onclick = (apex.unlocked && !state.apex_protocol) ? `onclick="selectApex('${apex.id}')"` : '';
+        const stateLabel = apex.selected ? '已持有' : (apex.unlocked ? '可选择' : '未解锁');
+        return `
+            <div class="${classes.join(' ')}" ${onclick}>
+                <div class="apex-name">${apex.name}</div>
+                <div class="apex-req">${formatRequirements(apex.requirements)} · +${apex.append_rate_bp} bp</div>
+                <div class="apex-req">${stateLabel}</div>
+            </div>`;
+    }).join('');
+    html += `
+        <div class="apex-node-stack">
+            <div class="apex-title">◆ 觉醒协议 ◆</div>
+            ${apexHtml}
+        </div>`;
 
-function apexName(apexId) {
-    const mapping = {
-        singularity: '奇点协议',
-        abyss_unity: '深渊归一',
-        fate_solitude: '天命独行',
-        resonance_summit: '共振之巅',
-    };
-    return mapping[apexId] || apexId;
-}
-
-function formatRequirements(requirements) {
-    const mapping = {
-        abyss_compression: '深渊压缩',
-        fate_severance: '天命截断',
-        resonance_dampening: '共振拑鋭',
-    };
-    return Object.entries(requirements || {}).map(([key, value]) => `${mapping[key] || key} Lv.${value}`).join(' / ');
-}
-
-function formatEventDetail(detail) {
-    return Object.entries(detail || {}).map(([key, value]) => `${key}: ${value}`).join(' · ') || '无细节';
+    grid.innerHTML = html;
+    document.getElementById('apexResetBtn').disabled = !state.apex_protocol;
 }
 
 renderScifi();
-refreshScifiBoard();
-refreshScifiLogs();
 </script>
 {% endblock %}

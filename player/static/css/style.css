@@ -26,6 +26,8 @@ html {
 body {
     min-height: 100vh;
     padding-top: 76px;
+    position: relative;
+    isolation: isolate;
     color: var(--ink);
     font-family: var(--sans);
     background:
@@ -49,6 +51,97 @@ body::before {
         transparent 4px
     );
     mix-blend-mode: multiply;
+    z-index: 0;
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.7;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    z-index: 0;
+}
+
+.player-main,
+.editorial-footer {
+    position: relative;
+    z-index: 1;
+}
+
+body[data-zone-id="1"]::after {
+    background-image:
+        radial-gradient(circle at 18% 22%, rgba(147, 226, 255, 0.34), transparent 24%),
+        radial-gradient(circle at 78% 16%, rgba(255, 244, 194, 0.28), transparent 20%),
+        linear-gradient(180deg, rgba(182, 228, 245, 0.52), rgba(255, 248, 236, 0.08) 55%),
+        url("../img/zones/zone-1.png");
+    opacity: 0.92;
+}
+
+body[data-zone-id="2"]::after {
+    background-image:
+        radial-gradient(circle at 16% 18%, rgba(127, 205, 255, 0.34), transparent 22%),
+        radial-gradient(circle at 82% 24%, rgba(125, 165, 232, 0.28), transparent 21%),
+        linear-gradient(180deg, rgba(129, 175, 224, 0.38), rgba(255, 248, 236, 0.06) 58%),
+        url("../img/zones/zone-2.png");
+    opacity: 0.92;
+}
+
+body[data-zone-id="3"]::after {
+    background-image:
+        radial-gradient(circle at 20% 22%, rgba(255, 194, 140, 0.32), transparent 22%),
+        radial-gradient(circle at 74% 18%, rgba(245, 235, 196, 0.26), transparent 20%),
+        linear-gradient(180deg, rgba(224, 176, 119, 0.36), rgba(255, 248, 236, 0.05) 58%),
+        url("../img/zones/zone-3.png");
+    opacity: 0.92;
+}
+
+body[data-zone-id="4"]::after {
+    background-image:
+        radial-gradient(circle at 18% 18%, rgba(255, 225, 132, 0.34), transparent 22%),
+        radial-gradient(circle at 76% 16%, rgba(255, 163, 101, 0.24), transparent 19%),
+        linear-gradient(180deg, rgba(240, 185, 96, 0.38), rgba(255, 248, 236, 0.04) 58%),
+        url("../img/zones/zone-4.png");
+    opacity: 0.92;
+}
+
+body[data-zone-id="5"]::after {
+    background-image:
+        radial-gradient(circle at 18% 20%, rgba(93, 224, 230, 0.28), transparent 22%),
+        radial-gradient(circle at 78% 18%, rgba(129, 122, 255, 0.22), transparent 20%),
+        linear-gradient(180deg, rgba(95, 143, 176, 0.42), rgba(255, 248, 236, 0.03) 60%),
+        url("../img/zones/zone-5.png");
+    opacity: 0.92;
+}
+
+body[data-zone-id="6"]::after {
+    background-image:
+        radial-gradient(circle at 20% 22%, rgba(213, 245, 171, 0.3), transparent 23%),
+        radial-gradient(circle at 76% 20%, rgba(188, 228, 255, 0.22), transparent 19%),
+        linear-gradient(180deg, rgba(161, 200, 164, 0.36), rgba(255, 248, 236, 0.03) 60%),
+        url("../img/zones/zone-6.png");
+    opacity: 0.92;
+}
+
+body[data-zone-id="7"]::after {
+    background-image:
+        radial-gradient(circle at 18% 16%, rgba(136, 98, 161, 0.28), transparent 20%),
+        radial-gradient(circle at 78% 22%, rgba(74, 98, 150, 0.24), transparent 20%),
+        linear-gradient(180deg, rgba(74, 62, 101, 0.46), rgba(255, 248, 236, 0.02) 62%),
+        url("../img/zones/zone-7.png");
+    opacity: 0.92;
+}
+
+body[data-zone-id="8"]::after {
+    background-image:
+        radial-gradient(circle at 16% 18%, rgba(255, 143, 84, 0.3), transparent 20%),
+        radial-gradient(circle at 80% 20%, rgba(198, 53, 39, 0.24), transparent 20%),
+        linear-gradient(180deg, rgba(149, 73, 47, 0.44), rgba(255, 248, 236, 0.02) 62%),
+        url("../img/zones/zone-8.png");
+    opacity: 0.92;
 }
 
 h1,
@@ -193,6 +286,69 @@ a:hover {
     font-size: 0.82rem;
     font-weight: 700;
     text-transform: uppercase;
+}
+
+/* ============================================================
+   首页：终端式状态行（替代 metric-strip）
+   主题专属外观由 scifi.css / wendao.css 等覆盖
+   ============================================================ */
+.hero-status-block {
+    margin-top: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-family: var(--serif, ui-serif, Georgia, "STKaiti", serif);
+    font-style: italic;
+    font-size: 0.93rem;
+    color: var(--muted, #71685c);
+}
+.hero-status-line {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    opacity: 0;
+    transform: translateY(-4px);
+    animation: hero-status-fade 0.55s ease forwards;
+}
+.hero-status-line[data-status-row="2"] { animation-delay: 0.18s; }
+@keyframes hero-status-fade {
+    to { opacity: 1; transform: translateY(0); }
+}
+.hero-status-prompt {
+    color: var(--ink, #2a2520);
+    margin-right: 0.4em;
+    opacity: 0.55;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-style: normal;
+}
+.hero-status-text {
+    color: var(--muted, #71685c);
+}
+.hero-status-action {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0 0 0 0.4em;
+    color: var(--ink, #2a2520);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: color .2s, text-decoration-color .2s;
+}
+.hero-status-action:hover {
+    color: var(--accent, #b22d3f);
+}
+.hero-status-action.is-done {
+    cursor: default;
+    text-decoration: none;
+    opacity: 0.55;
+}
+.hero-status-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
 }
 
 .section-title {
@@ -1500,4 +1656,375 @@ body.cthulhu-u14 .player-main {
 .authority-board-tier {
     background: rgba(255, 248, 248, 0.78);
     border-color: rgba(129, 28, 40, 0.12) !important;
+}
+
+.shop-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.shop-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(38, 58, 71, 0.08);
+    color: #27404e;
+    font-size: 0.82rem;
+}
+
+.shop-chip.is-ok {
+    background: rgba(21, 128, 61, 0.12);
+    color: #17603b;
+}
+
+.shop-chip.reward {
+    background: rgba(180, 120, 24, 0.12);
+    color: #7a4a09;
+}
+
+.playmode-portal-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
+    gap: 1.25rem;
+    padding: 1.4rem;
+    border-radius: 24px;
+    border: 1px solid rgba(31, 41, 55, 0.08);
+    background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.85), transparent 45%),
+        linear-gradient(135deg, rgba(255,255,255,0.95), rgba(246, 240, 230, 0.92));
+    box-shadow: 0 18px 45px rgba(23, 28, 34, 0.08);
+}
+
+.playmode-portal-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 0.55rem;
+}
+
+.playmode-portal-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.playmode-portal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.portal-scifi .playmode-portal-shell {
+    background:
+        radial-gradient(circle at top left, rgba(219, 242, 255, 0.95), transparent 38%),
+        linear-gradient(135deg, rgba(247, 252, 255, 0.98), rgba(228, 240, 248, 0.96));
+}
+
+.portal-expedition .playmode-portal-shell {
+    background:
+        radial-gradient(circle at top left, rgba(219, 246, 235, 0.94), transparent 40%),
+        linear-gradient(135deg, rgba(249, 254, 251, 0.98), rgba(227, 242, 232, 0.96));
+}
+
+.portal-xianhuan .playmode-portal-shell {
+    background:
+        radial-gradient(circle at top left, rgba(240, 248, 225, 0.95), transparent 40%),
+        linear-gradient(135deg, rgba(253, 254, 248, 0.98), rgba(236, 245, 225, 0.96));
+}
+
+.portal-cthulhu .playmode-portal-shell {
+    background:
+        radial-gradient(circle at top left, rgba(236, 225, 233, 0.92), transparent 40%),
+        linear-gradient(135deg, rgba(252, 248, 250, 0.98), rgba(237, 228, 236, 0.96));
+}
+
+.portal-magic .playmode-portal-shell {
+    background:
+        radial-gradient(circle at top left, rgba(255, 235, 220, 0.92), transparent 40%),
+        linear-gradient(135deg, rgba(255, 251, 247, 0.98), rgba(248, 232, 223, 0.96));
+}
+
+.shop-map-board {
+    border-radius: 28px;
+    overflow: hidden;
+    border: 1px solid rgba(31, 41, 55, 0.08);
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
+}
+
+.shop-map-backdrop {
+    position: relative;
+    min-height: 540px;
+    padding: 2rem;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(255,255,255,0.75), transparent 22%),
+        radial-gradient(circle at 80% 18%, rgba(243, 229, 200, 0.55), transparent 24%),
+        linear-gradient(160deg, #efe3c8, #dcc7a2 42%, #cdb48a 100%);
+}
+
+.shop-map-backdrop::before {
+    content: "";
+    position: absolute;
+    inset: 1.4rem;
+    border: 1px dashed rgba(80, 57, 25, 0.18);
+    border-radius: 20px;
+    pointer-events: none;
+}
+
+.shop-map-intro {
+    max-width: 360px;
+    padding: 1.35rem 1.45rem;
+    border-radius: 22px;
+    background: rgba(255, 251, 244, 0.82);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 18px 36px rgba(77, 57, 28, 0.12);
+}
+
+.shop-map-node {
+    position: absolute;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    min-width: 150px;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(66, 44, 17, 0.12);
+    border-radius: 18px;
+    background: rgba(255, 252, 247, 0.92);
+    box-shadow: 0 14px 30px rgba(74, 53, 25, 0.12);
+    text-align: left;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.shop-map-node:hover {
+    transform: translateY(-2px) rotate(-1deg);
+    box-shadow: 0 18px 34px rgba(74, 53, 25, 0.18);
+}
+
+.shop-map-node small {
+    color: #6b7280;
+}
+
+.shop-map-label {
+    font-weight: 700;
+    color: #2f2b24;
+}
+
+.node-general { top: 18%; left: 52%; }
+.node-scifi { top: 46%; left: 58%; }
+.node-xianhuan { top: 58%; left: 18%; }
+.node-cthulhu { top: 28%; left: 72%; }
+.node-magic { top: 74%; left: 63%; }
+
+.shop-modal-section-header {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(31, 41, 55, 0.08);
+}
+
+.shop-modal-card {
+    border-radius: 20px;
+    border: 1px solid rgba(31, 41, 55, 0.08);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+
+.shop-modal-card.is-disabled {
+    opacity: 0.72;
+}
+
+.company-card-entry,
+.company-card-coast,
+.company-card-recycle {
+    overflow: hidden;
+}
+
+.company-card-entry {
+    background: linear-gradient(180deg, rgba(255, 248, 234, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.company-card-coast {
+    background: linear-gradient(180deg, rgba(232, 246, 255, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.company-card-recycle {
+    background: linear-gradient(180deg, rgba(245, 240, 232, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+/* 玩法页（zone 4~8）的 company-zone-card 主题色:
+   默认普通主题下显示;主题切换时由 body.theme-X .card 接管视觉。 */
+.company-card-expedition {
+    background: linear-gradient(180deg, rgba(225, 244, 255, 0.96), rgba(255, 255, 255, 0.98));
+    border-left: 4px solid #0f766e;
+}
+
+.company-card-scifi {
+    background: linear-gradient(180deg, rgba(220, 240, 255, 0.96), rgba(255, 255, 255, 0.98));
+    border-left: 4px solid #0085c7;
+}
+
+.company-card-xianhuan {
+    background: linear-gradient(180deg, rgba(240, 230, 220, 0.96), rgba(255, 255, 255, 0.98));
+    border-left: 4px solid #b22d3f;
+}
+
+.company-card-cthulhu {
+    background: linear-gradient(180deg, rgba(30, 22, 26, 0.96), rgba(16, 10, 14, 0.98));
+    border-left: 4px solid #c43232;
+    color: #c9c0a8;
+}
+.company-card-cthulhu h4,
+.company-card-cthulhu .text-muted { color: #c9c0a8 !important; }
+
+.company-card-magic {
+    background: linear-gradient(180deg, rgba(32, 20, 18, 0.96), rgba(20, 12, 10, 0.98));
+    border-left: 4px solid #f0d6a0;
+    color: #c5b18a;
+}
+.company-card-magic h4,
+.company-card-magic .text-muted { color: #c5b18a !important; }
+
+/* ============================================================
+   公司调度台 / 玩法页区域入口 — 横向大卡片
+   按钮组（商店 + 进入区域）固定在卡片右下角
+   ============================================================ */
+.company-zones-stack {
+    display: grid;
+    gap: 1rem;
+}
+
+.company-zone-card {
+    border-radius: 22px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.company-zone-card .card-body {
+    padding: 1.35rem 1.4rem;
+}
+
+.company-zone-shell {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 1.4rem;
+    min-height: 96px;
+}
+
+.company-zone-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.4rem;
+}
+
+.company-zone-description {
+    max-width: 60rem;
+    margin: 0;
+}
+
+.company-zone-actions {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    flex-wrap: wrap;
+}
+
+.company-zone-actions .btn {
+    min-height: 44px;
+    font-weight: 700;
+}
+
+.company-shop-button {
+    font-weight: 700;
+    box-shadow: 0 12px 28px rgba(191, 133, 10, 0.18);
+}
+
+.company-dispatch-title {
+    font-family: var(--serif, ui-serif, Georgia, "STKaiti", serif);
+    letter-spacing: 0.05em;
+}
+
+@media (max-width: 991.98px) {
+    .company-zone-shell {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .company-zone-actions {
+        justify-content: flex-end;
+        align-items: stretch;
+        flex-direction: row;
+    }
+    .company-zone-actions .btn { flex: 1 1 auto; }
+}
+
+.company-card-shop-banner {
+    padding: 1rem 1rem 0.95rem;
+    border-radius: 18px;
+    border: 1px solid rgba(31, 41, 55, 0.08);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+}
+
+.company-card-shop-kicker {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7a6a52;
+    margin-bottom: 0.2rem;
+}
+
+.company-card-shop-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2f2b24;
+    margin-bottom: 0.25rem;
+}
+
+.company-shop-button {
+    font-weight: 700;
+    box-shadow: 0 12px 28px rgba(191, 133, 10, 0.18);
+}
+
+#webuiActionModal.modal-stack-front {
+    z-index: 1085;
+}
+
+.modal-backdrop.modal-stack-front-backdrop {
+    z-index: 1080;
+}
+
+@media (max-width: 991.98px) {
+    .playmode-portal-shell {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .shop-map-backdrop {
+        min-height: auto;
+        display: grid;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+
+    .shop-map-backdrop::before {
+        display: none;
+    }
+
+    .shop-map-node {
+        position: static;
+        width: 100%;
+        min-width: 0;
+    }
 }

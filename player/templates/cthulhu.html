@@ -1,63 +1,492 @@
 {% extends "layout.html" %}
 
 {% block title %}深潜 - MetaFishing！{% endblock %}
+{% block body_class %}theme-cthulhu{% endblock %}
+
+{% block extra_css %}
+<style>
+.abyss-page-title {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+}
+.abyss-page-title .whisper {
+    font-size: 0.92rem;
+    color: var(--abyss-bone, #c9c0a8);
+    opacity: 0.75;
+    font-style: italic;
+    font-family: "Georgia", "STKaiti", serif;
+    letter-spacing: 0.04em;
+}
+
+.abyss-status-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem 2rem;
+    padding: 8px 0;
+    margin-bottom: 1.5rem;
+    border-top: 1px dashed rgba(196, 50, 50, 0.4);
+    border-bottom: 1px dashed rgba(196, 50, 50, 0.4);
+    font-family: "Georgia", monospace;
+    font-size: 0.85rem;
+    color: var(--abyss-bone, #c9c0a8);
+}
+.abyss-status-bar .stat-key {
+    opacity: 0.6;
+    margin-right: 0.4em;
+    letter-spacing: 0.08em;
+}
+.abyss-status-bar .stat-val {
+    font-weight: 700;
+    color: var(--abyss-blood, #b22838);
+    text-shadow: 0 0 6px rgba(196, 50, 50, 0.4);
+}
+
+.abyss-decision-wrap { max-width: 720px; margin: 0 auto 2rem; }
+.abyss-decision-card {
+    background:
+        radial-gradient(ellipse at center, rgba(50, 14, 18, 0.65), rgba(8, 4, 6, 0.92)),
+        repeating-linear-gradient(0deg, transparent 0 2px, rgba(50, 14, 18, 0.04) 2px 4px);
+    border: 1px solid rgba(196, 50, 50, 0.5);
+    box-shadow:
+        0 0 0 1px rgba(196, 50, 50, 0.15),
+        0 0 36px rgba(0, 0, 0, 0.7),
+        inset 0 0 28px rgba(60, 8, 12, 0.7);
+    padding: 2rem 1.8rem;
+    position: relative;
+    overflow: hidden;
+}
+.abyss-decision-card::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border: 1px dashed rgba(196, 50, 50, 0.18);
+    pointer-events: none;
+}
+.abyss-decision-title {
+    font-family: "Georgia", "STKaiti", serif;
+    font-size: 1.6rem;
+    font-style: italic;
+    letter-spacing: 0.4em;
+    color: var(--abyss-blood, #c43232);
+    text-shadow: 0 0 12px rgba(196, 50, 50, 0.5);
+    text-align: center;
+    margin-bottom: 1.2rem;
+    animation: abyss-title-pulse 5s ease-in-out infinite;
+}
+@keyframes abyss-title-pulse {
+    0%, 100% { text-shadow: 0 0 12px rgba(196, 50, 50, 0.5); }
+    50%      { text-shadow: 0 0 22px rgba(196, 50, 50, 0.9), 0 0 4px rgba(255, 100, 100, 0.6); }
+}
+.abyss-decision-scene-title {
+    font-family: "Georgia", serif;
+    color: var(--abyss-bone, #c9c0a8);
+    font-size: 1.15rem;
+    text-align: center;
+    margin-bottom: 0.6rem;
+    letter-spacing: 0.06em;
+}
+.abyss-decision-scene-text {
+    color: rgba(201, 192, 168, 0.78);
+    font-style: italic;
+    font-family: "Georgia", serif;
+    font-size: 0.92rem;
+    text-align: center;
+    line-height: 1.7;
+    margin-bottom: 1.4rem;
+}
+.abyss-choice {
+    display: block;
+    width: 100%;
+    padding: 0.85rem 1.2rem;
+    margin-bottom: 0.6rem;
+    background: rgba(20, 8, 12, 0.6);
+    border: 1px solid rgba(196, 50, 50, 0.4);
+    color: var(--abyss-bone, #c9c0a8);
+    font-family: "Georgia", "STKaiti", serif;
+    text-align: left;
+    cursor: pointer;
+    transition: all .3s;
+    position: relative;
+}
+.abyss-choice::before {
+    content: "✦";
+    position: absolute;
+    left: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(196, 50, 50, 0.4);
+    font-size: 0.7rem;
+    transition: all .3s;
+}
+.abyss-choice:hover {
+    background: rgba(60, 14, 18, 0.85);
+    border-color: var(--abyss-blood, #c43232);
+    color: #fff;
+    box-shadow: 0 0 14px rgba(196, 50, 50, 0.5);
+    padding-left: 1.6rem;
+}
+.abyss-choice:hover::before {
+    color: var(--abyss-blood, #c43232);
+    left: 0.85rem;
+}
+.abyss-choice .choice-text { font-size: 0.96rem; letter-spacing: 0.04em; }
+.abyss-choice .choice-prob { font-size: 0.78rem; opacity: 0.5; margin-left: 0.6rem; font-family: monospace; }
+.abyss-decision-current {
+    text-align: center;
+    margin-top: 0.9rem;
+    font-size: 0.82rem;
+    color: rgba(201, 192, 168, 0.4);
+    font-style: italic;
+}
+.abyss-decision-empty {
+    text-align: center;
+    font-family: "Georgia", serif;
+    font-style: italic;
+    color: rgba(201, 192, 168, 0.4);
+    padding: 1.5rem 0;
+    letter-spacing: 0.12em;
+}
+
+.abyss-naming-wrap { max-width: 820px; margin: 0 auto 2rem; }
+.abyss-naming-title {
+    font-family: "Georgia", "STKaiti", serif;
+    font-style: italic;
+    text-align: center;
+    color: var(--abyss-bone, #c9c0a8);
+    letter-spacing: 0.16em;
+    margin-bottom: 1rem;
+    font-size: 1.05rem;
+    opacity: 0.85;
+}
+.abyss-naming-section { margin-bottom: 1.4rem; }
+.abyss-naming-section-label {
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    color: rgba(196, 50, 50, 0.65);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px dotted rgba(196, 50, 50, 0.25);
+    padding-bottom: 4px;
+}
+.abyss-true-name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid rgba(196, 50, 50, 0.15);
+    background: rgba(20, 8, 12, 0.4);
+    margin-bottom: 6px;
+    font-family: "Georgia", "STKaiti", serif;
+    font-size: 0.88rem;
+    color: var(--abyss-bone, #c9c0a8);
+}
+.abyss-true-name-row.in-progress { opacity: 0.5; font-style: italic; }
+.abyss-true-name-string { flex: 1; letter-spacing: 0.05em; }
+.abyss-true-name-meta { font-size: 0.74rem; opacity: 0.55; margin-left: 0.8rem; }
+.abyss-call-btn {
+    background: transparent;
+    border: 1px solid var(--abyss-blood, #c43232);
+    color: var(--abyss-blood, #c43232);
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    font-family: "Georgia", serif;
+    cursor: pointer;
+    transition: all .25s;
+}
+.abyss-call-btn:hover {
+    background: var(--abyss-blood, #c43232);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(196, 50, 50, 0.5);
+}
+.abyss-call-progress {
+    text-align: center;
+    font-family: "Georgia", "STKaiti", serif;
+    font-style: italic;
+    font-size: 0.92rem;
+    color: rgba(201, 192, 168, 0.6);
+    padding: 0.8rem 0;
+    letter-spacing: 0.08em;
+}
+.abyss-vote-row { display: flex; gap: 8px; margin-top: 0.8rem; }
+.abyss-vote-row input {
+    flex: 1;
+    background: rgba(20, 8, 12, 0.6);
+    border: 1px solid rgba(196, 50, 50, 0.4);
+    color: var(--abyss-bone, #c9c0a8);
+    padding: 6px 10px;
+    font-family: "Georgia", serif;
+    font-style: italic;
+}
+.abyss-vote-row input:focus {
+    outline: none;
+    border-color: var(--abyss-blood, #c43232);
+    box-shadow: 0 0 8px rgba(196, 50, 50, 0.4);
+}
+
+.abyss-sigil-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    max-width: 920px;
+    margin: 2rem auto 1rem;
+}
+.abyss-sigil-block { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.abyss-sigil-svg {
+    width: 96px;
+    height: 96px;
+    cursor: pointer;
+    transition: all .35s;
+    filter: drop-shadow(0 0 8px rgba(196, 50, 50, 0.3));
+}
+.abyss-sigil-svg:hover {
+    transform: scale(1.06);
+    filter: drop-shadow(0 0 16px rgba(196, 50, 50, 0.7));
+}
+.abyss-sigil-block.is-active .abyss-sigil-svg {
+    filter: drop-shadow(0 0 22px rgba(196, 50, 50, 0.9));
+    animation: abyss-sigil-spin 12s linear infinite;
+}
+@keyframes abyss-sigil-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+.abyss-sigil-name {
+    margin-top: 0.6rem;
+    font-family: "Georgia", "STKaiti", serif;
+    font-size: 0.95rem;
+    color: var(--abyss-bone, #c9c0a8);
+    letter-spacing: 0.1em;
+}
+.abyss-sigil-block.is-active .abyss-sigil-name {
+    color: var(--abyss-blood, #c43232);
+    text-shadow: 0 0 8px rgba(196, 50, 50, 0.5);
+}
+.abyss-sigil-tiers {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 0.5rem;
+    width: 100%;
+    max-width: 140px;
+}
+.abyss-tier-btn {
+    background: transparent;
+    border: 1px solid rgba(196, 50, 50, 0.2);
+    color: rgba(201, 192, 168, 0.65);
+    font-size: 0.74rem;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: "Georgia", serif;
+    letter-spacing: 0.06em;
+}
+.abyss-tier-btn:hover { border-color: var(--abyss-blood, #c43232); color: var(--abyss-bone, #c9c0a8); }
+.abyss-tier-btn.is-selected {
+    background: rgba(196, 50, 50, 0.18);
+    border-color: var(--abyss-blood, #c43232);
+    color: var(--abyss-bone, #c9c0a8);
+    box-shadow: inset 0 0 8px rgba(196, 50, 50, 0.25);
+}
+
+.abyss-authority-detail {
+    max-width: 720px;
+    margin: 1rem auto 2rem;
+    padding: 1.2rem 1.4rem;
+    background: radial-gradient(ellipse at center, rgba(50, 14, 18, 0.4), rgba(8, 4, 6, 0.7));
+    border-top: 1px solid rgba(196, 50, 50, 0.3);
+    border-bottom: 1px solid rgba(196, 50, 50, 0.3);
+    font-family: "Georgia", "STKaiti", serif;
+    color: var(--abyss-bone, #c9c0a8);
+    min-height: 120px;
+    display: none;
+}
+.abyss-authority-detail.is-visible { display: block; }
+.abyss-authority-detail .detail-title {
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    color: rgba(196, 50, 50, 0.7);
+    margin-bottom: 0.6rem;
+    text-align: center;
+}
+.abyss-authority-detail .holder-line {
+    font-size: 0.92rem;
+    text-align: center;
+    margin-bottom: 0.6rem;
+}
+.abyss-authority-detail .holder-line strong { color: var(--abyss-blood, #c43232); }
+.abyss-authority-detail .effect-text {
+    font-style: italic;
+    text-align: center;
+    line-height: 1.7;
+    color: rgba(201, 192, 168, 0.85);
+    margin-bottom: 1rem;
+}
+.abyss-authority-detail .pray-row { text-align: center; }
+.abyss-authority-detail .pray-btn {
+    background: rgba(60, 14, 18, 0.7);
+    border: 1px solid var(--abyss-blood, #c43232);
+    color: var(--abyss-blood, #c43232);
+    padding: 8px 26px;
+    letter-spacing: 0.3em;
+    font-family: "Georgia", "STKaiti", serif;
+    cursor: pointer;
+    transition: all .3s;
+}
+.abyss-authority-detail .pray-btn:not(:disabled):hover {
+    background: var(--abyss-blood, #c43232);
+    color: #fff;
+    box-shadow: 0 0 18px rgba(196, 50, 50, 0.7);
+}
+.abyss-authority-detail .pray-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+    .abyss-sigil-row { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-3">
     <div class="col-12">
-        <h2 class="mb-0"><i class="fas fa-water"></i> 克苏鲁深潜</h2>
-        <p class="text-muted mt-2">个人深潜、真名呼唤、全服权柄与永久污染。</p>
+        <h2 class="abyss-page-title mb-0">
+            <span><i class="fas fa-water"></i> 深潜</span>
+            <small class="whisper">呼唤吧，呼唤吧，潜入深渊，呼唤真神，夺取非人之权柄。</small>
+        </h2>
     </div>
 </div>
 
-<div class="row g-4">
-    <div class="col-lg-4">
-        <div class="card h-100">
-            <div class="card-header"><strong>理智与深潜</strong></div>
-            <div class="card-body" id="cthulhuStateCard"></div>
-        </div>
-    </div>
-    <div class="col-lg-8">
-        <div class="card h-100">
-            <div class="card-header"><strong>待抉择事件</strong></div>
-            <div class="card-body" id="cthulhuEventCard"></div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-4 mt-1">
-    <div class="col-lg-6">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <strong>我的真名</strong>
-                <button class="btn btn-sm btn-outline-primary" onclick="refreshCthulhu()">刷新</button>
+{% if zone_card %}
+{% set zone = zone_card %}
+<div class="company-zones-stack mb-3">
+    <div class="card company-zone-card {{ zone.accent_class }} {% if zone.is_current %}border-primary{% endif %}">
+        <div class="card-body">
+            <div class="company-zone-shell">
+                <div class="company-zone-copy">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h4 class="mb-0">{{ zone.name }}</h4>
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-coins"></i> {{ "{:,}".format(zone.fishing_cost) }} 金币/次
+                        </span>
+                        {% if zone.required_pass %}
+                        <span class="badge text-bg-warning-subtle border border-warning-subtle text-warning-emphasis">
+                            <i class="fas fa-ticket-alt"></i> 需要：{{ zone.required_pass }}
+                        </span>
+                        {% else %}
+                        <span class="badge text-bg-success">
+                            <i class="fas fa-unlock"></i> 自由进入
+                        </span>
+                        {% endif %}
+                        {% if zone.is_current %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis">
+                            <i class="fas fa-check-circle"></i> 当前驻留
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p class="company-zone-description text-muted mb-3">{{ zone.description }}</p>
+                </div>
+                <div class="company-zone-actions">
+                    <button class="btn btn-warning company-shop-button" type="button" onclick='openShopCatalog({{ zone.shop_scope|tojson }}, {{ zone.shop_name|tojson }})'>
+                        <i class="fas fa-store"></i> {{ zone.shop_name }}
+                    </button>
+                    {% if zone.is_current %}
+                    <button class="btn btn-secondary" type="button" disabled>
+                        <i class="fas fa-check"></i> 已在此区域
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary" type="button" onclick='goToPortalZone({{ zone.id }}, {{ zone.name|tojson }})'>
+                        <i class="fas fa-arrow-right"></i> 进入区域
+                    </button>
+                    {% endif %}
+                </div>
             </div>
-            <div class="card-body" id="cthulhuNamesCard"></div>
         </div>
     </div>
-    <div class="col-lg-6">
-        <div class="card h-100">
-            <div class="card-header"><strong>进行中的呼唤</strong></div>
-            <div class="card-body" id="cthulhuCallsCard"></div>
+</div>
+{% endif %}
+
+<div class="abyss-status-bar" id="abyssStatusBar"></div>
+
+<div class="abyss-decision-wrap">
+    <div class="abyss-decision-card" id="cthulhuEventCard"></div>
+</div>
+
+<div class="abyss-naming-wrap">
+    <div class="card">
+        <div class="card-header" style="text-align:center;">
+            <span class="abyss-naming-title">深渊埋葬着它之真名……</span>
         </div>
+        <div class="card-body" id="cthulhuNamingCard"></div>
     </div>
 </div>
 
-<div class="row g-4 mt-1">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header"><strong>权柄展板</strong></div>
-            <div class="card-body" id="cthulhuAuthorityCard"></div>
-        </div>
-    </div>
-</div>
+<div class="abyss-sigil-row" id="abyssSigilRow"></div>
+
+<div class="abyss-authority-detail" id="abyssAuthorityDetail"></div>
 
 <script id="cthulhuInitialData" type="application/json">{{ initial_view|tojson }}</script>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+        <symbol id="sigil-predict" viewBox="0 0 100 100">
+            <polygon points="50,8 92,84 8,84" fill="none" stroke="#c43232" stroke-width="2"/>
+            <polygon points="50,22 80,76 20,76" fill="none" stroke="#c43232" stroke-width="1" opacity="0.6"/>
+            <ellipse cx="50" cy="58" rx="18" ry="10" fill="none" stroke="#c43232" stroke-width="1.5"/>
+            <circle cx="50" cy="58" r="5" fill="#c43232"/>
+            <circle cx="50" cy="58" r="2" fill="#0a0405"/>
+        </symbol>
+        <symbol id="sigil-time" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#c43232" stroke-width="1.5"/>
+            <path d="M 30,20 L 70,20 L 30,80 L 70,80 Z" fill="none" stroke="#c43232" stroke-width="2"/>
+            <path d="M 50,50 m 0,-14 a 14,14 0 1,1 -0.01,0" fill="none" stroke="#c43232" stroke-width="1" opacity="0.7"/>
+            <circle cx="50" cy="50" r="3" fill="#c43232"/>
+        </symbol>
+        <symbol id="sigil-pollute" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#c43232" stroke-width="1.5" opacity="0.85"/>
+            <path d="M 50,22 Q 36,40 40,58 Q 44,72 30,82" fill="none" stroke="#c43232" stroke-width="2" stroke-linecap="round"/>
+            <path d="M 50,22 Q 64,40 60,58 Q 56,72 70,82" fill="none" stroke="#c43232" stroke-width="2" stroke-linecap="round"/>
+            <path d="M 50,22 Q 50,46 50,70 Q 50,80 50,84" fill="none" stroke="#c43232" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="30" cy="82" r="2" fill="#c43232"/>
+            <circle cx="50" cy="84" r="2" fill="#c43232"/>
+            <circle cx="70" cy="82" r="2" fill="#c43232"/>
+        </symbol>
+        <symbol id="sigil-sacrifice" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#c43232" stroke-width="1.5"/>
+            <polygon points="50,92 78,18 12,62 88,62 22,18" fill="none" stroke="#c43232" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M 50,40 Q 44,52 50,58 Q 56,52 50,40 Z" fill="#c43232"/>
+        </symbol>
+    </defs>
+</svg>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 let cthulhuView = JSON.parse(document.getElementById('cthulhuInitialData').textContent);
+let selectedAuthority = null;
+let lastCallProgress = null;
+
+const GOD_NAMES = {
+    predict:   '预知权柄',
+    time:      '时间权柄',
+    pollute:   '污染权柄',
+    sacrifice: '献祭权柄',
+};
+const GOD_SIGIL = {
+    predict:   'sigil-predict',
+    time:      'sigil-time',
+    pollute:   'sigil-pollute',
+    sacrifice: 'sigil-sacrifice',
+};
+const TIER_DESC = { upper: '上位', middle: '中位', lower: '下位' };
+const AUTHORITY_EFFECT_TEXT = {
+    predict:   '在潮水尚未涌至岸边时，先于他人窥见明日之鱼。',
+    time:      '令一次夜潮多活几息，时间在祈求者面前略作迟疑。',
+    pollute:   '将自身受到的注视，轻轻拨向另一名渔人。',
+    sacrifice: '以自身一缕清明，换取一次暴烈的，无悔的改写。',
+};
 
 async function refreshCthulhu() {
     const response = await fetch('{{ url_for("player_bp.cthulhu_api_state") }}');
@@ -80,7 +509,15 @@ async function chooseCthulhu(choiceId) {
 async function startCalling(nameId) {
     const response = await fetch(`/player/api/cthulhu/names/${nameId}/call`, {method: 'POST'});
     const data = await response.json();
-    showToast(data.message || (data.success ? '已发起呼唤' : '操作失败'), data.success ? 'success' : 'error');
+    if (data.success) {
+        lastCallProgress = {
+            text: '向深渊呼唤它之真名，然后静候回应……',
+            current: data.progress ?? data.current ?? 1,
+            threshold: data.threshold ?? 30,
+        };
+    } else {
+        showToast(data.message || '操作失败', 'error');
+    }
     await refreshCthulhu();
 }
 
@@ -92,21 +529,45 @@ async function voteCall() {
         body: JSON.stringify({name_string: input.value.trim()}),
     });
     const data = await response.json();
-    showToast(data.message || (data.success ? '呼唤成功' : '呼唤失败'), data.success ? 'success' : 'error');
-    if (data.success) input.value = '';
+    if (data.success) {
+        lastCallProgress = {
+            text: '向深渊呼唤它之真名，然后静候回应……',
+            current: data.progress ?? 1,
+            threshold: data.threshold ?? 30,
+        };
+        input.value = '';
+    } else {
+        showToast(data.message || '呼唤失败', 'error');
+    }
     await refreshCthulhu();
 }
 
-async function useAuthority(authorityId) {
-    if (authorityId.startsWith('time_') || authorityId.startsWith('pollute_')) {
-        const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})});
+function selectSigil(godType, tier) {
+    selectedAuthority = { godType, tier };
+    renderCthulhu();
+}
+
+async function prayAuthority() {
+    if (!selectedAuthority) return;
+    const { godType, tier } = selectedAuthority;
+    const authorityId = `${godType}_${tier}`;
+    if (godType === 'time' || godType === 'pollute') {
+        const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({})
+        });
         const data = await response.json();
         showToast(data.message || (data.success ? '权柄已发动' : '权柄使用失败'), data.success ? 'success' : 'error');
         await refreshCthulhu();
         return;
     }
-    if (authorityId.startsWith('predict_')) {
-        const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})});
+    if (godType === 'predict') {
+        const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({})
+        });
         const data = await response.json();
         if (!data.success) {
             showToast(data.message || '权柄使用失败', 'error');
@@ -118,14 +579,14 @@ async function useAuthority(authorityId) {
         const confirmResponse = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({candidate_index: Number(choice) - 1}),
+            body: JSON.stringify({candidate_index: Number(choice) - 1})
         });
         const confirmData = await confirmResponse.json();
         showToast(confirmData.message || (confirmData.success ? '已确认预知' : '确认失败'), confirmData.success ? 'success' : 'error');
         await refreshCthulhu();
         return;
     }
-    if (authorityId.startsWith('sacrifice_')) {
+    if (godType === 'sacrifice') {
         const itemType = prompt('请输入献祭类型：rod / accessory / bait / item');
         if (!itemType) return;
         const token = prompt('请输入标识：鱼竿/饰品可用实例 ID 或短码，其余用模板 ID');
@@ -133,7 +594,7 @@ async function useAuthority(authorityId) {
         const response = await fetch(`/player/api/cthulhu/authority/${authorityId}/use`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({item_type: itemType, token}),
+            body: JSON.stringify({item_type: itemType, token})
         });
         const data = await response.json();
         showToast(data.message || (data.success ? '献祭成功' : '献祭失败'), data.success ? 'success' : 'error');
@@ -143,94 +604,115 @@ async function useAuthority(authorityId) {
 
 function renderCthulhu() {
     const state = cthulhuView.state || {};
-    const godLabels = {predict: '预知权柄', time: '时间权柄', pollute: '污染权柄', sacrifice: '献祭权柄'};
-    document.getElementById('cthulhuStateCard').innerHTML = `
-        <p class="mb-2">SAN：<strong>${state.current_san}/${state.max_san}</strong></p>
-        <p class="mb-2">今日深潜：${state.is_in_deepdive_today ? '已开启' : '未开启'}</p>
-        <p class="mb-0">可见污染：${(cthulhuView.visible_pollutions?.visible_pollutions || []).join(', ') || '无'}</p>
+
+    const visiblePoll = (cthulhuView.visible_pollutions?.visible_pollutions || []);
+    document.getElementById('abyssStatusBar').innerHTML = `
+        <span><span class="stat-key">SAN</span><span class="stat-val">${state.current_san}/${state.max_san}</span></span>
+        <span><span class="stat-key">今日深潜</span><span class="stat-val">${state.is_in_deepdive_today ? '已开启' : '未开启'}</span></span>
+        <span><span class="stat-key">可见污染</span><span class="stat-val">${visiblePoll.length ? visiblePoll.join('、') : '无'}</span></span>
     `;
 
     const pending = cthulhuView.pending_event;
+    const evCard = document.getElementById('cthulhuEventCard');
     if (!pending) {
-        document.getElementById('cthulhuEventCard').innerHTML = '<p class="text-muted mb-0">当前没有待抉择事件。</p>';
+        evCard.innerHTML = `
+            <div class="abyss-decision-title">抉择</div>
+            <div class="abyss-decision-empty">寂静——深渊暂未投下凝视。</div>
+        `;
     } else {
-        const choiceButtons = pending.choices.map(choice => `
-            <button class="btn btn-sm btn-outline-primary me-2 mb-2" onclick="chooseCthulhu('${choice.choice_id}')">
-                ${choice.choice_id}. ${choice.label}
+        const choices = pending.choices.map(c => `
+            <button class="abyss-choice" onclick="chooseCthulhu('${c.choice_id}')">
+                <span class="choice-text">${c.choice_id}. ${c.label}</span>
+                <span class="choice-prob">${Number(c.probability_percent || 0).toFixed(1)}%</span>
             </button>
         `).join('');
-        document.getElementById('cthulhuEventCard').innerHTML = `
-            <h5>${pending.title}</h5>
-            <p class="text-muted">${pending.scene_text}</p>
-            <div>${choiceButtons}</div>
-            <p class="mb-0">当前选择：${cthulhuView.pending_choice || '未选择'}</p>
+        evCard.innerHTML = `
+            <div class="abyss-decision-title">抉择</div>
+            <div class="abyss-decision-scene-title">${pending.title}</div>
+            <div class="abyss-decision-scene-text">${pending.scene_text}</div>
+            ${choices}
+            ${cthulhuView.pending_choice ? `<div class="abyss-decision-current">当前选择：${cthulhuView.pending_choice}</div>` : ''}
         `;
     }
 
     const trueNames = cthulhuView.true_names || [];
-    document.getElementById('cthulhuNamesCard').innerHTML = trueNames.length ? `
-        <div class="list-group">
-            ${trueNames.map(name => `
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-start gap-2">
-                        <div>
-                            <div><strong>#${name.name_id}</strong> ${name.name_string}</div>
-                            <div class="small text-muted">${godLabels[name.god_type] || name.god_type} · ${name.tier_label || name.tier} · ${name.status}</div>
-                        </div>
-                        ${name.status === 'in_inventory' ? `<button class="btn btn-sm btn-primary" onclick="startCalling(${name.name_id})">发起呼唤</button>` : ''}
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    ` : '<p class="text-muted mb-0">你当前没有真名。</p>';
+    const activeCalls = cthulhuView.active_calls || [];
 
-    const calls = cthulhuView.active_calls || [];
-    document.getElementById('cthulhuCallsCard').innerHTML = `
-        <div class="mb-3">
-            <div class="input-group">
-                <input id="cthulhuVoteInput" class="form-control" placeholder="输入精确真名字符串">
-                <button class="btn btn-primary" onclick="voteCall()">呼唤</button>
+    const namesHtml = trueNames.length ? trueNames.map(name => `
+        <div class="abyss-true-name-row">
+            <span class="abyss-true-name-string">${name.name_string}</span>
+            <span class="abyss-true-name-meta">${name.tier_label || ''} · ${name.status}</span>
+            ${name.status === 'in_inventory' ? `<button class="abyss-call-btn" onclick="startCalling(${name.name_id})">发起呼唤</button>` : ''}
+        </div>
+    `).join('') : '<div class="abyss-call-progress">你尚未持有任何真名。</div>';
+
+    const callsHtml = activeCalls.length ? activeCalls.map(call => `
+        <div class="abyss-true-name-row in-progress">
+            <span class="abyss-true-name-string">??? ??? ???</span>
+            <span class="abyss-true-name-meta">${call.tier_label || ''} · ${call.progress}/${call.threshold}</span>
+        </div>
+    `).join('') : '<div class="abyss-call-progress">深渊一时寂静，无人在呼唤。</div>';
+
+    const progressLine = lastCallProgress
+        ? `<div class="abyss-call-progress">${lastCallProgress.text}（${lastCallProgress.current}/${lastCallProgress.threshold}）</div>`
+        : '';
+
+    document.getElementById('cthulhuNamingCard').innerHTML = `
+        <div class="abyss-naming-section">
+            <div class="abyss-naming-section-label">◆ 我的真名</div>
+            ${namesHtml}
+        </div>
+        <div class="abyss-naming-section">
+            <div class="abyss-naming-section-label">◆ 进行中的呼唤</div>
+            ${callsHtml}
+            ${progressLine}
+            <div class="abyss-vote-row">
+                <input id="cthulhuVoteInput" placeholder="低语：输入精确真名字符串……">
+                <button class="abyss-call-btn" onclick="voteCall()">呼唤</button>
             </div>
         </div>
-        ${calls.length ? calls.map(call => `
-            <div class="border rounded p-2 mb-2">
-                <div><strong>${call.name_string}</strong></div>
-                <div class="small text-muted"><span class="cthulhu-player-name" data-cthulhu-name="${call.owner_nickname || call.owner_user_id}">${call.owner_nickname || call.owner_user_id}</span> · ${godLabels[call.god_type] || call.god_type} · ${call.tier_label || call.tier}</div>
-                <div class="mt-1">${call.progress}/${call.threshold}</div>
-            </div>
-        `).join('') : '<p class="text-muted mb-0">当前没有呼唤进行中。</p>'}
     `;
 
-    const ownedSet = new Set((cthulhuView.owned_authorities || []).map(item => item.authority_id));
     const sections = cthulhuView.authority_board_sections || [];
-    document.getElementById('cthulhuAuthorityCard').innerHTML = sections.length ? `
-        <div class="row g-3">
-            ${sections.map(section => `
-                <div class="col-lg-3 col-md-6">
-                    <div class="border rounded-4 h-100 p-3 authority-board-column">
-                        <div class="mb-3">
-                            <div class="fw-semibold">${section.title}</div>
-                            <div class="small text-muted">${section.subtitle}</div>
-                        </div>
-                        <div class="d-grid gap-2">
-                            ${section.tiers.map(authority => `
-                                <div class="border rounded-3 p-2 authority-board-tier">
-                                    <div class="d-flex justify-content-between align-items-start gap-2">
-                                        <div>
-                                            <div class="fw-semibold">${authority.tier_label}</div>
-                                            <div class="small text-muted">现任：<span class="cthulhu-player-name" data-cthulhu-name="${authority.holder_label}">${authority.holder_label}</span></div>
-                                            <div class="small text-muted">上一任：<span class="cthulhu-player-name" data-cthulhu-name="${authority.previous_holder_label}">${authority.previous_holder_label}</span></div>
-                                        </div>
-                                        ${ownedSet.has(authority.authority_id) ? `<button class="btn btn-sm btn-outline-danger" onclick="useAuthority('${authority.authority_id}')">使用</button>` : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    ` : '<p class="text-muted mb-0">暂无权柄数据。</p>';
+    const ownedSet = new Set((cthulhuView.owned_authorities || []).map(it => it.authority_id));
+    document.getElementById('abyssSigilRow').innerHTML = sections.map(section => {
+        const isActive = selectedAuthority && selectedAuthority.godType === section.god_type;
+        const tiersHtml = section.tiers.map(t => {
+            const isSelTier = isActive && selectedAuthority.tier === t.tier;
+            return `<button class="abyss-tier-btn ${isSelTier ? 'is-selected' : ''}"
+                            onclick="selectSigil('${section.god_type}','${t.tier}')">${t.tier_label || TIER_DESC[t.tier] || t.tier}</button>`;
+        }).join('');
+        return `
+            <div class="abyss-sigil-block ${isActive ? 'is-active' : ''}">
+                <svg class="abyss-sigil-svg" onclick="selectSigil('${section.god_type}','${(selectedAuthority && selectedAuthority.godType===section.god_type) ? selectedAuthority.tier : section.tiers[0].tier}')">
+                    <use href="#${GOD_SIGIL[section.god_type]}"/>
+                </svg>
+                <div class="abyss-sigil-name">${GOD_NAMES[section.god_type]}</div>
+                <div class="abyss-sigil-tiers">${tiersHtml}</div>
+            </div>`;
+    }).join('');
+
+    const detail = document.getElementById('abyssAuthorityDetail');
+    if (selectedAuthority) {
+        const section = sections.find(s => s.god_type === selectedAuthority.godType);
+        const tierRow = section && section.tiers.find(t => t.tier === selectedAuthority.tier);
+        const authorityId = `${selectedAuthority.godType}_${selectedAuthority.tier}`;
+        const owned = ownedSet.has(authorityId);
+        const tierLabel = tierRow?.tier_label || TIER_DESC[selectedAuthority.tier] || selectedAuthority.tier;
+        detail.classList.add('is-visible');
+        detail.innerHTML = `
+            <div class="detail-title">${GOD_NAMES[selectedAuthority.godType]} · ${tierLabel}</div>
+            <div class="holder-line">现任：<strong>${tierRow?.holder_label || '暂无持有者'}</strong></div>
+            <div class="effect-text">${AUTHORITY_EFFECT_TEXT[selectedAuthority.godType] || ''}</div>
+            <div class="pray-row">
+                <button class="pray-btn" ${owned ? '' : 'disabled'} onclick="prayAuthority()">祈 求</button>
+                ${owned ? '' : '<div class="abyss-call-progress" style="margin-top:0.6rem; font-size:0.78rem;">尚未持有此权柄，无法祈求。</div>'}
+            </div>
+        `;
+    } else {
+        detail.classList.remove('is-visible');
+        detail.innerHTML = '';
+    }
 }
 
 renderCthulhu();

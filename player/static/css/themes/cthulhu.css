@@ -1,0 +1,852 @@
+/* ============================================================
+   克苏鲁·深渊凝视主题（区域 7 全站皮肤）
+   触发：body.theme-cthulhu（玩家所在区域=7 时由 layout 自动添加）
+   优先级：低于 .has-cthulhu-pollution（"污染态"额外覆盖此主题）
+
+   设计目标：洛夫克拉夫特式 · 深渊海底神祇凝视
+   色彩：墨黑 + 深海青 + 腐绿 + 薄血红 + 蛀紫
+   ============================================================ */
+
+body.theme-cthulhu {
+    /* —— 深渊色板 —— */
+    --abyss-black: #03070b;           /* 海底墨黑 */
+    --abyss-deep: #06121a;            /* 深渊蓝黑 */
+    --abyss-water: #0c1f2b;           /* 深海青 */
+    --abyss-water-soft: #1a3a4a;
+    --abyss-teal: #2e8a8d;            /* 海青·神祇虹彩 */
+    --abyss-teal-glow: rgba(46, 138, 141, 0.45);
+    --abyss-bone: #c9c0a8;            /* 骨白 / 沉没古卷 */
+    --abyss-bone-dim: #8e8675;
+    --abyss-flesh: #b88e7a;            /* 腐肉色 */
+    --abyss-blood: #8a1f2a;            /* 薄血红 */
+    --abyss-blood-bright: #c43232;
+    --abyss-blood-soft: rgba(138, 31, 42, 0.42);
+    --abyss-rot: #4a6b3d;              /* 腐绿·苔藓 */
+    --abyss-violet: #5a3a7a;           /* 蛀紫 */
+    --abyss-violet-soft: rgba(90, 58, 122, 0.4);
+    --abyss-line: rgba(46, 138, 141, 0.30);
+    --abyss-line-strong: rgba(46, 138, 141, 0.55);
+    --abyss-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(46, 138, 141, 0.15),
+        inset 0 0 36px rgba(6, 18, 26, 0.45);
+
+    /* 重定向通用变量，让旧组件在深渊里也读得清 */
+    --muted: #8e8675;
+    --ink: #c9c0a8;
+    --hairline: rgba(46, 138, 141, 0.22);
+
+    color: var(--abyss-bone);
+    font-family: "EB Garamond", "Cormorant Garamond", "Georgia", "Songti SC", "STSong", serif;
+    letter-spacing: 0.02em;
+}
+
+/* 在 zone-7 漩涡之上叠加深渊色调 + 暗潮波动 */
+body.theme-cthulhu::after {
+    background-image:
+        /* 顶层：极暗罩 + 边缘血雾 */
+        radial-gradient(ellipse 95% 70% at 50% 45%, transparent 0%, rgba(3, 7, 11, 0.62) 70%, rgba(3, 7, 11, 0.93) 100%),
+        /* 边缘血色侵蚀（四角） */
+        radial-gradient(circle at 0% 0%, rgba(138, 31, 42, 0.32), transparent 28%),
+        radial-gradient(circle at 100% 0%, rgba(138, 31, 42, 0.30), transparent 28%),
+        radial-gradient(circle at 0% 100%, rgba(138, 31, 42, 0.28), transparent 32%),
+        radial-gradient(circle at 100% 100%, rgba(138, 31, 42, 0.34), transparent 32%),
+        /* 海青冷光环 */
+        radial-gradient(ellipse 45% 45% at 50% 50%, rgba(46, 138, 141, 0.18), transparent 60%),
+        /* 底图：zone-7 漩涡 */
+        url("../../img/zones/zone-7.png");
+    background-size: cover, cover, cover, cover, cover, cover, cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 1;
+    animation: abyss-undulate 7s ease-in-out infinite;
+}
+@keyframes abyss-undulate {
+    0%, 100% { filter: brightness(0.85) hue-rotate(0deg) saturate(1.1); }
+    50%      { filter: brightness(1.00) hue-rotate(-8deg) saturate(1.25); }
+}
+
+/* ============================================================
+   血雾层：屏幕周期性渗血（独立心跳）
+   位于 body::after 的 zone 图之上、内容之下
+   ============================================================ */
+body.theme-cthulhu::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background:
+        radial-gradient(ellipse 120% 80% at 50% 50%, transparent 45%, rgba(138, 31, 42, 0.35) 88%, rgba(138, 31, 42, 0.70) 100%);
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+    animation: abyss-heartbeat 5.5s ease-in-out infinite;
+}
+@keyframes abyss-heartbeat {
+    0%, 100% { opacity: 0.28; }
+    8%       { opacity: 0.75; }
+    16%      { opacity: 0.40; }
+    22%      { opacity: 0.90; }
+    32%      { opacity: 0.32; }
+}
+
+/* ============================================================
+   背景层：浮动眼球（HTML 元素，JS 控制瞳孔；display 由主题决定）
+   非克苏鲁主题/区域时 .abyss-eye 默认 display:none（见底部默认规则）
+   ============================================================ */
+body.theme-cthulhu .abyss-eye {
+    display: block;
+    position: fixed;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.42;
+    filter:
+        drop-shadow(0 0 18px rgba(196, 50, 50, 0.55))
+        drop-shadow(0 0 38px rgba(138, 31, 42, 0.4));
+    animation: abyss-eye-blink 9s ease-in-out infinite;
+}
+body.theme-cthulhu .abyss-eye-1 {
+    top: 11%;
+    left: 4%;
+    width: 200px;
+    height: 200px;
+}
+body.theme-cthulhu .abyss-eye-2 {
+    top: 60%;
+    right: 4%;
+    width: 150px;
+    height: 150px;
+    opacity: 0.36;
+    animation-delay: 4s;
+}
+body.theme-cthulhu .abyss-eye-3 {
+    top: 32%;
+    right: 24%;
+    width: 90px;
+    height: 90px;
+    opacity: 0.3;
+    animation-delay: 2.5s;
+}
+@keyframes abyss-eye-blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    94%, 98%      { transform: scaleY(0.08); }
+}
+/* 眼球瞳孔（由 JS 实时移动 transform） */
+.abyss-eye .abyss-pupil {
+    transition: transform 0.12s ease-out;
+    transform-origin: center;
+    transform-box: fill-box;
+}
+
+/* ============================================================
+   背景层：触手剪影已移除（视觉效果不佳）
+   ============================================================ */
+
+/* ============================================================
+   全局段落 / 链接 / hr / 标题
+   ============================================================ */
+body.theme-cthulhu p { color: var(--abyss-bone); }
+body.theme-cthulhu a {
+    color: var(--abyss-teal);
+    text-decoration: none;
+}
+body.theme-cthulhu a:hover {
+    color: var(--abyss-blood-bright);
+    text-shadow: 0 0 8px var(--abyss-blood-soft);
+}
+body.theme-cthulhu hr { border-color: var(--abyss-line); opacity: 0.6; }
+
+body.theme-cthulhu .player-main h1,
+body.theme-cthulhu .player-main h2,
+body.theme-cthulhu .player-main h3,
+body.theme-cthulhu .player-main h4,
+body.theme-cthulhu .player-main h5,
+body.theme-cthulhu .player-main h6 {
+    color: var(--abyss-bone);
+    font-family: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 14px rgba(46, 138, 141, 0.22);
+}
+
+/* ============================================================
+   顶栏
+   ============================================================ */
+body.theme-cthulhu .player-topbar {
+    background:
+        linear-gradient(180deg, rgba(3, 7, 11, 0.94), rgba(6, 18, 26, 0.94)) !important;
+    border-bottom: 1px solid var(--abyss-line-strong);
+    box-shadow:
+        0 2px 16px rgba(0, 0, 0, 0.65),
+        0 -1px 0 rgba(46, 138, 141, 0.18) inset;
+    backdrop-filter: blur(10px);
+}
+body.theme-cthulhu .player-topbar.navbar-light .navbar-brand,
+body.theme-cthulhu .player-topbar.navbar-light .navbar-nav .nav-link,
+body.theme-cthulhu .player-topbar.navbar-light .nav-link.dropdown-toggle,
+body.theme-cthulhu .player-topbar .navbar-brand,
+body.theme-cthulhu .player-topbar .navbar-nav .nav-link {
+    color: var(--abyss-bone) !important;
+    font-family: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
+    letter-spacing: 0.04em;
+}
+body.theme-cthulhu .player-topbar .navbar-brand {
+    color: var(--abyss-teal) !important;
+    font-weight: 600;
+    text-shadow: 0 0 12px var(--abyss-teal-glow);
+}
+body.theme-cthulhu .player-topbar.navbar-light .navbar-brand:hover,
+body.theme-cthulhu .player-topbar.navbar-light .navbar-nav .nav-link:hover,
+body.theme-cthulhu .player-topbar.navbar-light .navbar-nav .nav-link.show {
+    color: var(--abyss-blood-bright) !important;
+    text-shadow: 0 0 8px var(--abyss-blood-soft);
+}
+body.theme-cthulhu .player-topbar .navbar-toggler-icon {
+    filter: invert(0.85) sepia(0.5) hue-rotate(140deg);
+}
+body.theme-cthulhu .player-topbar .dropdown-menu {
+    background: linear-gradient(180deg, rgba(3, 7, 11, 0.97), rgba(6, 18, 26, 0.97));
+    border: 1px solid var(--abyss-line-strong);
+    border-radius: 2px;
+    box-shadow: var(--abyss-shadow);
+}
+body.theme-cthulhu .player-topbar .dropdown-menu .dropdown-item {
+    color: var(--abyss-bone);
+    letter-spacing: 0.04em;
+    font-family: "EB Garamond", "Georgia", serif;
+}
+body.theme-cthulhu .player-topbar .dropdown-menu .dropdown-item:hover,
+body.theme-cthulhu .player-topbar .dropdown-menu .dropdown-item:focus {
+    background: rgba(46, 138, 141, 0.16);
+    color: var(--abyss-teal);
+}
+body.theme-cthulhu .player-topbar .dropdown-menu .dropdown-item.text-danger {
+    color: var(--abyss-blood-bright) !important;
+}
+body.theme-cthulhu .player-topbar .dropdown-menu .dropdown-item.text-danger:hover {
+    background: var(--abyss-blood-soft);
+}
+body.theme-cthulhu .player-topbar .dropdown-menu .dropdown-divider {
+    border-top-color: var(--abyss-line);
+}
+body.theme-cthulhu .player-topbar .player-wallet-pill,
+body.theme-cthulhu .player-topbar .player-account-trigger {
+    background: rgba(6, 18, 26, 0.6) !important;
+    border: 1px solid var(--abyss-line-strong) !important;
+    color: var(--abyss-bone) !important;
+    font-family: "EB Garamond", "Georgia", serif;
+    border-radius: 2px !important;
+}
+body.theme-cthulhu .player-topbar .player-wallet-pill:hover,
+body.theme-cthulhu .player-topbar .player-account-trigger:hover {
+    background: rgba(46, 138, 141, 0.16) !important;
+    box-shadow: 0 0 12px var(--abyss-teal-glow);
+}
+
+/* ============================================================
+   卡片：沉没古书
+   ============================================================ */
+body.theme-cthulhu .card {
+    background:
+        radial-gradient(ellipse at top, rgba(46, 138, 141, 0.05), transparent 60%),
+        linear-gradient(180deg, rgba(12, 31, 43, 0.85) 0%, rgba(3, 7, 11, 0.92) 100%) !important;
+    border: 1px solid var(--abyss-line-strong) !important;
+    border-radius: 2px !important;
+    color: var(--abyss-bone);
+    box-shadow: var(--abyss-shadow) !important;
+    backdrop-filter: blur(4px);
+    transition: box-shadow .3s ease, border-color .3s ease;
+    position: relative;
+}
+body.theme-cthulhu .card:hover {
+    border-color: var(--abyss-blood) !important;
+    box-shadow:
+        0 14px 38px rgba(0, 0, 0, 0.8),
+        0 0 28px var(--abyss-blood-soft),
+        inset 0 0 50px rgba(138, 31, 42, 0.06) !important;
+}
+body.theme-cthulhu .card-header {
+    background:
+        linear-gradient(90deg, rgba(46, 138, 141, 0.18), rgba(90, 58, 122, 0.10) 70%, transparent) !important;
+    color: var(--abyss-teal) !important;
+    border-bottom: 1px solid var(--abyss-line-strong);
+    font-family: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    font-size: 0.96rem;
+    padding: 10px 18px;
+    position: relative;
+}
+body.theme-cthulhu .card-header::before {
+    content: "◉";
+    display: inline-block;
+    color: var(--abyss-blood);
+    margin-right: 12px;
+    text-shadow: 0 0 6px var(--abyss-blood-soft);
+    font-size: 0.8em;
+    vertical-align: 0.05em;
+}
+body.theme-cthulhu .card-header i.fas,
+body.theme-cthulhu .card-header i.fa {
+    color: var(--abyss-teal);
+    margin-right: 8px;
+    text-shadow: 0 0 6px var(--abyss-teal-glow);
+}
+body.theme-cthulhu .card-header.bg-info,
+body.theme-cthulhu .card-header.bg-warning,
+body.theme-cthulhu .card-header.bg-primary,
+body.theme-cthulhu .card-header.bg-secondary,
+body.theme-cthulhu .card-header.bg-success,
+body.theme-cthulhu .card-header.bg-danger {
+    background:
+        linear-gradient(90deg, rgba(46, 138, 141, 0.20), rgba(90, 58, 122, 0.12) 70%, transparent) !important;
+    color: var(--abyss-teal) !important;
+}
+body.theme-cthulhu .card-body { padding: 18px; color: var(--abyss-bone); }
+body.theme-cthulhu .card-body .border.rounded {
+    background: rgba(3, 7, 11, 0.55) !important;
+    border: 1px solid var(--abyss-line) !important;
+    border-left: 3px solid var(--abyss-teal) !important;
+    border-radius: 1px !important;
+}
+
+body.theme-cthulhu .text-muted,
+body.theme-cthulhu .card-body .text-muted {
+    color: var(--abyss-bone-dim) !important;
+}
+
+/* 钓鱼仪表盘等吃 var(--ink)/var(--muted) 的旧组件，
+   :root 已重定向；这里补强单元格细节 */
+body.theme-cthulhu .stat-dashboard-board { border-color: var(--abyss-line); }
+body.theme-cthulhu .stat-dashboard-cell {
+    border-color: var(--abyss-line);
+    background: rgba(3, 7, 11, 0.45);
+}
+body.theme-cthulhu .stat-line-label { color: var(--abyss-teal); letter-spacing: 0.02em; }
+body.theme-cthulhu .stat-line-note { color: var(--abyss-bone-dim); }
+body.theme-cthulhu .stat-dashboard-cell strong {
+    color: var(--abyss-blood-bright);
+    text-shadow: 0 0 6px var(--abyss-blood-soft);
+}
+body.theme-cthulhu .stat-line-icon { color: var(--abyss-teal); }
+
+/* ============================================================
+   按钮：腐铜铭刻
+   ============================================================ */
+body.theme-cthulhu .btn {
+    font-family: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
+    letter-spacing: 0.06em;
+    font-size: 0.86rem;
+    font-weight: 600;
+    border-radius: 2px;
+    padding: 7px 16px;
+    transition: all .25s ease;
+    position: relative;
+}
+body.theme-cthulhu .btn-primary,
+body.theme-cthulhu .btn-info,
+body.theme-cthulhu .btn-outline-primary,
+body.theme-cthulhu .btn-outline-info {
+    background: linear-gradient(180deg, rgba(46, 138, 141, 0.22) 0%, rgba(12, 31, 43, 0.6) 100%) !important;
+    border: 1px solid var(--abyss-teal) !important;
+    color: var(--abyss-teal) !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(46, 138, 141, 0.22),
+        0 0 12px rgba(46, 138, 141, 0.18) !important;
+    text-shadow: 0 0 4px var(--abyss-teal-glow);
+}
+body.theme-cthulhu .btn-primary:hover:not(:disabled),
+body.theme-cthulhu .btn-info:hover:not(:disabled),
+body.theme-cthulhu .btn-outline-primary:hover:not(:disabled),
+body.theme-cthulhu .btn-outline-info:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(46, 138, 141, 0.42) 0%, rgba(20, 50, 65, 0.7) 100%) !important;
+    color: #d0f3f4 !important;
+    box-shadow:
+        0 4px 18px rgba(46, 138, 141, 0.5),
+        0 0 32px var(--abyss-teal-glow),
+        inset 0 1px 0 rgba(46, 138, 141, 0.4) !important;
+    transform: translateY(-1px);
+}
+body.theme-cthulhu .btn-success,
+body.theme-cthulhu .btn-warning,
+body.theme-cthulhu .btn-outline-success,
+body.theme-cthulhu .btn-outline-warning {
+    background: linear-gradient(180deg, rgba(201, 192, 168, 0.10) 0%, rgba(80, 75, 60, 0.5) 100%) !important;
+    border: 1px solid var(--abyss-bone-dim) !important;
+    color: var(--abyss-bone) !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(201, 192, 168, 0.20) !important;
+}
+body.theme-cthulhu .btn-success:hover:not(:disabled),
+body.theme-cthulhu .btn-warning:hover:not(:disabled),
+body.theme-cthulhu .btn-outline-success:hover:not(:disabled),
+body.theme-cthulhu .btn-outline-warning:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(201, 192, 168, 0.22) 0%, rgba(100, 92, 76, 0.65) 100%) !important;
+    color: #fff7e0 !important;
+    box-shadow:
+        0 4px 18px rgba(201, 192, 168, 0.3),
+        inset 0 1px 0 rgba(201, 192, 168, 0.4) !important;
+    transform: translateY(-1px);
+}
+body.theme-cthulhu .btn-secondary,
+body.theme-cthulhu .btn-outline-secondary {
+    background: linear-gradient(180deg, rgba(90, 58, 122, 0.20) 0%, rgba(40, 25, 60, 0.55) 100%) !important;
+    border: 1px solid var(--abyss-violet) !important;
+    color: #c5a8e5 !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(197, 168, 229, 0.22) !important;
+}
+body.theme-cthulhu .btn-secondary:hover:not(:disabled),
+body.theme-cthulhu .btn-outline-secondary:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(120, 80, 165, 0.38) 0%, rgba(60, 38, 90, 0.7) 100%) !important;
+    color: #ebd9ff !important;
+    box-shadow:
+        0 4px 18px var(--abyss-violet-soft),
+        0 0 24px rgba(90, 58, 122, 0.5),
+        inset 0 1px 0 rgba(197, 168, 229, 0.4) !important;
+    transform: translateY(-1px);
+}
+body.theme-cthulhu .btn-danger,
+body.theme-cthulhu .btn-outline-danger {
+    background: linear-gradient(180deg, rgba(138, 31, 42, 0.30) 0%, rgba(70, 12, 18, 0.7) 100%) !important;
+    border: 1px solid var(--abyss-blood) !important;
+    color: #ffb3b3 !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 100, 100, 0.20) !important;
+    text-shadow: 0 0 4px var(--abyss-blood-soft);
+}
+body.theme-cthulhu .btn-danger:hover:not(:disabled),
+body.theme-cthulhu .btn-outline-danger:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(196, 50, 50, 0.45) 0%, rgba(100, 18, 24, 0.75) 100%) !important;
+    color: #fff !important;
+    box-shadow:
+        0 4px 18px var(--abyss-blood-soft),
+        0 0 28px rgba(196, 50, 50, 0.5),
+        inset 0 1px 0 rgba(255, 100, 100, 0.42) !important;
+    transform: translateY(-1px);
+}
+body.theme-cthulhu .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+body.theme-cthulhu .btn-close {
+    filter: invert(0.85) sepia(0.4) hue-rotate(140deg);
+}
+
+/* ============================================================
+   alert
+   ============================================================ */
+body.theme-cthulhu .alert {
+    background: rgba(3, 7, 11, 0.7) !important;
+    border: 1px solid var(--abyss-line-strong) !important;
+    color: var(--abyss-bone) !important;
+    border-radius: 2px;
+    border-left: 3px solid var(--abyss-teal) !important;
+    backdrop-filter: blur(4px);
+}
+body.theme-cthulhu .alert-info {
+    border-left-color: var(--abyss-teal) !important;
+    background: rgba(46, 138, 141, 0.10) !important;
+}
+body.theme-cthulhu .alert-warning {
+    border-left-color: var(--abyss-bone-dim) !important;
+    background: rgba(201, 192, 168, 0.10) !important;
+}
+body.theme-cthulhu .alert-success {
+    border-left-color: var(--abyss-rot) !important;
+    background: rgba(74, 107, 61, 0.14) !important;
+}
+body.theme-cthulhu .alert-danger {
+    border-left-color: var(--abyss-blood) !important;
+    background: rgba(138, 31, 42, 0.18) !important;
+    color: #ffb3b3 !important;
+}
+
+/* ============================================================
+   进度条：血脉 / 神经搏动
+   ============================================================ */
+body.theme-cthulhu .progress {
+    background: rgba(0, 0, 0, 0.55) !important;
+    border: 1px solid var(--abyss-line-strong);
+    border-radius: 1px;
+    height: 22px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75);
+    overflow: hidden;
+}
+body.theme-cthulhu .progress-bar {
+    background: linear-gradient(90deg,
+        var(--abyss-water) 0%,
+        var(--abyss-teal) 40%,
+        var(--abyss-violet) 70%,
+        var(--abyss-blood) 100%) !important;
+    background-size: 200% 100% !important;
+    color: #d0f3f4 !important;
+    font-family: "EB Garamond", "Georgia", serif;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 12px var(--abyss-teal-glow);
+    animation: abyss-pulse 4.5s linear infinite;
+}
+@keyframes abyss-pulse {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+body.theme-cthulhu .progress-bar.bg-success {
+    background: linear-gradient(90deg, #2c3e25, var(--abyss-rot)) !important;
+}
+body.theme-cthulhu .progress-bar.bg-danger {
+    background: linear-gradient(90deg, #4a0a10, var(--abyss-blood)) !important;
+    animation: none;
+    box-shadow: 0 0 14px var(--abyss-blood-soft);
+}
+body.theme-cthulhu .progress-bar.bg-info {
+    background: linear-gradient(90deg, #1a3a4a, var(--abyss-teal)) !important;
+    animation: none;
+}
+
+/* ============================================================
+   badge
+   ============================================================ */
+body.theme-cthulhu .badge {
+    background: rgba(3, 7, 11, 0.7) !important;
+    color: var(--abyss-bone) !important;
+    border: 1px solid var(--abyss-line-strong);
+    border-radius: 1px;
+    font-family: "EB Garamond", "Georgia", serif;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 4px 10px;
+}
+body.theme-cthulhu .badge.bg-primary,
+body.theme-cthulhu .badge.bg-info {
+    background: rgba(46, 138, 141, 0.22) !important;
+    color: var(--abyss-teal) !important;
+    border-color: var(--abyss-teal);
+    text-shadow: 0 0 4px var(--abyss-teal-glow);
+}
+body.theme-cthulhu .badge.bg-success {
+    background: rgba(74, 107, 61, 0.30) !important;
+    color: #b8d49d !important;
+    border-color: var(--abyss-rot);
+}
+body.theme-cthulhu .badge.bg-warning {
+    background: rgba(201, 192, 168, 0.18) !important;
+    color: var(--abyss-bone) !important;
+    border-color: var(--abyss-bone-dim);
+}
+body.theme-cthulhu .badge.bg-danger {
+    background: var(--abyss-blood) !important;
+    color: #ffe0e0 !important;
+    border-color: var(--abyss-blood-bright);
+    box-shadow: 0 0 8px var(--abyss-blood-soft);
+}
+body.theme-cthulhu .badge.bg-secondary {
+    border-color: var(--abyss-violet);
+    color: #c5a8e5 !important;
+}
+body.theme-cthulhu .badge.bg-light {
+    background: rgba(201, 192, 168, 0.18) !important;
+    color: var(--abyss-bone) !important;
+}
+
+/* ============================================================
+   表格
+   ============================================================ */
+body.theme-cthulhu .table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(46, 138, 141, 0.05);
+    --bs-table-hover-bg: rgba(46, 138, 141, 0.12);
+    --bs-table-border-color: var(--abyss-line);
+    color: var(--abyss-bone);
+}
+body.theme-cthulhu .table thead th {
+    border-bottom: 2px solid var(--abyss-teal);
+    font-family: "EB Garamond", "Georgia", serif;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--abyss-teal);
+    background: rgba(46, 138, 141, 0.08) !important;
+}
+body.theme-cthulhu .table > :not(caption) > * > * {
+    background-color: transparent;
+    border-color: var(--abyss-line);
+    color: var(--abyss-bone);
+}
+
+/* ============================================================
+   utility 颜色
+   ============================================================ */
+body.theme-cthulhu .bg-info,
+body.theme-cthulhu .bg-primary {
+    background: linear-gradient(135deg, var(--abyss-teal), var(--abyss-water)) !important;
+    color: #d0f3f4 !important;
+}
+body.theme-cthulhu .bg-warning,
+body.theme-cthulhu .bg-success {
+    background: linear-gradient(135deg, var(--abyss-rot), #2c3e25) !important;
+    color: #b8d49d !important;
+}
+body.theme-cthulhu .bg-secondary {
+    background: linear-gradient(135deg, var(--abyss-violet), #2a1a40) !important;
+    color: #fff !important;
+}
+body.theme-cthulhu .bg-light {
+    background: rgba(201, 192, 168, 0.12) !important;
+    color: var(--abyss-bone) !important;
+}
+body.theme-cthulhu .text-muted { color: var(--abyss-bone-dim) !important; }
+body.theme-cthulhu .text-info,
+body.theme-cthulhu .text-primary { color: var(--abyss-teal) !important; }
+body.theme-cthulhu .text-warning,
+body.theme-cthulhu .text-success { color: var(--abyss-bone) !important; }
+body.theme-cthulhu .text-danger { color: var(--abyss-blood-bright) !important; }
+body.theme-cthulhu .text-white { color: var(--abyss-bone) !important; }
+body.theme-cthulhu .border-info,
+body.theme-cthulhu .border-warning,
+body.theme-cthulhu .border-primary,
+body.theme-cthulhu .border-secondary,
+body.theme-cthulhu .border-success {
+    border-color: var(--abyss-line-strong) !important;
+}
+body.theme-cthulhu .border-danger { border-color: var(--abyss-blood) !important; }
+
+/* ============================================================
+   form
+   ============================================================ */
+body.theme-cthulhu .form-control,
+body.theme-cthulhu .form-select {
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--abyss-line-strong);
+    color: var(--abyss-bone);
+    border-radius: 2px;
+    font-family: "EB Garamond", "Georgia", serif;
+}
+body.theme-cthulhu .form-control:focus,
+body.theme-cthulhu .form-select:focus {
+    background: rgba(6, 18, 26, 0.7);
+    border-color: var(--abyss-teal);
+    box-shadow: 0 0 0 0.2rem var(--abyss-teal-glow);
+    color: var(--abyss-bone);
+}
+body.theme-cthulhu .form-control::placeholder { color: var(--abyss-bone-dim); }
+body.theme-cthulhu .form-label,
+body.theme-cthulhu .form-text,
+body.theme-cthulhu label {
+    color: var(--abyss-bone);
+    font-family: "EB Garamond", "Georgia", serif;
+}
+
+/* ============================================================
+   list-group
+   ============================================================ */
+body.theme-cthulhu .list-group,
+body.theme-cthulhu .list-group-item {
+    background: transparent !important;
+    color: var(--abyss-bone);
+    border: none !important;
+}
+body.theme-cthulhu .list-group-item {
+    border-bottom: 1px dashed var(--abyss-line) !important;
+    padding: 10px 14px;
+}
+body.theme-cthulhu .list-group-item:hover { background: rgba(46, 138, 141, 0.08) !important; }
+body.theme-cthulhu .list-group-item-success { background: rgba(74, 107, 61, 0.14) !important; color: #b8d49d !important; }
+body.theme-cthulhu .list-group-item-danger { background: rgba(138, 31, 42, 0.18) !important; color: #ffb3b3 !important; }
+body.theme-cthulhu .list-group-item-warning { background: rgba(201, 192, 168, 0.10) !important; color: var(--abyss-bone) !important; }
+body.theme-cthulhu .list-group-item-info { background: rgba(46, 138, 141, 0.10) !important; color: var(--abyss-teal) !important; }
+
+/* ============================================================
+   editorial-footer
+   ============================================================ */
+body.theme-cthulhu .editorial-footer {
+    background: transparent !important;
+    border-top: 1px solid var(--abyss-line-strong);
+    color: var(--abyss-bone-dim);
+    font-family: "EB Garamond", "Georgia", serif;
+}
+body.theme-cthulhu .editorial-footer a { color: var(--abyss-teal); }
+
+/* ============================================================
+   toast / modal
+   ============================================================ */
+body.theme-cthulhu #playerToastStack .toast {
+    background: linear-gradient(180deg, rgba(12, 31, 43, 0.95), rgba(3, 7, 11, 0.95));
+    color: var(--abyss-bone);
+    border: 1px solid var(--abyss-line-strong);
+    border-radius: 2px;
+    box-shadow: var(--abyss-shadow);
+    backdrop-filter: blur(8px);
+}
+body.theme-cthulhu .toast-header {
+    background: rgba(46, 138, 141, 0.14);
+    color: var(--abyss-teal);
+    border-bottom: 1px solid var(--abyss-line);
+    font-family: "EB Garamond", "Georgia", serif;
+}
+body.theme-cthulhu .modal-content {
+    background:
+        radial-gradient(ellipse at top, rgba(46, 138, 141, 0.10), transparent 60%),
+        linear-gradient(180deg, rgba(12, 31, 43, 0.96) 0%, rgba(3, 7, 11, 0.98) 100%);
+    color: var(--abyss-bone);
+    border: 1px solid var(--abyss-line-strong);
+    border-radius: 2px;
+    box-shadow:
+        0 24px 56px rgba(0, 0, 0, 0.85),
+        0 0 36px rgba(46, 138, 141, 0.30),
+        0 0 0 1px rgba(46, 138, 141, 0.18);
+    backdrop-filter: blur(10px);
+}
+body.theme-cthulhu .modal-header {
+    background: linear-gradient(90deg, rgba(46, 138, 141, 0.20), rgba(90, 58, 122, 0.10) 70%, transparent);
+    border-bottom: 1px solid var(--abyss-line-strong);
+}
+body.theme-cthulhu .modal-title {
+    color: var(--abyss-teal);
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    text-shadow: 0 0 8px var(--abyss-teal-glow);
+    font-family: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
+}
+body.theme-cthulhu .modal-footer { border-top: 1px solid var(--abyss-line); }
+
+/* ============================================================
+   通知面板
+   ============================================================ */
+body.theme-cthulhu #notificationPanel.card {
+    background: linear-gradient(180deg, rgba(12, 31, 43, 0.95), rgba(3, 7, 11, 0.95)) !important;
+    border: 1px solid var(--abyss-line-strong) !important;
+    box-shadow: var(--abyss-shadow);
+    backdrop-filter: blur(8px);
+}
+body.theme-cthulhu #notificationPanel .card-header {
+    cursor: pointer;
+    background: rgba(46, 138, 141, 0.14) !important;
+    color: var(--abyss-teal) !important;
+}
+body.theme-cthulhu #notificationPanel .card-header::before { display: none; }
+
+/* ============================================================
+   主页 hero 状态行：低语谶文
+   ============================================================ */
+body.theme-cthulhu .hero-status-block {
+    margin-top: 0.65rem;
+    padding-left: 0.6rem;
+    position: relative;
+    border-left: 1px solid var(--abyss-line-strong);
+}
+body.theme-cthulhu .hero-status-block::before {
+    content: "";
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(180deg,
+        var(--abyss-teal) 0%,
+        var(--abyss-violet) 50%,
+        var(--abyss-blood) 100%);
+    box-shadow: 0 0 8px var(--abyss-teal-glow);
+    opacity: 0.65;
+}
+body.theme-cthulhu .hero-status-line {
+    font-family: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--abyss-bone);
+    letter-spacing: 0.03em;
+    line-height: 2;
+    text-shadow: 0 0 6px rgba(46, 138, 141, 0.16);
+
+    /* 低语涌现：从下方/混沌中浮起 */
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(3px);
+    animation: abyss-whisper 0.85s ease-out forwards;
+}
+body.theme-cthulhu .hero-status-line[data-status-row="1"] { animation-delay: 0.15s; }
+body.theme-cthulhu .hero-status-line[data-status-row="2"] { animation-delay: 0.55s; }
+@keyframes abyss-whisper {
+    0%   { opacity: 0; transform: translateY(6px); filter: blur(3px); }
+    60%  { opacity: 0.85; filter: blur(0.5px); }
+    100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+body.theme-cthulhu .hero-status-prompt {
+    display: inline-block;
+    width: 1.1em;
+    height: 1.1em;
+    vertical-align: -0.15em;
+    margin-right: 0.5em;
+    color: transparent;
+    /* 行首：开口的眼，瞳孔轻微闪缩 */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><g fill='none' stroke='%23c43232' stroke-width='1.4'><path d='M2 12 Q12 4 22 12 Q12 20 2 12 Z'/><circle cx='12' cy='12' r='3.2' fill='%238a1f2a'/><circle cx='12' cy='12' r='1.2' fill='%23000'/></g></svg>");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 4px var(--abyss-blood-soft));
+    animation: abyss-iris-throb 3.5s ease-in-out infinite;
+}
+@keyframes abyss-iris-throb {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px var(--abyss-blood-soft)); }
+    50%      { transform: scale(1.1); filter: drop-shadow(0 0 10px var(--abyss-blood-soft)); }
+}
+body.theme-cthulhu .hero-status-text em {
+    font-style: italic;
+    color: var(--abyss-blood-bright);
+    font-weight: 600;
+    padding: 0 0.15em;
+    text-shadow: 0 0 8px var(--abyss-blood-soft);
+}
+body.theme-cthulhu .hero-status-action {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0 0 1px 0;
+    margin: 0 0 0 0.55em;
+    font: inherit;
+    color: var(--abyss-teal);
+    text-decoration: none;
+    border-bottom: 1.5px solid var(--abyss-teal);
+    cursor: pointer;
+    transition: all .25s ease;
+    text-shadow: 0 0 6px var(--abyss-teal-glow);
+}
+body.theme-cthulhu .hero-status-action:hover:not(.is-done):not(:disabled) {
+    color: var(--abyss-blood-bright);
+    border-bottom-color: var(--abyss-blood-bright);
+    text-shadow: 0 0 10px var(--abyss-blood-soft);
+}
+body.theme-cthulhu .hero-status-action.is-done {
+    color: var(--abyss-bone-dim);
+    border-bottom: 1px dashed var(--abyss-line);
+    text-shadow: none;
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width: 768px) {
+    body.theme-cthulhu .abyss-eye-2,
+    body.theme-cthulhu .abyss-eye-3 { display: none; }
+    body.theme-cthulhu .abyss-eye-1 { width: 130px; height: 130px; }
+    body.theme-cthulhu .card-header { font-size: 0.86rem; padding: 8px 12px; }
+    body.theme-cthulhu .card-body { padding: 12px; }
+    body.theme-cthulhu .btn { font-size: 0.78rem; padding: 6px 12px; }
+}
+
+/* ============================================================
+   动画偏好
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    body.theme-cthulhu::after,
+    body.theme-cthulhu::before,
+    body.theme-cthulhu .abyss-eye,
+    body.theme-cthulhu .progress-bar,
+    body.theme-cthulhu .hero-status-line,
+    body.theme-cthulhu .hero-status-prompt { animation: none; }
+    body.theme-cthulhu .hero-status-line { opacity: 1; transform: none; filter: none; }
+}
+
+/* ============================================================
+   默认（非克苏鲁主题）：眼球不显示
+   ============================================================ */
+.abyss-eye { display: none; }

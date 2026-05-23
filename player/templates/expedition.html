@@ -4,18 +4,144 @@
 
 {% block extra_css %}
 <style>
-.expedition-hero {
-    border: 1px solid rgba(13, 202, 240, 0.25);
-    background: linear-gradient(135deg, rgba(13, 202, 240, 0.08), rgba(25, 135, 84, 0.08));
+/* ============================================================
+   expedition 探险卡片：横向折叠条
+   颜色全部走 .card 主题样式 + currentColor 派生
+   ============================================================ */
+.expedition-row {
+    margin-bottom: 0.85rem;
+    overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
+}
+.expedition-row[open] {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.expedition-row.is-short  { box-shadow: inset 4px 0 0 #22a06b; }
+.expedition-row.is-medium { box-shadow: inset 4px 0 0 #f4a623; }
+.expedition-row.is-long   { box-shadow: inset 4px 0 0 #e0594f; }
+.expedition-row.is-short[open]  { box-shadow: inset 4px 0 0 #22a06b, 0 6px 20px rgba(0,0,0,0.12); }
+.expedition-row.is-medium[open] { box-shadow: inset 4px 0 0 #f4a623, 0 6px 20px rgba(0,0,0,0.12); }
+.expedition-row.is-long[open]   { box-shadow: inset 4px 0 0 #e0594f, 0 6px 20px rgba(0,0,0,0.12); }
+
+.expedition-row > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.85rem 1rem 0.85rem 1.25rem;
+    display: grid;
+    grid-template-columns: 140px 1fr 110px 1fr 220px;
+    gap: 0.85rem;
+    align-items: center;
+}
+.expedition-row > summary::-webkit-details-marker { display: none; }
+.expedition-row > summary::marker { display: none; content: ''; }
+
+.expedition-summary-type {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.95rem;
+}
+.expedition-summary-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.85rem;
+    opacity: 0.85;
+    min-width: 0;
+}
+.expedition-summary-meta strong { opacity: 1; font-weight: 600; }
+.expedition-summary-people { text-align: center; font-size: 0.85rem; opacity: 0.85; }
+.expedition-summary-people .count {
+    font-weight: 700;
+    font-size: 1.15rem;
+    display: block;
+    opacity: 1;
+}
+.expedition-summary-progress { min-width: 0; }
+.expedition-summary-progress .progress { height: 14px; border-radius: 8px; overflow: hidden; }
+.expedition-summary-progress .small { margin-top: 2px; font-size: 0.75rem; opacity: 0.7; }
+.expedition-summary-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.4rem;
 }
 
-.expedition-card .card-header {
-    min-height: 78px;
+.expedition-public-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-left: 0.4rem;
+    background: rgba(255, 200, 80, 0.18);
+    border: 1px solid currentColor;
+    opacity: 0.85;
+}
+.expedition-public-pill.is-private { opacity: 0.5; background: transparent; }
+
+.expedition-detail {
+    padding: 0.85rem 1rem 1rem 1.25rem;
+    border-top: 1px dashed currentColor;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+.expedition-row .expedition-detail { border-top-color: rgba(255, 255, 255, 0.15); }
+.expedition-detail h6 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+    text-transform: none;
+}
+.expedition-target-list,
+.expedition-member-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.85rem;
+}
+.expedition-target-list li,
+.expedition-member-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 4px;
+    border-bottom: 1px dotted rgba(127, 127, 127, 0.25);
+}
+.expedition-target-list li:last-child,
+.expedition-member-list li:last-child { border-bottom: none; }
+
+.expedition-member-list {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid rgba(127, 127, 127, 0.25);
+    border-radius: 6px;
+    padding: 2px 4px;
+}
+.expedition-member-list li { padding: 4px 8px; }
+.expedition-member-list .is-creator {
+    background: rgba(255, 200, 50, 0.12);
+    font-weight: 600;
+    border-radius: 3px;
 }
 
 .expedition-invite-pill {
-    font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    letter-spacing: 0.08em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    letter-spacing: 0.06em;
+    font-size: 0.78rem;
+}
+
+@media (max-width: 992px) {
+    .expedition-row > summary {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+    }
+    .expedition-summary-progress { grid-column: 1 / -1; }
+    .expedition-summary-actions  { grid-column: 1 / -1; justify-content: flex-start; }
+    .expedition-detail { grid-template-columns: 1fr; }
 }
 </style>
 {% endblock %}
@@ -26,144 +152,168 @@
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-0">
-            <i class="fas fa-compass"></i> 科学考察公告板
+            <i class="fas fa-compass"></i> 科学考察
         </h2>
-        <p class="text-muted mt-2">查看进行中的科考队伍，公开邀请码加入，或在完成后领取个人奖励。</p>
+        <p class="text-muted mt-2 mb-0">欢迎加入鱼类进化科研项目！您将在这里真正证明自己的价值。当然，许可证和通行证请务必在研究院购买……</p>
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card expedition-hero">
-            <div class="card-body">
-                <div class="row g-3 align-items-center">
-                    <div class="col-lg-8">
-                        <h5 class="mb-2"><i class="fas fa-flask"></i> 发起方式</h5>
-                        <p class="mb-0 text-muted">使用命令 <code>,发起科考 探险|征服|圣域</code> 创建队伍。队长可在本页公开邀请码，队员可直接点击邀请码加入。</p>
+{% if expedition_zone_card %}
+{% set zone = expedition_zone_card %}
+<div class="company-zones-stack mb-4">
+    <div class="card company-zone-card {{ zone.accent_class }} {% if zone.is_current %}border-primary{% endif %}">
+        <div class="card-body">
+            <div class="company-zone-shell">
+                <div class="company-zone-copy">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <h4 class="mb-0">{{ zone.name }}</h4>
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-coins"></i> {{ "{:,}".format(zone.fishing_cost) }} 金币/次
+                        </span>
+                        {% if zone.required_pass %}
+                        <span class="badge text-bg-warning-subtle border border-warning-subtle text-warning-emphasis">
+                            <i class="fas fa-ticket-alt"></i> 需要：{{ zone.required_pass }}
+                        </span>
+                        {% else %}
+                        <span class="badge text-bg-success">
+                            <i class="fas fa-unlock"></i> 自由进入
+                        </span>
+                        {% endif %}
+                        <span class="badge bg-info text-dark">{{ expeditions|length }} 个进行中</span>
+                        {% if zone.is_current %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis">
+                            <i class="fas fa-check-circle"></i> 当前驻留
+                        </span>
+                        {% endif %}
                     </div>
-                    <div class="col-lg-4">
-                        <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                            <span class="badge bg-success">探险</span>
-                            <span class="badge bg-warning text-dark">征服</span>
-                            <span class="badge bg-danger">圣域</span>
-                            <span class="badge bg-info text-dark">{{ expeditions|length }} 个进行中</span>
-                        </div>
-                    </div>
+                    <p class="company-zone-description text-muted mb-3">{{ zone.description }}</p>
+                </div>
+                <div class="company-zone-actions">
+                    <button class="btn btn-warning company-shop-button" type="button" onclick='openShopCatalog({{ zone.shop_scope|tojson }}, {{ zone.shop_name|tojson }})'>
+                        <i class="fas fa-store"></i> {{ zone.shop_name }}
+                    </button>
+                    {% if zone.is_current %}
+                    <button class="btn btn-secondary" type="button" disabled>
+                        <i class="fas fa-check"></i> 已在此区域
+                    </button>
+                    {% else %}
+                    <button class="btn btn-primary" type="button" onclick='goToPortalZone({{ zone.id }}, {{ zone.name|tojson }})'>
+                        <i class="fas fa-arrow-right"></i> 进入区域
+                    </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="row">
     <div class="col-12">
         {% if expeditions %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
-            {% for exp in expeditions %}
-            <div class="col">
-                <div class="card h-100 expedition-card {% if exp.type == 'short' %}border-success{% elif exp.type == 'medium' %}border-warning{% else %}border-danger{% endif %}">
-                    <div class="card-header {% if exp.type == 'short' %}bg-success{% elif exp.type == 'medium' %}bg-warning{% else %}bg-danger{% endif %} text-white">
-                        <div class="d-flex justify-content-between align-items-start gap-2">
-                            <div class="d-flex flex-column gap-1">
-                                <strong>
-                                    {% if exp.type == 'short' %}
-                                    <i class="fas fa-leaf"></i> 探险科考
-                                    {% elif exp.type == 'medium' %}
-                                    <i class="fas fa-compass"></i> 征服科考
-                                    {% else %}
-                                    <i class="fas fa-rocket"></i> 圣域科考
-                                    {% endif %}
-                                </strong>
-                                <span class="badge bg-light text-dark align-self-start">{{ exp.member_count }} 人</span>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 expedition-action-bar">
-                                {% if exp.is_current_user_creator and exp.status == 'active' %}
-                                <button class="btn btn-sm expedition-action-button {% if exp.invite_public %}btn-warning{% else %}btn-light{% endif %}"
-                                        type="button"
-                                        title="{% if exp.invite_public %}关闭公开邀请码{% else %}公开邀请码{% endif %}"
-                                        onclick="setExpeditionInvitePublic('{{ exp.expedition_id }}', {% if exp.invite_public %}false{% else %}true{% endif %})">
-                                    <i class="fas {% if exp.invite_public %}fa-eye-slash{% else %}fa-bullhorn{% endif %}"></i>
-                                </button>
-                                {% endif %}
-                                <button class="btn btn-sm expedition-action-button {% if exp.current_user_can_claim %}btn-success{% elif exp.current_user_claimed %}btn-outline-light{% else %}btn-secondary{% endif %}"
-                                        type="button"
-                                        title="{% if exp.current_user_claimed %}奖励已领取{% elif exp.current_user_can_claim %}领取奖励{% else %}任务全部完成后可领取{% endif %}"
-                                        {% if exp.current_user_can_claim %}
-                                        onclick="claimExpeditionReward('{{ exp.expedition_id }}')"
-                                        {% else %}
-                                        disabled
-                                        {% endif %}>
-                                    <i class="fas {% if exp.current_user_claimed %}fa-check{% else %}fa-gift{% endif %}"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body d-flex flex-column">
-                        <div class="mb-2">
-                            <small class="text-muted">
-                                <i class="fas fa-user"></i> 队长：{{ exp.creator_name }}
-                            </small>
-                        </div>
-                        {% if exp.can_show_invite_code %}
-                        <div class="mb-3">
-                            {% if exp.can_join_via_public_invite %}
-                            <button class="btn btn-sm btn-light expedition-invite-pill" type="button"
-                                    title="点击加入科考"
-                                    onclick="joinExpedition('{{ exp.expedition_id }}')">
-                                {{ exp.expedition_id }}
-                            </button>
-                            {% else %}
-                            <button class="btn btn-sm btn-light expedition-invite-pill" type="button"
-                                    title="复制邀请码"
-                                    onclick="copyExpeditionCode('{{ exp.expedition_id }}')">
-                                {{ exp.expedition_id }}
-                            </button>
-                            {% endif %}
-                        </div>
+        {% for exp in expeditions %}
+        <details class="card expedition-row {% if exp.type == 'short' %}is-short{% elif exp.type == 'medium' %}is-medium{% else %}is-long{% endif %}">
+            <summary>
+                <div class="expedition-summary-type">
+                    {% if exp.type == 'short' %}<i class="fas fa-leaf"></i> 探险科考
+                    {% elif exp.type == 'medium' %}<i class="fas fa-compass"></i> 征服科考
+                    {% else %}<i class="fas fa-rocket"></i> 圣域科考{% endif %}
+                </div>
+                <div class="expedition-summary-meta">
+                    <span><strong>队长</strong> {{ exp.creator_name }}</span>
+                    <span>
+                        {% if exp.invite_public %}
+                        <span class="expedition-public-pill is-public"><i class="fas fa-bullhorn"></i> 公开</span>
+                        {% else %}
+                        <span class="expedition-public-pill is-private"><i class="fas fa-lock"></i> 非公开</span>
                         {% endif %}
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <small><strong>总进度</strong></small>
-                                <small class="text-muted">{{ (exp.total_progress * 100)|round(1) }}%</small>
-                            </div>
-                            <div class="progress" style="height: 20px;">
-                                <div class="progress-bar bg-info progress-bar-striped progress-bar-animated"
-                                     role="progressbar"
-                                     style="width: {{ (exp.total_progress * 100)|round(1) }}%"
-                                     aria-valuenow="{{ (exp.total_progress * 100)|round(1) }}"
-                                     aria-valuemin="0"
-                                     aria-valuemax="100">
-                                    {{ (exp.total_progress * 100)|round(1) }}%
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <small><strong>目标鱼类</strong></small>
-                            <div class="mt-1">
-                                {% for key, target in exp.targets.items() %}
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="small">{{ star_label(target.rarity) }} {{ target.fish_name }}</span>
-                                    <span class="small text-muted">{{ target.caught }}/{{ target.required }}</span>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        <div class="mt-auto">
-                            <small class="text-muted text-center d-block">
-                                {{ exp.current_user_reward_text or '任务全部完成后可领取' }}
-                            </small>
-                        </div>
+                    </span>
+                </div>
+                <div class="expedition-summary-people">
+                    <span class="count">{{ exp.member_count }}</span>
+                    <span>队员</span>
+                </div>
+                <div class="expedition-summary-progress">
+                    <div class="progress">
+                        <div class="progress-bar bg-info" role="progressbar"
+                             style="width: {{ (exp.total_progress * 100)|round(1) }}%"></div>
+                    </div>
+                    <div class="small">总进度 {{ (exp.total_progress * 100)|round(1) }}%</div>
+                </div>
+                <div class="expedition-summary-actions" onclick="event.stopPropagation();">
+                    {% if exp.can_join_via_public_invite %}
+                    <button class="btn btn-sm btn-warning" type="button"
+                            onclick="event.preventDefault(); joinExpedition('{{ exp.expedition_id }}');">
+                        <i class="fas fa-user-plus"></i> 加入
+                    </button>
+                    {% endif %}
+                    {% if exp.is_current_user_creator and exp.status == 'active' %}
+                    <button class="btn btn-sm {% if exp.invite_public %}btn-warning{% else %}btn-outline-secondary{% endif %}"
+                            type="button"
+                            title="{% if exp.invite_public %}关闭公开{% else %}公开邀请码{% endif %}"
+                            onclick="event.preventDefault(); setExpeditionInvitePublic('{{ exp.expedition_id }}', {% if exp.invite_public %}false{% else %}true{% endif %});">
+                        <i class="fas {% if exp.invite_public %}fa-eye-slash{% else %}fa-bullhorn{% endif %}"></i>
+                    </button>
+                    {% endif %}
+                    {% if exp.can_show_invite_code %}
+                    <button class="btn btn-sm btn-light expedition-invite-pill" type="button"
+                            title="复制邀请码"
+                            onclick="event.preventDefault(); copyExpeditionCode('{{ exp.expedition_id }}');">
+                        {{ exp.expedition_id }}
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-sm {% if exp.current_user_can_claim %}btn-success{% elif exp.current_user_claimed %}btn-outline-secondary{% else %}btn-secondary{% endif %}"
+                            type="button"
+                            title="{% if exp.current_user_claimed %}奖励已领取{% elif exp.current_user_can_claim %}领取奖励{% else %}任务全部完成后可领取{% endif %}"
+                            {% if exp.current_user_can_claim %}
+                            onclick="event.preventDefault(); claimExpeditionReward('{{ exp.expedition_id }}');"
+                            {% else %}disabled{% endif %}>
+                        <i class="fas {% if exp.current_user_claimed %}fa-check{% else %}fa-gift{% endif %}"></i>
+                    </button>
+                </div>
+            </summary>
+
+            <div class="expedition-detail">
+                <div>
+                    <h6>目标鱼类</h6>
+                    <ul class="expedition-target-list">
+                        {% for key, target in exp.targets.items() %}
+                        <li>
+                            <span>{{ star_label(target.rarity) }} {{ target.fish_name }}</span>
+                            <span class="text-muted">{{ target.caught }} / {{ target.required }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="mt-2 small text-muted">
+                        {{ exp.current_user_reward_text or '任务全部完成后可领取' }}
                     </div>
                 </div>
+                <div>
+                    <h6>参与的玩家（{{ exp.member_count }} 人）</h6>
+                    <ul class="expedition-member-list">
+                        {% for uid, p in exp.participants.items() %}
+                        {% set contrib_total = p.contribution.values()|sum if p.contribution else 0 %}
+                        <li class="{% if uid == exp.creator_id %}is-creator{% endif %}">
+                            <span>
+                                {% if uid == exp.creator_id %}<i class="fas fa-crown text-warning"></i>{% endif %}
+                                {{ p.nickname or uid }}
+                            </span>
+                            {% if contrib_total %}
+                            <span class="text-muted">贡献 {{ contrib_total }}</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
-            {% endfor %}
-        </div>
+        </details>
+        {% endfor %}
         {% else %}
         <div class="card">
             <div class="card-body text-center text-muted py-5">
                 <i class="fas fa-compass fa-3x mb-3"></i>
                 <p class="mb-2">暂无进行中的科学考察</p>
-                <small>使用命令 <code>,发起科考 探险|征服|圣域</code> 发起科考队伍</small>
+                <small>使用许可证发起全新队伍，或者用通行证加入已有队伍！</small>
             </div>
         </div>
         {% endif %}
@@ -178,13 +328,11 @@ async function copyTextToClipboard(text) {
         await navigator.clipboard.writeText(text);
         return true;
     }
-
     const tempInput = document.createElement('input');
     tempInput.value = text;
     document.body.appendChild(tempInput);
     tempInput.select();
     tempInput.setSelectionRange(0, 99999);
-
     try {
         return document.execCommand('copy');
     } finally {
@@ -205,21 +353,15 @@ async function setExpeditionInvitePublic(expeditionId, isPublic) {
     try {
         const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/publish-invite`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                public: !!isPublic
-            })
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({public: !!isPublic})
         });
-
         const data = await response.json();
         if (data.success) {
             await showToast(data.message || (isPublic ? '邀请码已公开' : '邀请码已取消公开'), 'success');
             window.location.reload();
             return;
         }
-
         showToast(data.message || '操作失败', 'error');
     } catch (error) {
         showToast('操作失败，请稍后重试', 'error');
@@ -228,9 +370,7 @@ async function setExpeditionInvitePublic(expeditionId, isPublic) {
 
 async function joinExpedition(expeditionId) {
     try {
-        const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/join`, {
-            method: 'POST'
-        });
+        const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/join`, {method: 'POST'});
         const data = await response.json();
         if (data.success) {
             await showToast(data.message || '加入成功', 'success');
@@ -245,9 +385,7 @@ async function joinExpedition(expeditionId) {
 
 async function claimExpeditionReward(expeditionId) {
     try {
-        const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/claim`, {
-            method: 'POST'
-        });
+        const response = await fetch(`/api/user/tavern/expeditions/${encodeURIComponent(expeditionId)}/claim`, {method: 'POST'});
         const data = await response.json();
         if (data.success) {
             await showToast(data.message || '领取成功', 'success');

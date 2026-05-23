@@ -10,6 +10,10 @@
             <div class="editorial-kicker"><i class="fas fa-feather-pointed"></i> MetaFishing！</div>
             <h2>欢迎回来，{{ session.get('nickname', session.get('user_id')) }}</h2>
             <p class="text-muted mb-0 mt-2">整理装备、查看鱼塘，并从这里开始今天的钓鱼。</p>
+            <div class="hero-status-block">
+                <div class="hero-status-line" data-status-row="1"><span class="hero-status-prompt" aria-hidden="true">&gt;</span><span class="hero-status-text">连续签到 {{ stats.consecutive_login_days }} 天。</span>{% if stats.has_checked_in_today %}<span class="hero-status-action is-done">[已签到]</span>{% else %}<button class="hero-status-action" type="button" onclick="dailyCheckin()">[今日签到]</button>{% endif %}</div>
+                <div class="hero-status-line" data-status-row="2"><span class="hero-status-prompt" aria-hidden="true">&gt;</span><span class="hero-status-text">自动钓鱼{% if user_state.auto_fishing_enabled %}已开启，正在为你打捞潮汐。{% else %}尚未开启，潮汐正在等你。{% endif %}</span><button id="autoFishingBtn" class="hero-status-action" type="button" onclick="toggleAutoFishing()">{% if user_state.auto_fishing_enabled %}[关闭自动钓鱼]{% else %}[开启自动钓鱼]{% endif %}</button></div>
+            </div>
         </div>
         <div class="editorial-actions">
             <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#startGuideModal">
@@ -106,7 +110,7 @@
             </div>
             <div class="modal-footer">
                 <a href="{{ url_for('player_bp.inventory') }}" class="btn btn-outline-secondary"><i class="fas fa-briefcase"></i> 背包</a>
-                <a href="{{ url_for('player_bp.shop') }}" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> 商店</a>
+                <a href="{{ url_for('player_bp.fishing') }}" class="btn btn-primary"><i class="fas fa-map-marked-alt"></i> 地图</a>
             </div>
         </div>
     </div>
@@ -165,7 +169,7 @@
             </div>
             <div class="modal-footer">
                 <a href="{{ url_for('player_bp.inventory') }}" class="btn btn-outline-secondary"><i class="fas fa-briefcase"></i> 背包</a>
-                <a href="{{ url_for('player_bp.shop') }}" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> 商店</a>
+                <a href="{{ url_for('player_bp.fishing') }}" class="btn btn-primary"><i class="fas fa-map-marked-alt"></i> 地图</a>
             </div>
         </div>
     </div>
@@ -231,55 +235,8 @@
             </div>
             <div class="modal-footer">
                 <a href="{{ url_for('player_bp.inventory') }}" class="btn btn-outline-secondary"><i class="fas fa-briefcase"></i> 背包</a>
-                <a href="{{ url_for('player_bp.shop') }}" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> 商店</a>
+                <a href="{{ url_for('player_bp.fishing') }}" class="btn btn-primary"><i class="fas fa-map-marked-alt"></i> 地图</a>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- 基础统计 -->
-<div class="row g-0 metric-strip">
-    <div class="col-md-6 col-lg-3">
-        <div class="editorial-metric metric-coin h-100">
-            <h5><i class="fas fa-coins"></i> 金币</h5>
-            <div class="metric-value">{{ "{:,}".format(stats.coins) }}</div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-lg-3">
-        <div class="editorial-metric metric-gem h-100">
-            <h5><i class="fas fa-gem"></i> 高级货币</h5>
-            <div class="metric-value">{{ "{:,}".format(stats.premium_currency) }}</div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-lg-3">
-        <div class="editorial-metric metric-fish h-100 position-relative">
-            <button class="btn btn-sm {% if user_state.auto_fishing_enabled %}btn-outline-secondary{% else %}btn-primary{% endif %} metric-action"
-                    onclick="toggleAutoFishing()" id="autoFishingBtn">
-                <i class="fas fa-power-off"></i>
-                {% if user_state.auto_fishing_enabled %}关闭{% else %}开启{% endif %}
-            </button>
-            <h5><i class="fas fa-robot"></i> 自动钓鱼</h5>
-            <div class="metric-value {% if not user_state.auto_fishing_enabled %}text-danger{% endif %}">
-                {% if user_state.auto_fishing_enabled %}已开启{% else %}未开启{% endif %}
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-lg-3">
-        <div class="editorial-metric metric-streak h-100 position-relative">
-            <div class="metric-action">
-                {% if stats.has_checked_in_today %}
-                    <span class="badge"><i class="fas fa-check"></i> 已签到</span>
-                {% else %}
-                    <button class="btn btn-outline-secondary btn-sm" onclick="dailyCheckin()">
-                        <i class="fas fa-hand-point-up"></i> 签到
-                    </button>
-                {% endif %}
-            </div>
-            <h5><i class="fas fa-calendar-check"></i> 连续签到</h5>
-            <div class="metric-value">{{ stats.consecutive_login_days }} 天</div>
         </div>
     </div>
 </div>

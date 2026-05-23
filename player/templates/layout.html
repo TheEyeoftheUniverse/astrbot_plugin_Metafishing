@@ -6,10 +6,14 @@
     <title>{% block title %}MetaFishing！{% endblock %}</title>
     <link href="{{ url_for('player_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css', v='20260505') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='vendor/fontawesome/css/all.min.css', v='20260505') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260509b') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260523c') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/scifi.css', v='20260523b') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/wendao.css', v='20260523b') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/cthulhu.css', v='20260523a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/mahuan.css', v='20260523a') }}">
     {% block extra_css %}{% endblock %}
 </head>
-<body class="player-ui">
+<body class="player-ui {% block body_class %}{% if nav_zone_id == 5 %}theme-scifi{% elif nav_zone_id == 6 %}theme-wendao{% elif nav_zone_id == 7 %}theme-cthulhu{% elif nav_zone_id == 8 %}theme-mahuan{% endif %}{% endblock %}" {% if nav_zone_id %}data-zone-id="{{ nav_zone_id }}"{% endif %}>
 {% if session.get('user_id') %}
 <nav class="navbar navbar-expand-lg navbar-light player-topbar fixed-top">
     <div class="container-fluid">
@@ -27,11 +31,11 @@
                     </a>
                 </li>
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="fishingDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-fish"></i> 钓鱼
+                    <a class="nav-link dropdown-toggle" href="#" id="mapDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-map-marked-alt"></i> 地图
                     </a>
-                    <ul class="dropdown-menu" aria-labelledby="fishingDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('player_bp.fishing') }}"><i class="fas fa-map-marked-alt"></i> 区域</a></li>
+                    <ul class="dropdown-menu" aria-labelledby="mapDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('player_bp.fishing') }}"><i class="fas fa-building"></i> 公司</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.expedition_page') }}"><i class="fas fa-search"></i> 考察</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.scifi_page') }}"><i class="fas fa-eye"></i> 观测</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.tribulation_page') }}"><i class="fas fa-yin-yang"></i> 问道</a></li>
@@ -56,7 +60,6 @@
                         <i class="fas fa-exchange-alt"></i> 交易
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="tradeDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('player_bp.shop') }}"><i class="fas fa-shopping-cart"></i> 商店</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.market') }}"><i class="fas fa-store"></i> 交易市场</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('player_bp.exchange') }}"><i class="fas fa-chart-line"></i> 交易所</a></li>
                     </ul>
@@ -76,11 +79,11 @@
             <div class="player-wallet-summary" aria-label="玩家货币">
                 <span class="btn btn-outline-secondary btn-sm player-wallet-pill" title="金币">
                     <i class="fas fa-coins text-warning"></i>
-                    <span>{{ "{:,}".format(nav_wallet.coins) }}</span>
+                    <span id="navWalletCoins">{{ "{:,}".format(nav_wallet.coins) }}</span>
                 </span>
                 <span class="btn btn-outline-secondary btn-sm player-wallet-pill" title="钻石">
                     <i class="fas fa-gem text-info"></i>
-                    <span>{{ "{:,}".format(nav_wallet.premium_currency) }}</span>
+                    <span id="navWalletPremium">{{ "{:,}".format(nav_wallet.premium_currency) }}</span>
                 </span>
             </div>
             {% endif %}
@@ -167,6 +170,26 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" id="webuiActionModalCancel" data-bs-dismiss="modal">取消</button>
                 <button type="button" class="btn btn-primary" id="webuiActionModalConfirm">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="shopCatalogModal" tabindex="-1" aria-labelledby="shopCatalogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="shopCatalogModalLabel">商店</h5>
+                    <div class="small text-muted" id="shopCatalogWalletSummary">正在同步余额…</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body" id="shopCatalogModalBody">
+                <div class="text-center text-muted py-5">
+                    <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+                    正在读取商店目录…
+                </div>
             </div>
         </div>
     </div>
@@ -317,11 +340,41 @@ function webuiAlert(message, options = {}) {
     });
 }
 
+function safeStorageGet(area, key) {
+    try {
+        const storage = area === 'local' ? window.localStorage : window.sessionStorage;
+        return storage ? storage.getItem(key) : null;
+    } catch (error) {
+        console.debug(`storage get blocked: ${area}:${key}`, error);
+        return null;
+    }
+}
+
+function safeStorageSet(area, key, value) {
+    try {
+        const storage = area === 'local' ? window.localStorage : window.sessionStorage;
+        if (storage) {
+            storage.setItem(key, value);
+        }
+    } catch (error) {
+        console.debug(`storage set blocked: ${area}:${key}`, error);
+    }
+}
+
 // 从 localStorage 恢复通知面板状态
-let notificationPanelCollapsed = localStorage.getItem('notificationPanelCollapsed') === 'true';
+let notificationPanelCollapsed = safeStorageGet('local', 'notificationPanelCollapsed') === 'true';
 
 // 页面加载时恢复状态
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== Modal 迁移到 body 根级 =====
+    // 主题页的 .player-main 创建了 z-index 堆叠上下文,
+    // 会把 .modal 困在 backdrop 之下,导致点不到。统一迁移到 body 根级。
+    document.querySelectorAll('.modal').forEach((modalEl) => {
+        if (modalEl.parentElement !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+    });
+
     if (notificationPanelCollapsed) {
         const body = document.getElementById('notificationBody');
         const icon = document.getElementById('panelToggleIcon');
@@ -347,6 +400,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const type = category === 'danger' ? 'error' : (category === 'success' ? 'success' : (category === 'warning' ? 'warning' : 'info'));
         showToast(message, type);
     });
+
+    const shopCatalogModalEl = document.getElementById('shopCatalogModal');
+    const actionModalEl = document.getElementById('webuiActionModal');
+    if (shopCatalogModalEl && actionModalEl) {
+        actionModalEl.addEventListener('shown.bs.modal', () => {
+            if (!shopCatalogModalEl.classList.contains('show')) return;
+            actionModalEl.classList.add('modal-stack-front');
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            const topBackdrop = backdrops[backdrops.length - 1];
+            if (topBackdrop) {
+                topBackdrop.classList.add('modal-stack-front-backdrop');
+            }
+        });
+        actionModalEl.addEventListener('hidden.bs.modal', () => {
+            actionModalEl.classList.remove('modal-stack-front');
+            document.querySelectorAll('.modal-backdrop.modal-stack-front-backdrop').forEach((backdrop) => {
+                backdrop.classList.remove('modal-stack-front-backdrop');
+            });
+            if (shopCatalogModalEl.classList.contains('show')) {
+                document.body.classList.add('modal-open');
+            }
+        });
+    }
 });
 
 // 切换通知面板折叠状态
@@ -368,7 +444,7 @@ function toggleNotificationPanel() {
     }
 
     // 保存状态到 localStorage
-    localStorage.setItem('notificationPanelCollapsed', notificationPanelCollapsed);
+    safeStorageSet('local', 'notificationPanelCollapsed', String(notificationPanelCollapsed));
 }
 
 // 保存通知到 sessionStorage
@@ -386,12 +462,12 @@ function saveNotifications() {
         }
     }
 
-    sessionStorage.setItem('notifications', JSON.stringify(notifications));
+    safeStorageSet('session', 'notifications', JSON.stringify(notifications));
 }
 
 // 从 sessionStorage 恢复通知
 function restoreNotifications() {
-    const saved = sessionStorage.getItem('notifications');
+    const saved = safeStorageGet('session', 'notifications');
     if (saved) {
         try {
             const notifications = JSON.parse(saved);
@@ -544,6 +620,213 @@ function showToast(message, type = 'success', options = {}) {
     });
 }
 
+const shopCatalogState = {
+    scope: null,
+    title: '',
+    payload: null,
+};
+
+function formatShopNumber(value) {
+    return Number(value || 0).toLocaleString('zh-CN');
+}
+
+function escapeHtmlAttr(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function updateWalletDisplay(wallet) {
+    if (!wallet) return;
+    const coinsEl = document.getElementById('navWalletCoins');
+    const premiumEl = document.getElementById('navWalletPremium');
+    if (coinsEl) coinsEl.textContent = formatShopNumber(wallet.coins);
+    if (premiumEl) premiumEl.textContent = formatShopNumber(wallet.premium_currency);
+    const modalWallet = document.getElementById('shopCatalogWalletSummary');
+    if (modalWallet) {
+        modalWallet.textContent = `金币 ${formatShopNumber(wallet.coins)} · 钻石 ${formatShopNumber(wallet.premium_currency)}`;
+    }
+}
+
+function renderShopCosts(costs) {
+    return (costs || []).filter(cost => cost.cost_type && Number(cost.cost_amount || 0) > 0).map(cost => {
+        let label = `${cost.cost_amount}`;
+        if (cost.cost_type === 'coins') label = `金币 ×${cost.cost_amount}`;
+        else if (cost.cost_type === 'premium') label = `钻石 ×${cost.cost_amount}`;
+        else if (cost.cost_type === 'item') label = `${cost.cost_item_name || '道具'} ×${cost.cost_amount}`;
+        else if (cost.cost_type === 'fish') label = `${cost.cost_item_name || '鱼类'} ×${cost.cost_amount}`;
+        else if (cost.cost_type === 'bait') label = `${cost.cost_item_name || '鱼饵'} ×${cost.cost_amount}`;
+        else if (cost.cost_type === 'rod') label = `${cost.cost_item_name || '鱼竿'} ×${cost.cost_amount}`;
+        else if (cost.cost_type === 'accessory') label = `${cost.cost_item_name || '饰品'} ×${cost.cost_amount}`;
+        return `<span class="shop-chip ${cost.satisfied ? 'is-ok' : ''}">${label}</span>`;
+    }).join('');
+}
+
+function renderShopRewards(rewards) {
+    return (rewards || []).map(reward => {
+        let label = `${reward.reward_quantity || reward.reward_amount || 1}`;
+        if (reward.reward_type === 'coins') label = `金币 ×${reward.reward_quantity || reward.reward_amount || 0}`;
+        else if (reward.reward_type === 'premium') label = `钻石 ×${reward.reward_quantity || reward.reward_amount || 0}`;
+        else if (reward.reward_type === 'item') label = `${reward.reward_item_name || '道具'} ×${reward.reward_quantity || reward.reward_amount || 1}`;
+        else if (reward.reward_type === 'bait') label = `${reward.reward_item_name || '鱼饵'} ×${reward.reward_quantity || reward.reward_amount || 1}`;
+        else if (reward.reward_type === 'fish') label = `${reward.reward_item_name || '鱼类'} ×${reward.reward_quantity || reward.reward_amount || 1}`;
+        else if (reward.reward_type === 'rod') label = `${reward.reward_item_name || '鱼竿'}${reward.reward_refine_level ? ` +${reward.reward_refine_level}` : ''}`;
+        else if (reward.reward_type === 'accessory') label = `${reward.reward_item_name || '饰品'}${reward.reward_refine_level ? ` +${reward.reward_refine_level}` : ''}`;
+        return `<span class="shop-chip reward">${label}</span>`;
+    }).join('');
+}
+
+function renderShopCatalog(payload) {
+    const body = document.getElementById('shopCatalogModalBody');
+    if (!body) return;
+    updateWalletDisplay(payload.wallet);
+    const shops = payload.shops || [];
+    if (!shops.length) {
+        body.innerHTML = '<div class="text-center text-muted py-5">当前入口下暂无可用商品。</div>';
+        return;
+    }
+    body.innerHTML = shops.map(shop => `
+        <section class="shop-modal-section mb-4">
+            <div class="shop-modal-section-header mb-3">
+                <h5 class="mb-1">${shop.name}</h5>
+                <p class="text-muted mb-0">${shop.description || '暂无描述'}</p>
+            </div>
+            <div class="row g-3">
+                ${(shop.item_list || []).length ? (shop.item_list || []).map(itemData => {
+                    const item = itemData.item || {};
+                    const stockLeft = item.stock_total ? Math.max(0, Number(item.stock_total || 0) - Number(item.stock_sold || 0)) : null;
+                    return `
+                        <div class="col-md-6 col-xl-4">
+                            <article class="card h-100 shop-modal-card ${itemData.can_purchase ? '' : 'is-disabled'}">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                        <div>
+                                            <h6 class="mb-1">${item.name || '未命名商品'}</h6>
+                                            <div class="small text-muted">${item.description || '暂无描述'}</div>
+                                        </div>
+                                        ${stockLeft !== null ? `<span class="badge bg-light text-dark">库存 ${stockLeft}</span>` : ''}
+                                    </div>
+                                    <div class="small text-muted mb-2">消耗</div>
+                                    <div class="shop-chip-row mb-3">${renderShopCosts(itemData.costs)}</div>
+                                    <div class="small text-muted mb-2">获得</div>
+                                    <div class="shop-chip-row mb-3">${renderShopRewards(itemData.rewards)}</div>
+                                    <div class="small text-muted mb-3">${itemData.purchase_disabled_reason || '可连续购买，购买后仅刷新当前弹窗。'} </div>
+                                    <div class="mt-auto">
+                                        <button class="btn btn-sm w-100 ${itemData.can_purchase ? 'btn-primary' : 'btn-outline-secondary'}" ${itemData.can_purchase ? '' : 'disabled'} data-item-id="${Number(item.item_id || 0)}" data-item-name="${escapeHtmlAttr(item.name || '商品')}" onclick="buyShopCatalogItemFromButton(this)">
+                                            ${itemData.can_purchase ? '购买' : (itemData.purchase_disabled_reason || '不可购买')}
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                    `;
+                }).join('') : '<div class="col-12"><div class="alert alert-info mb-0">该商店暂无商品。</div></div>'}
+            </div>
+        </section>
+    `).join('');
+}
+
+async function buyShopCatalogItemFromButton(button) {
+    const itemId = Number(button.dataset.itemId || 0);
+    const itemName = button.dataset.itemName || '商品';
+    await buyShopCatalogItem(itemId, itemName);
+}
+
+async function fetchShopCatalog(scope) {
+    const response = await fetch(`{{ url_for("player_bp.api_shop_catalog") }}?scope=${encodeURIComponent(scope)}`);
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+        throw new Error(payload.message || '读取商店失败');
+    }
+    return payload;
+}
+
+async function openShopCatalog(scope, title = '商店') {
+    const modalEl = document.getElementById('shopCatalogModal');
+    const titleEl = document.getElementById('shopCatalogModalLabel');
+    const body = document.getElementById('shopCatalogModalBody');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    shopCatalogState.scope = scope;
+    shopCatalogState.title = title;
+    titleEl.textContent = title;
+    body.innerHTML = '<div class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>正在读取商店目录…</div>';
+    modal.show();
+    try {
+        const payload = await fetchShopCatalog(scope);
+        shopCatalogState.payload = payload;
+        renderShopCatalog(payload);
+    } catch (error) {
+        body.innerHTML = `<div class="alert alert-danger mb-0">${error.message || '读取商店失败'}</div>`;
+    }
+}
+
+async function refreshOpenShopCatalog() {
+    if (!shopCatalogState.scope) return;
+    const payload = await fetchShopCatalog(shopCatalogState.scope);
+    shopCatalogState.payload = payload;
+    renderShopCatalog(payload);
+}
+
+async function buyShopCatalogItem(itemId, itemName) {
+    const quantity = await webuiPrompt(`请输入购买【${itemName}】的数量。`, {
+        title: '购买商品',
+        defaultValue: '1',
+        inputType: 'number',
+        min: '1',
+        step: '1',
+        confirmText: '购买',
+    });
+    if (!quantity) return;
+    const qty = parseInt(quantity, 10);
+    if (!Number.isInteger(qty) || qty <= 0) {
+        showToast('数量无效', 'error');
+        return;
+    }
+    try {
+        const response = await fetch('{{ url_for("player_bp.api_buy_shop_item") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_id: itemId, quantity: qty}),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            showToast(data.message || '购买失败', 'error');
+            return;
+        }
+        updateWalletDisplay(data.wallet);
+        showToast(data.message || '购买成功', 'success');
+        await refreshOpenShopCatalog();
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+async function goToPortalZone(zoneId, zoneName) {
+    const formData = new FormData();
+    formData.append('zone_id', zoneId);
+    try {
+        const response = await fetch('{{ url_for("player_bp.change_zone") }}', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await response.json();
+        if (!data.success) {
+            showToast(data.message || '切换区域失败', 'error');
+            return;
+        }
+        showToast(data.message || `已前往 ${zoneName}`, 'success');
+        window.location.reload();
+    } catch (error) {
+        showToast('网络错误，请稍后重试', 'error');
+    }
+}
+
+window.openShopCatalog = openShopCatalog;
+window.buyShopCatalogItem = buyShopCatalogItem;
+window.goToPortalZone = goToPortalZone;
+
 async function loadCthulhuPollution() {
     const numeralGlyphs = {'0': '𒐀', '1': '𒐁', '2': '𒐂', '3': '𒐃', '4': '𒐄', '5': '𒐅', '6': '𒐆', '7': '𒐇', '8': '𒐈', '9': '𒐉'};
     const zalgoMarks = ['\u0300', '\u0301', '\u0302', '\u0303', '\u0304', '\u0307', '\u0308', '\u0323', '\u0330', '\u0336'];
@@ -650,6 +933,16 @@ async function loadCthulhuPollution() {
         const noise = document.getElementById('cthulhuNoiseOverlay');
         body.classList.remove('cthulhu-u8-red', 'cthulhu-u8-green', 'cthulhu-u8-purple', 'cthulhu-u11', 'cthulhu-u14');
         if (noise) noise.classList.add('d-none');
+        // 克苏鲁污染优先于区域主题：任意污染可见时取消区域主题
+        if (visible.length > 0) {
+            body.classList.add('has-cthulhu-pollution');
+            body.classList.remove('theme-scifi');
+            body.classList.remove('theme-wendao');
+            body.classList.remove('theme-cthulhu');
+            body.classList.remove('theme-mahuan');
+        } else {
+            body.classList.remove('has-cthulhu-pollution');
+        }
         if (visible.includes('U8')) {
             const variants = ['cthulhu-u8-red', 'cthulhu-u8-green', 'cthulhu-u8-purple'];
             body.classList.add(variants[('{{ session.get("user_id") }}'.length + visible.length) % variants.length]);
@@ -674,5 +967,76 @@ async function loadCthulhuPollution() {
 loadCthulhuPollution();
 </script>
 {% block extra_js %}{% endblock %}
+
+<!-- 克苏鲁主题装饰：3 颗深渊之眼（跟随鼠标）。仅在 body.theme-cthulhu 时通过 CSS 显示。 -->
+<svg class="abyss-eye abyss-eye-1" viewBox="0 0 200 200" aria-hidden="true">
+    <defs>
+        <clipPath id="abyssLid1"><path d="M 10 100 Q 100 30 190 100 Q 100 170 10 100 Z"/></clipPath>
+    </defs>
+    <path d="M 10 100 Q 100 30 190 100 Q 100 170 10 100 Z" fill="#0a0405" stroke="#3a0c12" stroke-width="2"/>
+    <g clip-path="url(#abyssLid1)">
+        <circle class="abyss-pupil" cx="100" cy="100" r="34" fill="#c43232"/>
+        <circle class="abyss-pupil" cx="100" cy="100" r="22" fill="#0a0405"/>
+        <circle class="abyss-pupil" cx="93" cy="93" r="4" fill="#fff" opacity="0.6"/>
+    </g>
+</svg>
+<svg class="abyss-eye abyss-eye-2" viewBox="0 0 200 200" aria-hidden="true">
+    <defs>
+        <clipPath id="abyssLid2"><path d="M 10 100 Q 100 30 190 100 Q 100 170 10 100 Z"/></clipPath>
+    </defs>
+    <path d="M 10 100 Q 100 30 190 100 Q 100 170 10 100 Z" fill="#0a0405" stroke="#3a0c12" stroke-width="2"/>
+    <g clip-path="url(#abyssLid2)">
+        <circle class="abyss-pupil" cx="100" cy="100" r="32" fill="#c43232"/>
+        <circle class="abyss-pupil" cx="100" cy="100" r="20" fill="#0a0405"/>
+        <circle class="abyss-pupil" cx="93" cy="93" r="4" fill="#fff" opacity="0.6"/>
+    </g>
+</svg>
+<svg class="abyss-eye abyss-eye-3" viewBox="0 0 200 200" aria-hidden="true">
+    <defs>
+        <clipPath id="abyssLid3"><path d="M 10 100 Q 100 30 190 100 Q 100 170 10 100 Z"/></clipPath>
+    </defs>
+    <path d="M 10 100 Q 100 30 190 100 Q 100 170 10 100 Z" fill="#0a0405" stroke="#3a0c12" stroke-width="2"/>
+    <g clip-path="url(#abyssLid3)">
+        <circle class="abyss-pupil" cx="100" cy="100" r="28" fill="#c43232"/>
+        <circle class="abyss-pupil" cx="100" cy="100" r="18" fill="#0a0405"/>
+        <circle class="abyss-pupil" cx="93" cy="93" r="3" fill="#fff" opacity="0.6"/>
+    </g>
+</svg>
+
+<script>
+(function initAbyssEyes() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const eyes = document.querySelectorAll('.abyss-eye');
+    if (!eyes.length) return;
+    const MAX_OFFSET = 16; // SVG user units
+    let targetX = 0, targetY = 0;
+    let rafPending = false;
+
+    function update(e) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const nx = (e.clientX / w) * 2 - 1;
+        const ny = (e.clientY / h) * 2 - 1;
+        targetX = nx * MAX_OFFSET;
+        targetY = ny * MAX_OFFSET;
+        if (!rafPending) {
+            rafPending = true;
+            requestAnimationFrame(apply);
+        }
+    }
+
+    function apply() {
+        eyes.forEach((eye) => {
+            eye.querySelectorAll('.abyss-pupil').forEach((p) => {
+                p.setAttribute('transform', `translate(${targetX} ${targetY})`);
+            });
+        });
+        rafPending = false;
+    }
+
+    document.addEventListener('mousemove', update, { passive: true });
+})();
+</script>
+
 </body>
 </html>

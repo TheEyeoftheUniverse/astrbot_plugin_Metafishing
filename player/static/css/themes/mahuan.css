@@ -1,0 +1,825 @@
+/* ============================================================
+   魔幻·黑暗火炼主题（区域 8 全站皮肤）
+   触发：body.theme-mahuan（玩家所在区域=8 时由 layout 自动添加）
+   优先级：低于 .has-cthulhu-pollution（克苏鲁污染会移除 theme-mahuan）
+
+   设计目标：D&D 法师塔 + 熔岩圣殿
+   色彩：岩黑 + 熔火橙 + 暗血红 + 占星紫 + 星光金
+   ============================================================ */
+
+body.theme-mahuan {
+    /* —— 黑暗火炼色板 —— */
+    --magic-rock: #0e0a08;            /* 岩黑·底 */
+    --magic-rock-soft: #1b1410;       /* 岩黑·浅 */
+    --magic-rock-deep: #050302;       /* 岩黑·深 */
+    --magic-ember: #ff6a1a;           /* 熔火橙 */
+    --magic-ember-bright: #ffb547;    /* 亮火 */
+    --magic-ember-deep: #7a2a0a;      /* 暗火 */
+    --magic-ember-glow: rgba(255, 106, 26, 0.45);
+    --magic-blood: #a32525;           /* 暗血红 */
+    --magic-blood-soft: rgba(163, 37, 37, 0.4);
+    --magic-ash: #5d524a;             /* 灰烬中性 */
+    --magic-parchment: #f0d6a0;       /* 羊皮纸黄·主文字 */
+    --magic-parchment-dim: #c5b18a;   /* 提亮一档，在黑底上要看得清 */
+    --magic-arcane: #7d4ec7;          /* 占星紫·点缀 */
+    --magic-arcane-soft: rgba(125, 78, 199, 0.35);
+    --magic-gold: #ffd277;            /* 烫金·边框 */
+    --magic-gold-deep: #b88838;
+    --magic-star: #ffe082;            /* 星光金·稀有 */
+    --magic-line: rgba(255, 210, 119, 0.32);
+    --magic-line-strong: rgba(255, 210, 119, 0.55);
+    --magic-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(255, 210, 119, 0.12),
+        inset 0 0 32px rgba(255, 106, 26, 0.06);
+
+    /* 重定向通用 --muted / --ink / --hairline，让所有用了 var(--muted) 的旧组件
+       （如 stat-dashboard、metric-strip、editorial-kicker 等）在黑底上仍可读 */
+    --muted: #c5b18a;
+    --ink: #f0d6a0;
+    --hairline: rgba(255, 210, 119, 0.22);
+
+    color: var(--magic-parchment);
+    font-family: "Cinzel", "Trajan Pro", "EB Garamond", "Georgia", "Songti SC", "STSong", serif;
+    letter-spacing: 0.02em;
+}
+
+/* 在 zone-8 背景图之上叠加火光呼吸 + 暗调 */
+body.theme-mahuan::after {
+    background-image:
+        /* 顶层暗罩：底部最暗，顶部留些天光 */
+        linear-gradient(180deg,
+            rgba(14, 10, 8, 0.30) 0%,
+            rgba(14, 10, 8, 0.45) 50%,
+            rgba(5, 3, 2, 0.65) 100%),
+        /* 双火把光晕：左下 + 右下 */
+        radial-gradient(circle at 8% 88%, rgba(255, 140, 50, 0.35), transparent 18%),
+        radial-gradient(circle at 92% 90%, rgba(255, 140, 50, 0.35), transparent 18%),
+        /* 顶部魔法冷光雾 */
+        radial-gradient(ellipse 80% 40% at 50% 0%, rgba(125, 78, 199, 0.20), transparent 60%),
+        /* 底层：zone-8 原图 */
+        url("../../img/zones/zone-8.png");
+    background-size: cover, cover, cover, cover, cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 1;
+    animation: magic-ember-breath 4.5s ease-in-out infinite;
+}
+@keyframes magic-ember-breath {
+    0%, 100% { filter: brightness(0.95); }
+    50%      { filter: brightness(1.08) saturate(1.08); }
+}
+
+/* ============================================================
+   层：背景隐约旋转的魔法阵（占据整个 .player-main 视区）
+   ============================================================ */
+body.theme-mahuan .player-main::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800' viewBox='0 0 800 800'><g fill='none' stroke='%23ffd277' stroke-width='1.4' opacity='0.85'><circle cx='400' cy='400' r='380'/><circle cx='400' cy='400' r='320'/><circle cx='400' cy='400' r='240'/><circle cx='400' cy='400' r='180'/><circle cx='400' cy='400' r='110'/><circle cx='400' cy='400' r='52'/><polygon points='400,40 462,508 102,242 698,242 338,508'/><polygon points='400,760 338,292 698,558 102,558 462,292'/><g stroke-width='0.8'><line x1='20' y1='400' x2='780' y2='400'/><line x1='400' y1='20' x2='400' y2='780'/><line x1='90' y1='90' x2='710' y2='710'/><line x1='710' y1='90' x2='90' y2='710'/></g><g font-family='Georgia, serif' font-size='18' fill='%23ffd277' stroke='none' opacity='0.9'><text x='395' y='28'>✦</text><text x='395' y='784'>✦</text><text x='12' y='406'>✦</text><text x='776' y='406'>✦</text></g></g></svg>");
+    background-size: 920px 920px;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.07;
+    animation: magic-sigil-rotate 80s linear infinite;
+}
+@keyframes magic-sigil-rotate {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 内容容器置于法阵之上 */
+body.theme-mahuan .player-main > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* ============================================================
+   全局段落 / 通用文字 / 链接 / hr
+   ============================================================ */
+body.theme-mahuan p { color: var(--magic-parchment); }
+body.theme-mahuan a {
+    color: var(--magic-gold);
+    text-decoration: none;
+    text-shadow: 0 0 6px rgba(255, 210, 119, 0.25);
+}
+body.theme-mahuan a:hover {
+    color: var(--magic-ember-bright);
+    text-shadow: 0 0 10px var(--magic-ember-glow);
+}
+body.theme-mahuan hr { border-color: var(--magic-line); opacity: 0.55; }
+
+body.theme-mahuan .player-main h1,
+body.theme-mahuan .player-main h2,
+body.theme-mahuan .player-main h3,
+body.theme-mahuan .player-main h4,
+body.theme-mahuan .player-main h5,
+body.theme-mahuan .player-main h6 {
+    color: var(--magic-gold);
+    font-family: "Cinzel", "Trajan Pro", "EB Garamond", "Georgia", serif;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 12px rgba(255, 106, 26, 0.18);
+}
+
+/* ============================================================
+   顶栏：黑铁烫金条
+   ============================================================ */
+body.theme-mahuan .player-topbar {
+    background:
+        linear-gradient(180deg, rgba(14, 10, 8, 0.94), rgba(5, 3, 2, 0.94)) !important;
+    border-bottom: 1px solid var(--magic-line-strong);
+    box-shadow:
+        0 2px 12px rgba(0, 0, 0, 0.6),
+        0 -1px 0 rgba(255, 210, 119, 0.18) inset;
+    backdrop-filter: blur(10px);
+}
+body.theme-mahuan .player-topbar.navbar-light .navbar-brand,
+body.theme-mahuan .player-topbar.navbar-light .navbar-nav .nav-link,
+body.theme-mahuan .player-topbar.navbar-light .nav-link.dropdown-toggle,
+body.theme-mahuan .player-topbar .navbar-brand,
+body.theme-mahuan .player-topbar .navbar-nav .nav-link {
+    color: var(--magic-parchment) !important;
+    font-family: "Cinzel", "Trajan Pro", "Georgia", serif;
+    letter-spacing: 0.04em;
+}
+body.theme-mahuan .player-topbar .navbar-brand {
+    color: var(--magic-gold) !important;
+    font-weight: 600;
+    text-shadow: 0 0 12px var(--magic-ember-glow);
+}
+body.theme-mahuan .player-topbar.navbar-light .navbar-brand:hover,
+body.theme-mahuan .player-topbar.navbar-light .navbar-nav .nav-link:hover,
+body.theme-mahuan .player-topbar.navbar-light .navbar-nav .nav-link.show {
+    color: var(--magic-ember-bright) !important;
+    text-shadow: 0 0 8px var(--magic-ember-glow);
+}
+body.theme-mahuan .player-topbar .navbar-toggler {
+    border-color: var(--magic-line-strong);
+}
+body.theme-mahuan .player-topbar .navbar-toggler-icon {
+    filter: invert(0.85) sepia(0.4) saturate(2);
+}
+body.theme-mahuan .player-topbar .dropdown-menu {
+    background: linear-gradient(180deg, rgba(14, 10, 8, 0.97), rgba(5, 3, 2, 0.97));
+    border: 1px solid var(--magic-line-strong);
+    border-radius: 2px;
+    box-shadow: var(--magic-shadow);
+}
+body.theme-mahuan .player-topbar .dropdown-menu .dropdown-item {
+    color: var(--magic-parchment);
+    letter-spacing: 0.04em;
+    font-family: "Cinzel", "Georgia", serif;
+}
+body.theme-mahuan .player-topbar .dropdown-menu .dropdown-item:hover,
+body.theme-mahuan .player-topbar .dropdown-menu .dropdown-item:focus {
+    background: rgba(255, 106, 26, 0.16);
+    color: var(--magic-ember-bright);
+}
+body.theme-mahuan .player-topbar .dropdown-menu .dropdown-item.text-danger {
+    color: var(--magic-blood) !important;
+}
+body.theme-mahuan .player-topbar .dropdown-menu .dropdown-item.text-danger:hover {
+    background: var(--magic-blood-soft);
+    color: #ff6b6b !important;
+}
+body.theme-mahuan .player-topbar .dropdown-menu .dropdown-divider {
+    border-top-color: var(--magic-line);
+}
+body.theme-mahuan .player-topbar .player-wallet-pill,
+body.theme-mahuan .player-topbar .player-account-trigger {
+    background: rgba(14, 10, 8, 0.6) !important;
+    border: 1px solid var(--magic-line-strong) !important;
+    color: var(--magic-parchment) !important;
+    font-family: "Cinzel", "Georgia", serif;
+    border-radius: 2px !important;
+}
+body.theme-mahuan .player-topbar .player-wallet-pill:hover,
+body.theme-mahuan .player-topbar .player-account-trigger:hover {
+    background: rgba(255, 106, 26, 0.18) !important;
+    box-shadow: 0 0 16px var(--magic-ember-glow);
+}
+
+/* ============================================================
+   卡片：石碑 / 法师卷轴
+   ============================================================ */
+body.theme-mahuan .card {
+    background:
+        radial-gradient(ellipse at top, rgba(255, 106, 26, 0.06), transparent 60%),
+        linear-gradient(180deg, rgba(27, 20, 16, 0.88) 0%, rgba(14, 10, 8, 0.92) 100%) !important;
+    border: 1px solid var(--magic-line-strong) !important;
+    border-radius: 3px !important;
+    color: var(--magic-parchment);
+    box-shadow: var(--magic-shadow) !important;
+    backdrop-filter: blur(4px);
+    transition: box-shadow .3s ease, border-color .3s ease, transform .3s ease;
+    position: relative;
+}
+/* 卡片四角符文装饰 */
+body.theme-mahuan .card::before {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    pointer-events: none;
+    border: 1px solid rgba(255, 210, 119, 0.10);
+    border-radius: 1px;
+}
+body.theme-mahuan .card:hover {
+    border-color: var(--magic-ember) !important;
+    box-shadow:
+        0 14px 36px rgba(0, 0, 0, 0.7),
+        0 0 28px var(--magic-ember-glow),
+        inset 0 0 50px rgba(255, 106, 26, 0.10) !important;
+}
+body.theme-mahuan .card-header {
+    background:
+        linear-gradient(90deg, rgba(255, 106, 26, 0.20), rgba(125, 78, 199, 0.10) 70%, transparent) !important;
+    color: var(--magic-gold) !important;
+    border-bottom: 1px solid var(--magic-line-strong);
+    font-family: "Cinzel", "Georgia", serif;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    font-size: 0.96rem;
+    padding: 10px 18px;
+    position: relative;
+}
+body.theme-mahuan .card-header::before {
+    content: "❖";
+    display: inline-block;
+    color: var(--magic-ember);
+    margin-right: 12px;
+    text-shadow: 0 0 8px var(--magic-ember-glow);
+    font-size: 1em;
+    vertical-align: -0.05em;
+}
+body.theme-mahuan .card-header i.fas,
+body.theme-mahuan .card-header i.fa {
+    color: var(--magic-ember-bright);
+    margin-right: 8px;
+    text-shadow: 0 0 6px var(--magic-ember-glow);
+}
+body.theme-mahuan .card-header.bg-info,
+body.theme-mahuan .card-header.bg-warning,
+body.theme-mahuan .card-header.bg-primary,
+body.theme-mahuan .card-header.bg-secondary,
+body.theme-mahuan .card-header.bg-success,
+body.theme-mahuan .card-header.bg-danger {
+    background:
+        linear-gradient(90deg, rgba(255, 106, 26, 0.22), rgba(125, 78, 199, 0.12) 70%, transparent) !important;
+    color: var(--magic-gold) !important;
+}
+body.theme-mahuan .card-body {
+    color: var(--magic-parchment);
+    padding: 18px;
+}
+body.theme-mahuan .card-body .border.rounded {
+    background: rgba(14, 10, 8, 0.55) !important;
+    border: 1px solid var(--magic-line) !important;
+    border-left: 3px solid var(--magic-ember) !important;
+    border-radius: 1px !important;
+    color: var(--magic-parchment);
+}
+body.theme-mahuan .text-muted,
+body.theme-mahuan .card-body .text-muted {
+    color: var(--magic-parchment-dim) !important;
+}
+
+/* 钓鱼仪表盘 / metric-strip 等吃 var(--ink)/var(--muted) 的旧组件，
+   在 :root 重定向后自动跟随魔幻配色；这里只补强对比与单元格细节。 */
+body.theme-mahuan .stat-dashboard-board { border-color: var(--magic-line); }
+body.theme-mahuan .stat-dashboard-cell {
+    border-color: var(--magic-line);
+    background: rgba(14, 10, 8, 0.35);
+}
+body.theme-mahuan .stat-line-label { color: var(--magic-gold); letter-spacing: 0.02em; }
+body.theme-mahuan .stat-line-note { color: var(--magic-parchment-dim); letter-spacing: 0; }
+body.theme-mahuan .stat-dashboard-cell strong {
+    color: var(--magic-ember-bright);
+    text-shadow: 0 0 6px var(--magic-ember-glow);
+}
+body.theme-mahuan .stat-line-icon { color: var(--magic-ember-bright); }
+
+/* ============================================================
+   按钮：法器铭文
+   ============================================================ */
+body.theme-mahuan .btn {
+    font-family: "Cinzel", "Trajan Pro", "Georgia", serif;
+    letter-spacing: 0.06em;
+    font-size: 0.86rem;
+    font-weight: 600;
+    border-radius: 2px;
+    padding: 7px 16px;
+    transition: all .25s ease;
+    position: relative;
+}
+body.theme-mahuan .btn-primary,
+body.theme-mahuan .btn-info,
+body.theme-mahuan .btn-outline-primary,
+body.theme-mahuan .btn-outline-info {
+    background: linear-gradient(180deg, rgba(255, 106, 26, 0.22) 0%, rgba(122, 42, 10, 0.5) 100%) !important;
+    border: 1px solid var(--magic-ember) !important;
+    color: var(--magic-ember-bright) !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 210, 119, 0.22),
+        0 0 12px rgba(255, 106, 26, 0.20) !important;
+    text-shadow: 0 0 4px var(--magic-ember-glow);
+}
+body.theme-mahuan .btn-primary:hover:not(:disabled),
+body.theme-mahuan .btn-info:hover:not(:disabled),
+body.theme-mahuan .btn-outline-primary:hover:not(:disabled),
+body.theme-mahuan .btn-outline-info:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(255, 140, 50, 0.42) 0%, rgba(150, 60, 18, 0.65) 100%) !important;
+    color: #fff5d6 !important;
+    border-color: var(--magic-ember-bright) !important;
+    box-shadow:
+        0 4px 18px rgba(255, 106, 26, 0.45),
+        0 0 32px var(--magic-ember-glow),
+        inset 0 1px 0 rgba(255, 210, 119, 0.45) !important;
+    transform: translateY(-1px);
+}
+body.theme-mahuan .btn-success,
+body.theme-mahuan .btn-warning,
+body.theme-mahuan .btn-outline-success,
+body.theme-mahuan .btn-outline-warning {
+    background: linear-gradient(180deg, rgba(255, 210, 119, 0.18) 0%, rgba(184, 136, 56, 0.5) 100%) !important;
+    border: 1px solid var(--magic-gold) !important;
+    color: var(--magic-gold) !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 224, 130, 0.25) !important;
+    text-shadow: 0 0 4px rgba(255, 210, 119, 0.4);
+}
+body.theme-mahuan .btn-success:hover:not(:disabled),
+body.theme-mahuan .btn-warning:hover:not(:disabled),
+body.theme-mahuan .btn-outline-success:hover:not(:disabled),
+body.theme-mahuan .btn-outline-warning:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(255, 224, 130, 0.32) 0%, rgba(220, 170, 80, 0.65) 100%) !important;
+    color: #fffbe8 !important;
+    box-shadow:
+        0 4px 18px rgba(255, 210, 119, 0.4),
+        0 0 28px rgba(255, 224, 130, 0.45),
+        inset 0 1px 0 rgba(255, 224, 130, 0.5) !important;
+    transform: translateY(-1px);
+}
+body.theme-mahuan .btn-secondary,
+body.theme-mahuan .btn-outline-secondary {
+    background: linear-gradient(180deg, rgba(125, 78, 199, 0.18) 0%, rgba(60, 35, 100, 0.55) 100%) !important;
+    border: 1px solid var(--magic-arcane) !important;
+    color: #d3bcfc !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(211, 188, 252, 0.25) !important;
+    text-shadow: 0 0 4px var(--magic-arcane-soft);
+}
+body.theme-mahuan .btn-secondary:hover:not(:disabled),
+body.theme-mahuan .btn-outline-secondary:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(160, 110, 230, 0.36) 0%, rgba(90, 55, 150, 0.65) 100%) !important;
+    color: #f0e3ff !important;
+    box-shadow:
+        0 4px 18px var(--magic-arcane-soft),
+        0 0 24px rgba(125, 78, 199, 0.5),
+        inset 0 1px 0 rgba(211, 188, 252, 0.45) !important;
+    transform: translateY(-1px);
+}
+body.theme-mahuan .btn-danger,
+body.theme-mahuan .btn-outline-danger {
+    background: linear-gradient(180deg, rgba(220, 40, 40, 0.30) 0%, rgba(110, 18, 18, 0.65) 100%) !important;
+    border: 1px solid var(--magic-blood) !important;
+    color: #ffb3b3 !important;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 100, 100, 0.22) !important;
+    text-shadow: 0 0 4px rgba(220, 40, 40, 0.4);
+}
+body.theme-mahuan .btn-danger:hover:not(:disabled),
+body.theme-mahuan .btn-outline-danger:hover:not(:disabled) {
+    background: linear-gradient(180deg, rgba(255, 70, 70, 0.42) 0%, rgba(140, 30, 30, 0.7) 100%) !important;
+    color: #fff !important;
+    box-shadow:
+        0 4px 18px var(--magic-blood-soft),
+        0 0 28px rgba(220, 40, 40, 0.5),
+        inset 0 1px 0 rgba(255, 100, 100, 0.45) !important;
+    transform: translateY(-1px);
+}
+body.theme-mahuan .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+body.theme-mahuan .btn-close {
+    filter: invert(0.85) sepia(0.5) saturate(2);
+}
+
+/* ============================================================
+   alert
+   ============================================================ */
+body.theme-mahuan .alert {
+    background: rgba(14, 10, 8, 0.70) !important;
+    border: 1px solid var(--magic-line-strong) !important;
+    color: var(--magic-parchment) !important;
+    border-radius: 2px;
+    border-left: 3px solid var(--magic-ember) !important;
+    backdrop-filter: blur(4px);
+}
+body.theme-mahuan .alert-info {
+    border-left-color: var(--magic-arcane) !important;
+    background: rgba(125, 78, 199, 0.10) !important;
+}
+body.theme-mahuan .alert-warning {
+    border-left-color: var(--magic-gold) !important;
+    background: rgba(255, 210, 119, 0.10) !important;
+}
+body.theme-mahuan .alert-success {
+    border-left-color: var(--magic-ember-bright) !important;
+    background: rgba(255, 106, 26, 0.10) !important;
+    color: var(--magic-ember-bright) !important;
+}
+body.theme-mahuan .alert-danger {
+    border-left-color: var(--magic-blood) !important;
+    background: rgba(163, 37, 37, 0.18) !important;
+    color: #ffb3b3 !important;
+}
+
+/* ============================================================
+   进度条：法术蓄能槽
+   ============================================================ */
+body.theme-mahuan .progress {
+    background: rgba(0, 0, 0, 0.55) !important;
+    border: 1px solid var(--magic-line-strong);
+    border-radius: 2px;
+    height: 22px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+}
+body.theme-mahuan .progress-bar {
+    background: linear-gradient(90deg,
+        var(--magic-ember-deep) 0%,
+        var(--magic-ember) 40%,
+        var(--magic-ember-bright) 70%,
+        var(--magic-gold) 100%) !important;
+    background-size: 200% 100% !important;
+    color: #fffbe8 !important;
+    font-family: "Cinzel", "Georgia", serif;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 14px var(--magic-ember-glow);
+    animation: magic-progress-flow 3.5s linear infinite;
+}
+@keyframes magic-progress-flow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+body.theme-mahuan .progress-bar.bg-success {
+    background: linear-gradient(90deg, var(--magic-gold-deep), var(--magic-gold)) !important;
+    box-shadow: 0 0 14px rgba(255, 210, 119, 0.4);
+}
+body.theme-mahuan .progress-bar.bg-danger {
+    background: linear-gradient(90deg, #5a0e0e, var(--magic-blood)) !important;
+    box-shadow: 0 0 14px var(--magic-blood-soft);
+    animation: none;
+}
+body.theme-mahuan .progress-bar.bg-info {
+    background: linear-gradient(90deg, #3b2270, var(--magic-arcane)) !important;
+    box-shadow: 0 0 14px var(--magic-arcane-soft);
+    animation: none;
+}
+
+/* ============================================================
+   badge：徽章 / 印记
+   ============================================================ */
+body.theme-mahuan .badge {
+    background: rgba(14, 10, 8, 0.7) !important;
+    color: var(--magic-parchment) !important;
+    border: 1px solid var(--magic-line-strong);
+    border-radius: 2px;
+    font-family: "Cinzel", "Georgia", serif;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    padding: 4px 10px;
+}
+body.theme-mahuan .badge.bg-primary,
+body.theme-mahuan .badge.bg-info {
+    background: rgba(255, 106, 26, 0.20) !important;
+    color: var(--magic-ember-bright) !important;
+    border-color: var(--magic-ember);
+    text-shadow: 0 0 4px var(--magic-ember-glow);
+}
+body.theme-mahuan .badge.bg-success {
+    background: rgba(255, 210, 119, 0.20) !important;
+    color: var(--magic-gold) !important;
+    border-color: var(--magic-gold);
+}
+body.theme-mahuan .badge.bg-warning {
+    background: rgba(255, 210, 119, 0.20) !important;
+    color: var(--magic-gold) !important;
+    border-color: var(--magic-gold);
+}
+body.theme-mahuan .badge.bg-danger {
+    background: rgba(163, 37, 37, 0.65) !important;
+    color: #ffe0e0 !important;
+    border-color: var(--magic-blood);
+    box-shadow: 0 0 8px var(--magic-blood-soft);
+}
+body.theme-mahuan .badge.bg-secondary {
+    border-color: var(--magic-arcane);
+    color: #d3bcfc !important;
+}
+body.theme-mahuan .badge.bg-light {
+    background: rgba(240, 214, 160, 0.18) !important;
+    color: var(--magic-parchment) !important;
+}
+
+/* ============================================================
+   表格
+   ============================================================ */
+body.theme-mahuan .table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(255, 106, 26, 0.05);
+    --bs-table-hover-bg: rgba(255, 106, 26, 0.12);
+    --bs-table-border-color: var(--magic-line);
+    color: var(--magic-parchment);
+}
+body.theme-mahuan .table thead th {
+    border-bottom: 2px solid var(--magic-gold);
+    font-family: "Cinzel", "Georgia", serif;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--magic-gold);
+    background: rgba(255, 106, 26, 0.10) !important;
+}
+body.theme-mahuan .table > :not(caption) > * > * {
+    background-color: transparent;
+    border-color: var(--magic-line);
+    color: var(--magic-parchment);
+}
+
+/* ============================================================
+   utility 颜色
+   ============================================================ */
+body.theme-mahuan .bg-info,
+body.theme-mahuan .bg-primary {
+    background: linear-gradient(135deg, var(--magic-ember), var(--magic-ember-deep)) !important;
+    color: #fffbe8 !important;
+}
+body.theme-mahuan .bg-warning,
+body.theme-mahuan .bg-success {
+    background: linear-gradient(135deg, var(--magic-gold), var(--magic-gold-deep)) !important;
+    color: var(--magic-rock) !important;
+}
+body.theme-mahuan .bg-secondary {
+    background: linear-gradient(135deg, var(--magic-arcane), #3b2270) !important;
+    color: #fff !important;
+}
+body.theme-mahuan .bg-light {
+    background: rgba(240, 214, 160, 0.12) !important;
+    color: var(--magic-parchment) !important;
+}
+body.theme-mahuan .text-muted { color: var(--magic-parchment-dim) !important; }
+body.theme-mahuan .text-info,
+body.theme-mahuan .text-primary { color: var(--magic-ember-bright) !important; }
+body.theme-mahuan .text-warning,
+body.theme-mahuan .text-success { color: var(--magic-gold) !important; }
+body.theme-mahuan .text-danger { color: #ff8585 !important; }
+body.theme-mahuan .text-white { color: var(--magic-parchment) !important; }
+body.theme-mahuan .border-info,
+body.theme-mahuan .border-warning,
+body.theme-mahuan .border-primary,
+body.theme-mahuan .border-secondary,
+body.theme-mahuan .border-success {
+    border-color: var(--magic-line-strong) !important;
+}
+body.theme-mahuan .border-danger { border-color: var(--magic-blood) !important; }
+
+/* ============================================================
+   form 控件
+   ============================================================ */
+body.theme-mahuan .form-control,
+body.theme-mahuan .form-select {
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--magic-line-strong);
+    color: var(--magic-parchment);
+    border-radius: 2px;
+    font-family: "Cinzel", "Georgia", serif;
+}
+body.theme-mahuan .form-control:focus,
+body.theme-mahuan .form-select:focus {
+    background: rgba(14, 10, 8, 0.7);
+    border-color: var(--magic-ember);
+    box-shadow: 0 0 0 0.2rem var(--magic-ember-glow);
+    color: var(--magic-parchment);
+}
+body.theme-mahuan .form-control::placeholder { color: var(--magic-parchment-dim); }
+body.theme-mahuan .form-label,
+body.theme-mahuan .form-text,
+body.theme-mahuan label {
+    color: var(--magic-parchment);
+    font-family: "Cinzel", "Georgia", serif;
+}
+
+/* ============================================================
+   list-group
+   ============================================================ */
+body.theme-mahuan .list-group,
+body.theme-mahuan .list-group-item {
+    background: transparent !important;
+    color: var(--magic-parchment);
+    border: none !important;
+}
+body.theme-mahuan .list-group-item {
+    border-bottom: 1px dashed var(--magic-line) !important;
+    padding: 10px 14px;
+}
+body.theme-mahuan .list-group-item:hover { background: rgba(255, 106, 26, 0.08) !important; }
+body.theme-mahuan .list-group-item-success { background: rgba(255, 210, 119, 0.10) !important; color: var(--magic-gold) !important; }
+body.theme-mahuan .list-group-item-danger { background: rgba(163, 37, 37, 0.16) !important; color: #ffb3b3 !important; }
+body.theme-mahuan .list-group-item-warning { background: rgba(255, 210, 119, 0.12) !important; color: var(--magic-gold) !important; }
+body.theme-mahuan .list-group-item-info { background: rgba(125, 78, 199, 0.12) !important; color: #d3bcfc !important; }
+
+/* ============================================================
+   editorial-footer
+   ============================================================ */
+body.theme-mahuan .editorial-footer {
+    background: transparent !important;
+    border-top: 1px solid var(--magic-line-strong);
+    color: var(--magic-parchment-dim);
+    font-family: "Cinzel", "Georgia", serif;
+}
+body.theme-mahuan .editorial-footer a { color: var(--magic-gold); }
+
+/* ============================================================
+   toast / modal：召唤阵 / 仪式书页
+   ============================================================ */
+body.theme-mahuan #playerToastStack .toast {
+    background: linear-gradient(180deg, rgba(27, 20, 16, 0.95), rgba(14, 10, 8, 0.95));
+    color: var(--magic-parchment);
+    border: 1px solid var(--magic-line-strong);
+    border-radius: 2px;
+    box-shadow: var(--magic-shadow);
+    backdrop-filter: blur(8px);
+}
+body.theme-mahuan .toast-header {
+    background: rgba(255, 106, 26, 0.14);
+    color: var(--magic-gold);
+    border-bottom: 1px solid var(--magic-line);
+    font-family: "Cinzel", "Georgia", serif;
+    letter-spacing: 0.12em;
+}
+body.theme-mahuan .modal-content {
+    background:
+        radial-gradient(ellipse at top, rgba(255, 106, 26, 0.10), transparent 60%),
+        linear-gradient(180deg, rgba(27, 20, 16, 0.96) 0%, rgba(14, 10, 8, 0.98) 100%);
+    color: var(--magic-parchment);
+    border: 1px solid var(--magic-line-strong);
+    border-radius: 3px;
+    box-shadow:
+        0 24px 56px rgba(0, 0, 0, 0.75),
+        0 0 36px var(--magic-ember-glow),
+        0 0 0 1px rgba(255, 210, 119, 0.18);
+    backdrop-filter: blur(10px);
+}
+body.theme-mahuan .modal-header {
+    background: linear-gradient(90deg, rgba(255, 106, 26, 0.22), rgba(125, 78, 199, 0.10) 70%, transparent);
+    border-bottom: 1px solid var(--magic-line-strong);
+    font-family: "Cinzel", "Georgia", serif;
+}
+body.theme-mahuan .modal-title {
+    color: var(--magic-gold);
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    text-shadow: 0 0 8px var(--magic-ember-glow);
+}
+body.theme-mahuan .modal-footer { border-top: 1px solid var(--magic-line); }
+
+/* ============================================================
+   通知面板
+   ============================================================ */
+body.theme-mahuan #notificationPanel.card {
+    background: linear-gradient(180deg, rgba(27, 20, 16, 0.95), rgba(14, 10, 8, 0.95)) !important;
+    border: 1px solid var(--magic-line-strong) !important;
+    box-shadow: var(--magic-shadow);
+    backdrop-filter: blur(8px);
+}
+body.theme-mahuan #notificationPanel .card-header {
+    cursor: pointer;
+    background: rgba(255, 106, 26, 0.14) !important;
+    color: var(--magic-gold) !important;
+}
+body.theme-mahuan #notificationPanel .card-header::before { display: none; }
+body.theme-mahuan #notificationPanel.card::before { display: none; }
+
+/* ============================================================
+   主页 hero 状态行：占卜咒文
+   ============================================================ */
+body.theme-mahuan .hero-status-block {
+    margin-top: 0.65rem;
+    padding-left: 0.6rem;
+    position: relative;
+    border-left: 1px solid var(--magic-line-strong);
+}
+body.theme-mahuan .hero-status-block::before {
+    content: "";
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(180deg,
+        var(--magic-ember) 0%,
+        var(--magic-gold) 50%,
+        var(--magic-arcane) 100%);
+    box-shadow: 0 0 8px var(--magic-ember-glow);
+    opacity: 0.7;
+}
+body.theme-mahuan .hero-status-line {
+    font-family: "Cinzel", "Trajan Pro", "EB Garamond", "Georgia", serif;
+    font-style: normal;
+    font-size: 0.95rem;
+    color: var(--magic-parchment);
+    letter-spacing: 0.10em;
+    line-height: 2;
+    text-shadow: 0 0 6px rgba(255, 106, 26, 0.18);
+
+    /* 咒文显现：blur + scale + 透明度 */
+    opacity: 0;
+    transform: scale(0.94);
+    filter: blur(4px);
+    animation: magic-conjure 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+body.theme-mahuan .hero-status-line[data-status-row="1"] { animation-delay: 0.15s; }
+body.theme-mahuan .hero-status-line[data-status-row="2"] { animation-delay: 0.55s; }
+@keyframes magic-conjure {
+    0%   { opacity: 0; transform: scale(0.94); filter: blur(4px); }
+    60%  { opacity: 0.9; filter: blur(0.5px); }
+    100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+/* 行首六芒星图标（替换 > 字符） */
+body.theme-mahuan .hero-status-prompt {
+    display: inline-block;
+    width: 1.1em;
+    height: 1.1em;
+    vertical-align: -0.15em;
+    margin-right: 0.5em;
+    color: transparent;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><g fill='none' stroke='%23ffd277' stroke-width='1.4'><polygon points='12,2 14.5,9 22,9 16,13.5 18.5,21 12,16.5 5.5,21 8,13.5 2,9 9.5,9'/><circle cx='12' cy='12' r='10.5' opacity='0.5'/></g></svg>");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 4px var(--magic-ember-glow));
+    animation: magic-sigil-spin 8s linear infinite;
+}
+@keyframes magic-sigil-spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+body.theme-mahuan .hero-status-text em {
+    font-style: normal;
+    color: var(--magic-ember-bright);
+    font-weight: 600;
+    padding: 0 0.15em;
+    text-shadow: 0 0 8px var(--magic-ember-glow);
+}
+body.theme-mahuan .hero-status-action {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 0 0 1px 0;
+    margin: 0 0 0 0.55em;
+    font: inherit;
+    color: var(--magic-gold);
+    text-decoration: none;
+    border-bottom: 1.5px solid var(--magic-gold);
+    cursor: pointer;
+    transition: all .25s ease;
+    text-shadow: 0 0 6px rgba(255, 210, 119, 0.35);
+}
+body.theme-mahuan .hero-status-action:hover:not(.is-done):not(:disabled) {
+    color: var(--magic-ember-bright);
+    border-bottom-color: var(--magic-ember-bright);
+    text-shadow: 0 0 10px var(--magic-ember-glow);
+}
+body.theme-mahuan .hero-status-action.is-done {
+    color: var(--magic-parchment-dim);
+    border-bottom: 1px dashed var(--magic-line);
+    text-shadow: none;
+}
+
+/* ============================================================
+   响应式：移动端
+   ============================================================ */
+@media (max-width: 768px) {
+    body.theme-mahuan .player-main::before { opacity: 0.04; }
+    body.theme-mahuan .card-header { font-size: 0.82rem; letter-spacing: 0.10em; padding: 8px 12px; }
+    body.theme-mahuan .card-body { padding: 12px; }
+    body.theme-mahuan .btn { font-size: 0.75rem; padding: 6px 12px; letter-spacing: 0.10em; }
+}
+
+/* ============================================================
+   动画偏好
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    body.theme-mahuan::after,
+    body.theme-mahuan .player-main::before,
+    body.theme-mahuan .progress-bar,
+    body.theme-mahuan .hero-status-prompt,
+    body.theme-mahuan .hero-status-line { animation: none; }
+    body.theme-mahuan .hero-status-line { opacity: 1; transform: none; filter: none; }
+}

@@ -41,36 +41,26 @@
                     <div class="mb-3">
                         <label for="user_id" class="form-label">账号 / 用户ID</label>
                         <input type="text" class="form-control" id="user_id" name="user_id"
-                               {% if first_login %}value="{{ user_id }}" readonly{% endif %}
+                               value="{{ user_id or '' }}"
                                placeholder="输入您在游戏中的用户ID或 WebUI 账号" required>
                         <div class="form-text">
-                            {% if first_login %}
-                                当前账号还没有设置 WebUI 密码，本次输入会直接保存为新密码
-                            {% else %}
-                                老玩家首次使用 WebUI 时，也可以直接在这里输入用户ID和新密码完成初始化
-                            {% endif %}
+                            若你还没有 WebUI 密码，请先私聊机器人使用“初始密码获取”。
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="password" class="form-label">
-                            {% if first_login %}设置密钥{% else %}登录密钥{% endif %}
-                        </label>
+                        <label for="password" class="form-label">登录密钥</label>
                         <input type="password" class="form-control" id="password" name="password"
-                               placeholder="{% if first_login %}设置一个登录密钥{% else %}输入您的登录密钥{% endif %}"
+                               placeholder="输入你的登录密钥"
                                minlength="{{ password_min_length }}" maxlength="20"
                                required>
                         <div class="form-text">
-                            {% if first_login %}
-                                请妥善保管密码，用于后续登录
-                            {% else %}
-                                WebUI 账号密码或你首次设置的玩家密码
-                            {% endif %}
+                            WebUI 密码最少 {{ password_min_length }} 位。若忘记密码，请私聊机器人使用“重置密码”。
                         </div>
                     </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-sign-in-alt"></i>
-                            {% if first_login %}设置密钥并登录{% else %}登录{% endif %}
+                            登录
                         </button>
                     </div>
                 </form>
@@ -98,7 +88,7 @@
                 </div>
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i>
-                    老玩家可继续使用 <code>,注册</code> 创建的游戏账号；若未设置过 WebUI 密码，首次登录时会直接进入设置流程
+                    老玩家可继续使用 <code>,注册</code> 创建的游戏账号；首次使用 WebUI 前，请先私聊机器人领取初始密码
                 </small>
             </div>
         </section>
