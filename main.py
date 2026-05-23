@@ -97,32 +97,25 @@ class FishingPlugin(Star):
 
         # --- 1.1. 数据与临时文件路径管理 ---
         plugin_root_dir = os.path.dirname(__file__)
-        local_data_dir = os.path.join(plugin_root_dir, "data")
-        legacy_data_dir = None
+        standard_data_dir = None
         try:
-            legacy_data_dir = str(StarTools.get_data_dir(self.plugin_id))
+            standard_data_dir = str(StarTools.get_data_dir(self.plugin_id))
         except Exception:
-            legacy_data_dir = None
+            standard_data_dir = None
 
-        self.data_dir = local_data_dir
+        if standard_data_dir:
+            self.data_dir = standard_data_dir
+        else:
+            self.data_dir = os.path.join(plugin_root_dir, "data")
+            logger.warning("无法获取 AstrBot 标准数据目录，回退到插件本地 data 目录")
+
         os.makedirs(self.data_dir, exist_ok=True)
         self.tmp_dir = os.path.join(self.data_dir, "tmp")
         os.makedirs(self.tmp_dir, exist_ok=True)
 
         db_path = os.path.join(self.data_dir, "fish.db")
-        legacy_db_path = os.path.join(legacy_data_dir, "fish.db") if legacy_data_dir else None
-        if (
-            legacy_db_path
-            and os.path.abspath(legacy_db_path) != os.path.abspath(db_path)
-            and not os.path.exists(db_path)
-            and os.path.exists(legacy_db_path)
-        ):
-            shutil.copy2(legacy_db_path, db_path)
-            logger.warning(
-                "检测到旧版 AstrBot 标准数据目录中的数据库，已迁移到插件本地 data 目录：%s -> %s",
-                legacy_db_path,
-                db_path,
-            )
+        logger.info(f"MetaFishing 数据目录: {self.data_dir}")
+        logger.info(f"数据库路径: {db_path}")
         
         # --- 1.2. 配置数据完整性检查注释 ---
         # 以下配置项必须在此处从 AstrBotConfig 中提取并放入 game_config，
