@@ -10,7 +10,6 @@ from ..repositories.abstract_repository import (
     AbstractInventoryRepository,
     AbstractItemTemplateRepository,
     AbstractLogRepository,
-    AbstractAchievementRepository
 )
 from ..domain.models import GachaPool, GachaPoolItem
 from ..utils import get_now
@@ -39,14 +38,12 @@ class GachaService:
         inventory_repo: AbstractInventoryRepository,
         item_template_repo: AbstractItemTemplateRepository,
         log_repo: AbstractLogRepository,
-        achievement_repo: AbstractAchievementRepository,
         config: Optional[Dict[str, Any]] = None,
     ):
         self.gacha_repo = gacha_repo
         self.user_repo = user_repo
         self.inventory_repo = inventory_repo
         self.item_template_repo = item_template_repo
-        self.achievement_repo = achievement_repo
         self.log_repo = log_repo
         self.config = config or {}
 
@@ -318,6 +315,5 @@ class GachaService:
             user.coins += item.quantity
             self.user_repo.update(user)
         elif item.item_type == "titles":
-            # 注意：成就仓储负责授予称号
-            self.achievement_repo.grant_title_to_user(user_id, item.item_id)
+            self.inventory_repo.grant_title_to_user(user_id, item.item_id)
             template = self.item_template_repo.get_title_by_id(item.item_id)

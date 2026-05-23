@@ -8,7 +8,6 @@ from ..repositories.abstract_repository import (
     AbstractLogRepository,
     AbstractInventoryRepository,
     AbstractItemTemplateRepository,
-    AbstractAchievementRepository
 )
 from .gacha_service import GachaService
 from ..domain.models import User, TaxRecord
@@ -49,7 +48,6 @@ class UserService:
         item_template_repo: AbstractItemTemplateRepository,
         gacha_service: "GachaService",
         config: Dict[str, Any],
-        achievement_repo: Optional[AbstractAchievementRepository] = None
     ):
         self.user_repo = user_repo
         self.log_repo = log_repo
@@ -57,7 +55,6 @@ class UserService:
         self.item_template_repo = item_template_repo
         self.gacha_service = gacha_service
         self.config = config
-        self.achievement_repo = achievement_repo
 
     def _build_onboarding_message(self, rod_name: str, accessory_name: str, bait_name: str) -> str:
         return (
@@ -380,9 +377,6 @@ class UserService:
         """
         通过称号名称授予用户称号。
         """
-        if not self.achievement_repo:
-            return {"success": False, "message": "成就仓储未初始化"}
-        
         user = self.user_repo.get_by_id(user_id)
         if not user:
             return {"success": False, "message": "用户不存在"}
@@ -395,17 +389,14 @@ class UserService:
         owned_titles = self.inventory_repo.get_user_titles(user_id)
         if title.title_id in owned_titles:
             return {"success": False, "message": f"用户已拥有称号 '{title_name}'"}
-        
-        self.achievement_repo.grant_title_to_user(user_id, title.title_id)
+
+        self.inventory_repo.grant_title_to_user(user_id, title.title_id)
         return {"success": True, "message": f"✅ 成功授予用户称号 '{title_name}'"}
 
     def revoke_title_from_user_by_name(self, user_id: str, title_name: str) -> Dict[str, Any]:
         """
         通过称号名称移除用户的称号。
         """
-        if not self.achievement_repo:
-            return {"success": False, "message": "成就仓储未初始化"}
-        
         user = self.user_repo.get_by_id(user_id)
         if not user:
             return {"success": False, "message": "用户不存在"}
@@ -423,8 +414,8 @@ class UserService:
         if user.current_title_id == title.title_id:
             user.current_title_id = None
             self.user_repo.update(user)
-        
-        self.achievement_repo.revoke_title_from_user(user_id, title.title_id)
+
+        self.inventory_repo.revoke_title_from_user(user_id, title.title_id)
         return {"success": True, "message": f"✅ 成功移除用户称号 '{title_name}'"}
 
     def create_custom_title(self, name: str, description: str, display_format: str = "{name}") -> Dict[str, Any]:

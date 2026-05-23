@@ -92,21 +92,6 @@ class Title:
     display_format: str = "{name}"
 
 @dataclass
-class Achievement:
-    """代表一个成就的模板信息"""
-    achievement_id: int
-    name: str
-    description: str
-    target_type: str
-    target_value: int
-    reward_type: str
-    target_fish_id: Optional[int] = None
-    reward_value: Optional[int] = None
-    reward_quantity: int = 1
-    is_repeatable: bool = False
-    icon_url: Optional[str] = None
-
-@dataclass
 class GachaPoolItem:
     """代表抽卡池中的一个奖品项"""
     gacha_pool_item_id: int

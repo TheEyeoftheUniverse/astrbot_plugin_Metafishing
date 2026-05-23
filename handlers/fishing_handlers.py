@@ -198,7 +198,6 @@ class FishingHandlers:
         self.market_service = plugin.market_service
         self.shop_service = plugin.shop_service
         self.item_template_repo = plugin.item_template_repo
-        self.achievement_service = plugin.achievement_service
         self.aquarium_service = plugin.aquarium_service
         self.exchange_service = plugin.exchange_service
 

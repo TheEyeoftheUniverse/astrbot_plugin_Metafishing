@@ -252,17 +252,6 @@ CREATE TABLE user_accessories (
             FOREIGN KEY (accessory_id) REFERENCES accessories(accessory_id) ON DELETE CASCADE
         );
 
--- table: user_achievement_progress
-CREATE TABLE user_achievement_progress (
-            user_id TEXT NOT NULL,
-            achievement_id INTEGER NOT NULL,
-            current_progress INTEGER DEFAULT 0,
-            completed_at DATETIME,
-            claimed_at DATETIME,
-            PRIMARY KEY (user_id, achievement_id),
-            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
-        );
-
 -- table: user_aquarium
 CREATE TABLE user_aquarium (
             user_id TEXT NOT NULL,
@@ -855,6 +844,7 @@ CREATE TABLE user_cthulhu_state (
     sci_fi_intervention_level    INTEGER NOT NULL DEFAULT 0,
     sci_fi_apex_abyss_unity      INTEGER NOT NULL DEFAULT 0,
     last_daily_reset_at          TEXT,
+    pending_event_snapshot       TEXT,
     pending_predict_candidates   TEXT,
     pending_predict_expires_at   TEXT
 );

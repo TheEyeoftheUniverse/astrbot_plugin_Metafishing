@@ -1,33 +1,25 @@
 import sqlite3
+import importlib.util
 from pathlib import Path
 
 from astrbot.api import logger
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema_latest.sql"
-SEED_PATH = Path(__file__).resolve().parent.parent / "seeds" / "initial_seed.sql"
+SEED_BUNDLE_PATH = Path(__file__).resolve().parent.parent / "seed_bundle.py"
 
 
-REQUIRED_SEED_COUNTS = {
-    "fish": 672,
-    "commodities": 15,
-    "exchange_commodity_rules": 15,
-    "exchange_prices": 15,
-    "rods": 42,
-    "accessories": 42,
-    "baits": 22,
-    "items": 57,
-    "fishing_zones": 8,
-    "zone_fish_mapping": 862,
-    "shops": 8,
-    "shop_items": 128,
-    "shop_item_costs": 188,
-    "shop_item_rewards": 128,
-    "gacha_pools": 8,
-    "gacha_pool_items": 108,
-    "cthulhu_authority": 12,
-    "cthulhu_global_pollution": 7,
-    "user_cthulhu_state": 0,
-}
+def _load_seed_bundle():
+    spec = importlib.util.spec_from_file_location("metafishing_seed_bundle", SEED_BUNDLE_PATH)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载种子模块: {SEED_BUNDLE_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_seed_bundle = _load_seed_bundle()
+build_seed_sql = _seed_bundle.build_seed_sql
+CURRENT_SEED_COUNTS = _seed_bundle.CURRENT_SEED_COUNTS
 
 
 def _read_required_sql(path: Path) -> str:
@@ -36,18 +28,8 @@ def _read_required_sql(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _read_seed_sql() -> str:
-    lines = []
-    for line in _read_required_sql(SEED_PATH).splitlines():
-        stripped = line.strip().rstrip(";").upper()
-        if stripped in {"BEGIN", "COMMIT"}:
-            continue
-        lines.append(line)
-    return "\n".join(lines)
-
-
 def _verify_seed_data(cursor: sqlite3.Cursor) -> None:
-    for table, expected_count in REQUIRED_SEED_COUNTS.items():
+    for table, expected_count in CURRENT_SEED_COUNTS.items():
         cursor.execute(f'SELECT COUNT(*) FROM "{table}"')
         actual_count = cursor.fetchone()[0]
         if actual_count != expected_count:
@@ -78,7 +60,7 @@ def up(cursor: sqlite3.Cursor):
     """应用唯一数据库基线：最新 schema + 最新静态 seed。"""
     logger.debug("正在执行 001_initial_setup: 应用最新 schema 与 seed...")
     cursor.executescript(_read_required_sql(SCHEMA_PATH))
-    cursor.executescript(_read_seed_sql())
+    cursor.executescript(build_seed_sql())
     _verify_seed_data(cursor)
 
 

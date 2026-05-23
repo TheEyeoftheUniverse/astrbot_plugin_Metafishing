@@ -8,13 +8,11 @@ class _GrantTitleBaseEffect(AbstractItemEffect):
 
     def __init__(
         self,
-        achievement_repo=None,
         item_template_repo=None,
         inventory_repo=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.achievement_repo = achievement_repo
         self.item_template_repo = item_template_repo
         self.inventory_repo = inventory_repo
 
@@ -41,7 +39,7 @@ class _GrantTitleBaseEffect(AbstractItemEffect):
         return None
 
     def apply(self, user, item_template, payload: Dict[str, Any], quantity: int = 1) -> Dict[str, Any]:
-        if not self.achievement_repo or not self.inventory_repo or not self.item_template_repo:
+        if not self.inventory_repo or not self.item_template_repo:
             return {"success": False, "message": "称号授予依赖未就绪。"}
 
         title_id = self._resolve_title_id(item_template, payload)
@@ -56,7 +54,7 @@ class _GrantTitleBaseEffect(AbstractItemEffect):
         if title_id in owned_titles:
             return {"success": False, "message": f"您已拥有称号【{title.name}】。"}
 
-        self.achievement_repo.grant_title_to_user(user.user_id, title_id)
+        self.inventory_repo.grant_title_to_user(user.user_id, title_id)
         return {"success": True, "message": f"获得称号【{title.name}】！"}
 
 

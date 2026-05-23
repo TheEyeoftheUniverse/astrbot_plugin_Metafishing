@@ -74,6 +74,36 @@ def _draw_rounded_card(draw: ImageDraw.ImageDraw, bbox, radius: int, fill, outli
     draw.rounded_rectangle(bbox, radius=radius, fill=fill, outline=outline, width=outline_width)
 
 
+def _rounded_alpha_mask(width: int, height: int, radius: int) -> Image.Image:
+    mask = Image.new("L", (width, height), 0)
+    mask_draw = ImageDraw.Draw(mask)
+    mask_draw.rounded_rectangle((0, 0, width, height), radius=radius, fill=255)
+    return mask
+
+
+def _fit_cover_image(image: Image.Image, width: int, height: int) -> Image.Image:
+    src_w, src_h = image.size
+    if src_w <= 0 or src_h <= 0:
+        raise ValueError("invalid image size")
+    scale = max(width / src_w, height / src_h)
+    resized = image.resize((max(1, int(src_w * scale)), max(1, int(src_h * scale))), Image.Resampling.LANCZOS)
+    left = max(0, (resized.size[0] - width) // 2)
+    top = max(0, (resized.size[1] - height) // 2)
+    return resized.crop((left, top, left + width, top + height))
+
+
+def _load_boss_cover(image_path: str, width: int, height: int, radius: int) -> Optional[Image.Image]:
+    if not image_path or not os.path.exists(image_path):
+        return None
+    try:
+        with Image.open(image_path) as raw:
+            cover = _fit_cover_image(raw.convert("RGBA"), width, height)
+        cover.putalpha(_rounded_alpha_mask(width, height, radius))
+        return cover
+    except Exception:
+        return None
+
+
 def _text_width(font: ImageFont.ImageFont, text: str) -> int:
     if hasattr(font, "getlength"):
         try:
@@ -217,23 +247,31 @@ def _draw_boss_card(
     cover_w, cover_h = 180, 180
     cover_x = x0 + 14
     cover_y = y + 10
-    _draw_rounded_card(
-        draw, [cover_x, cover_y, cover_x + cover_w, cover_y + cover_h],
-        10, theme["primary"], theme["accent"], 2,
-    )
-    # 在封面中央写 Boss 星级
-    star_text = f"⭐{boss.get('boss_star', '?')}"
-    sw = _text_width(title_font, star_text)
-    draw.text(
-        (cover_x + (cover_w - sw) // 2, cover_y + cover_h // 2 - 18),
-        star_text, font=title_font, fill=(255, 255, 255),
-    )
-    label = theme.get("label", "")
-    lw = _text_width(big_font, label)
-    draw.text(
-        (cover_x + (cover_w - lw) // 2, cover_y + cover_h // 2 + 16),
-        label, font=big_font, fill=(255, 255, 255),
-    )
+    cover_radius = 10
+    cover_image = _load_boss_cover(boss.get("image_path", ""), cover_w, cover_h, cover_radius)
+    if cover_image is not None:
+        img.paste(cover_image, (cover_x, cover_y), cover_image)
+        _draw_rounded_card(
+            draw, [cover_x, cover_y, cover_x + cover_w, cover_y + cover_h],
+            cover_radius, None, theme["accent"], 2,
+        )
+    else:
+        _draw_rounded_card(
+            draw, [cover_x, cover_y, cover_x + cover_w, cover_y + cover_h],
+            cover_radius, theme["primary"], theme["accent"], 2,
+        )
+        star_text = f"⭐{boss.get('boss_star', '?')}"
+        sw = _text_width(title_font, star_text)
+        draw.text(
+            (cover_x + (cover_w - sw) // 2, cover_y + cover_h // 2 - 18),
+            star_text, font=title_font, fill=(255, 255, 255),
+        )
+        label = theme.get("label", "")
+        lw = _text_width(big_font, label)
+        draw.text(
+            (cover_x + (cover_w - lw) // 2, cover_y + cover_h // 2 + 16),
+            label, font=big_font, fill=(255, 255, 255),
+        )
 
     # 右侧：Boss 名字 + 信息
     text_x = cover_x + cover_w + 16

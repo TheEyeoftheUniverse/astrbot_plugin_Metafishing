@@ -21,21 +21,29 @@ from ..services.wipe_bomb_daily_service import add_wipe_bomb_jackpot
 from ..utils import get_now, get_fish_template, get_today, get_last_reset_time, calculate_after_refine
 
 POKEDEX_REWARD_MILESTONES = [
-    (5, "coins", 5000),
-    (10, "coins", 12000),
-    (20, "coins", 30000),
-    (25, "premium", 188),
-    (30, "premium", 288),
-    (40, "premium", 520),
-    (50, "premium", 888),
-    (60, "premium", 1288),
-    (70, "premium", 1888),
-    (80, "premium", 2888),
-    (90, "premium", 6666),
-    (100, "premium", 66666),
+    (5, "coins", 4000),
+    (10, "coins", 8000),
+    (15, "coins", 12000),
+    (20, "coins", 16000),
+    (25, "coins", 21000),
+    (30, "coins", 26000),
+    (35, "coins", 32000),
+    (40, "coins", 39000),
+    (45, "coins", 47000),
+    (50, "coins", 56000),
+    (55, "coins", 66000),
+    (60, "premium", 120),
+    (65, "premium", 188),
+    (70, "premium", 288),
+    (75, "premium", 388),
+    (80, "premium", 588),
+    (85, "premium", 888),
+    (90, "premium", 1288),
+    (95, "premium", 1688),
+    (100, "premium", 2888),
 ]
 
-EQUIPMENT_POKEDEX_REWARD_MILESTONES = POKEDEX_REWARD_MILESTONES
+EQUIPMENT_POKEDEX_REWARD_MILESTONES = list(POKEDEX_REWARD_MILESTONES)
 
 EQUIPMENT_TYPE_META = {
     "rod": {"label": "鱼竿", "order": 0},
@@ -633,6 +641,27 @@ class FishingService:
             totals[reward_type] = totals.get(reward_type, 0) + int(reward.get("reward_amount", 0) or 0)
         return totals
 
+    def _get_pre_zone4_no_premium_cutoff_percent(self, total_fish_count: int) -> int:
+        if total_fish_count <= 0:
+            return 0
+        zone_fish_ids = set()
+        for zone_id in (1, 2, 3):
+            zone_fish_ids.update(self.inventory_repo.get_specific_fish_ids_for_zone(zone_id))
+        if not zone_fish_ids:
+            return 0
+        raw_percent = (len(zone_fish_ids) / total_fish_count) * 100
+        return min(100, int(math.ceil(raw_percent / 5.0) * 5))
+
+    def _build_fish_pokedex_reward_milestones(self, total_fish_count: int) -> List[tuple[int, str, int]]:
+        cutoff_percent = self._get_pre_zone4_no_premium_cutoff_percent(total_fish_count)
+        milestones: List[tuple[int, str, int]] = []
+        for milestone_percent, reward_type, reward_amount in POKEDEX_REWARD_MILESTONES:
+            if reward_type == "premium" and milestone_percent <= cutoff_percent:
+                milestones.append((milestone_percent, "coins", reward_amount * 120))
+            else:
+                milestones.append((milestone_percent, reward_type, reward_amount))
+        return milestones
+
     def _sum_claimed_rewards_by_type(self, rewards: List[Dict[str, Any]]) -> Dict[str, int]:
         totals = {"coins": 0, "premium": 0}
         for reward in rewards:
@@ -649,9 +678,10 @@ class FishingService:
         total_fish_count = len(self.item_template_repo.get_all_fish())
         unlocked_fish_count = len(stats)
         unlocked_ratio = (unlocked_fish_count / total_fish_count) if total_fish_count > 0 else 0.0
+        milestone_defs = self._build_fish_pokedex_reward_milestones(total_fish_count)
 
         milestones = []
-        for milestone_percent, reward_type, reward_amount in POKEDEX_REWARD_MILESTONES:
+        for milestone_percent, reward_type, reward_amount in milestone_defs:
             required_fish_count = (
                 math.ceil(total_fish_count * milestone_percent / 100.0)
                 if total_fish_count > 0
@@ -698,6 +728,7 @@ class FishingService:
             "current_premium_currency": user.premium_currency,
             "unlocked_fish_count": unlocked_fish_count,
             "total_fish_count": total_fish_count,
+            "pre_zone4_no_premium_cutoff_percent": self._get_pre_zone4_no_premium_cutoff_percent(total_fish_count),
             "unlocked_percentage": unlocked_ratio,
             "unlocked_percentage_text": f"{unlocked_ratio * 100:.1f}%",
             "milestones": milestones,

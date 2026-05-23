@@ -355,6 +355,29 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
             """, (user_id,))
             return [row["title_id"] for row in cursor.fetchall()]
 
+    def grant_title_to_user(self, user_id: str, title_id: int) -> None:
+        with self._connection_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM titles WHERE title_id = ?", (title_id,))
+            if cursor.fetchone() is None:
+                raise ValueError(f"title_id={title_id} 不存在")
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO user_titles (user_id, title_id, unlocked_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """,
+                (user_id, title_id),
+            )
+            conn.commit()
+
+    def revoke_title_from_user(self, user_id: str, title_id: int) -> None:
+        with self._connection_manager.get_connection() as conn:
+            conn.execute(
+                "DELETE FROM user_titles WHERE user_id = ? AND title_id = ?",
+                (user_id, title_id),
+            )
+            conn.commit()
+
     def get_random_bait(self, user_id: str) -> Optional[int]:
         """
         从用户的诱饵库存中随机获取一个可用的诱饵ID。

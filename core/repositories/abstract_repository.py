@@ -6,16 +6,13 @@ from datetime import date, datetime
 
 # 从领域模型导入所有需要的实体
 from ..domain.models import (
-    User, Fish, Rod, Bait, Accessory, Title, Achievement, Item,
+    User, Fish, Rod, Bait, Accessory, Title, Item,
     UserRodInstance, UserAccessoryInstance, UserFishInventoryItem, UserAquariumItem,
     FishingRecord, MarketListing, TaxRecord,
     GachaPool, GachaPoolItem, FishingZone, UserBuff, AquariumUpgrade,
     ShopOffer, ShopOfferCost, ShopOfferReward,
     Commodity, Exchange, UserCommodity, PokedexRewardClaim  # 新增交易所模型导入
 )
-
-# 定义用户成就进度的数据结构
-UserAchievementProgress = Dict[int, Dict[str, Any]] # {achievement_id: {progress: X, completed_at: Y}}
 
 class AbstractUserRepository(ABC):
     """用户数据仓储接口"""
@@ -238,6 +235,15 @@ class AbstractInventoryRepository(ABC):
     # 获取用户的鱼饵库存
     @abstractmethod
     def get_user_bait_inventory(self, user_id: str) -> Dict[int, int]: pass
+    # 获取用户拥有的称号 ID 列表
+    @abstractmethod
+    def get_user_titles(self, user_id: str) -> List[int]: pass
+    # 授予称号
+    @abstractmethod
+    def grant_title_to_user(self, user_id: str, title_id: int) -> None: pass
+    # 撤销称号
+    @abstractmethod
+    def revoke_title_from_user(self, user_id: str, title_id: int) -> None: pass
     # 随机获取一个用户的鱼饵
     @abstractmethod
     def get_random_bait(self, user_id: str) -> Optional[int]: pass
@@ -578,36 +584,6 @@ class AbstractLogRepository(ABC):
         total_fish_count: int,
     ) -> bool:
         pass
-
-class AbstractAchievementRepository(ABC):
-    """成就数据仓储接口"""
-    # 获取所有成就的模板信息
-    @abstractmethod
-    def get_all_achievements(self) -> List[Achievement]: pass
-    # 获取指定用户的所有成就进度
-    @abstractmethod
-    def get_user_progress(self, user_id: str) -> UserAchievementProgress: pass
-    # 创建或更新用户的成就进度
-    @abstractmethod
-    def update_user_progress(self, user_id: str, achievement_id: int, progress: int, completed_at: Optional[datetime]) -> None: pass
-    # 授予用户一个称号
-    @abstractmethod
-    def grant_title_to_user(self, user_id: str, title_id: int) -> None: pass
-    # 移除用户的一个称号
-    @abstractmethod
-    def revoke_title_from_user(self, user_id: str, title_id: int) -> None: pass
-    # 获取用户钓到的不同鱼种数量
-    @abstractmethod
-    def get_user_unique_fish_count(self, user_id: str) -> int: pass
-    # 获取用户钓到的垃圾物品总数
-    @abstractmethod
-    def get_user_garbage_count(self, user_id: str) -> int: pass
-    # 检查擦弹是否达到过特定倍率
-    @abstractmethod
-    def has_wipe_bomb_multiplier(self, user_id: str, multiplier: float) -> bool: pass
-    # 检查用户是否拥有特定稀有度的物品
-    @abstractmethod
-    def has_item_of_rarity(self, user_id: str, item_type: str, rarity: int) -> bool: pass
 
 class AbstractUserBuffRepository(ABC):
     @abstractmethod

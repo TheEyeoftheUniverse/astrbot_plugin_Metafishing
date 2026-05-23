@@ -526,6 +526,36 @@
         "type": "int",
         "default": 3
       },
+      "image_provider_id": {
+        "description": "用于 Boss 生图的 AstrBot Provider ID；留空则不调用生图接口",
+        "type": "string",
+        "default": ""
+      },
+      "image_model_override": {
+        "description": "可选：覆盖 Provider 配置中的模型名，直接用于 /images/generations 请求",
+        "type": "string",
+        "default": ""
+      },
+      "image_api_mode": {
+        "description": "Boss 生图接口模式；当前仅支持 openai_images",
+        "type": "string",
+        "default": "openai_images"
+      },
+      "image_provider_config_path": {
+        "description": "可选：AstrBot cmd_config.json 的绝对路径；留空则按插件所在目录自动推断",
+        "type": "string",
+        "default": ""
+      },
+      "image_size": {
+        "description": "Boss 生图尺寸，直接透传给 OpenAI-compatible /images/generations 接口",
+        "type": "string",
+        "default": "1024x1024"
+      },
+      "image_timeout_seconds": {
+        "description": "Boss 生图接口超时时间（秒）",
+        "type": "int",
+        "default": 120
+      },
       "enable_llm_text": {
         "description": "是否调用 LLM 生成 Boss 登场 / 退场战报文本（失败时降级为静态模板）",
         "type": "bool",

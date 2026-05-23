@@ -588,6 +588,7 @@ async def manual_daily_refresh(plugin: "FishingPlugin", event: AstrMessageEvent)
     """[管理员] 手动触发项目内可安全重跑的每日刷新逻辑。"""
     try:
         maintenance_result = plugin.fishing_service.force_daily_maintenance()
+        title_refresh_result = plugin.gameplay_title_service.force_daily_refresh()
         tax_result = plugin.fishing_service.apply_daily_taxes()
         exchange_result = plugin.exchange_service.manual_update_prices()
         if not exchange_result.get("success", False):
@@ -633,6 +634,17 @@ async def manual_daily_refresh(plugin: "FishingPlugin", event: AstrMessageEvent)
             lines.append("  · 未启用渡劫服务")
         else:
             lines.append(f"  · tick 已执行：{tribulation_result}")
+
+        lines.extend(
+            [
+                "",
+                "🏅 玩法称号：",
+                f"  · 扫描活跃玩家：{title_refresh_result.get('scanned_users', 0)}",
+                f"  · 跳过僵尸号：{title_refresh_result.get('skipped_zombies', 0)}",
+                f"  · 新授予：{title_refresh_result.get('granted_count', 0)}",
+                f"  · 取消：{title_refresh_result.get('revoked_count', 0)}",
+            ]
+        )
 
         lines.extend([
             "",

@@ -1,5 +1,6 @@
 import os
 import asyncio
+import shutil
 
 from astrbot.api import logger, AstrBotConfig
 from astrbot.api.event import AstrMessageEvent, filter
@@ -16,7 +17,6 @@ from .core.repositories.sqlite_gacha_repo import SqliteGachaRepository
 from .core.repositories.sqlite_market_repo import SqliteMarketRepository
 from .core.repositories.sqlite_shop_repo import SqliteShopRepository
 from .core.repositories.sqlite_log_repo import SqliteLogRepository
-from .core.repositories.sqlite_achievement_repo import SqliteAchievementRepository
 from .core.repositories.sqlite_user_buff_repo import SqliteUserBuffRepository
 from .core.repositories.sqlite_exchange_repo import SqliteExchangeRepository # 新增交易所Repo
 from .core.repositories.sqlite_aquarium_income_repo import SqliteAquariumIncomeRepository
@@ -30,13 +30,13 @@ from .core.services.inventory_service import InventoryService
 from .core.services.shop_service import ShopService
 from .core.services.market_service import MarketService
 from .core.services.gacha_service import GachaService
-from .core.services.achievement_service import AchievementService
 from .core.services.game_mechanics_service import GameMechanicsService
 from .core.services.effect_manager import EffectManager
 from .core.services.fishing_zone_service import FishingZoneService
 from .core.services.exchange_service import ExchangeService # 新增交易所Service
 from .core.services.aquarium_income_service import AquariumIncomeService
 from .core.services.aquarium_quips_service import AquariumQuipsService
+from .core.services.gameplay_title_service import GameplayTitleService
 
 from .core.database.migration import run_migrations
 from .core.database.sqlite_utils import close_thread_local_connection
@@ -96,19 +96,33 @@ class FishingPlugin(Star):
         self.plugin_id = "astrbot_plugin_metafishing"
 
         # --- 1.1. 数据与临时文件路径管理 ---
+        plugin_root_dir = os.path.dirname(__file__)
+        local_data_dir = os.path.join(plugin_root_dir, "data")
+        legacy_data_dir = None
         try:
-            # AstrBot 标准 API：StarTools.get_data_dir 是类方法，返回 data/plugin_data/<plugin_id> 绝对路径
-            self.data_dir = str(StarTools.get_data_dir(self.plugin_id))
+            legacy_data_dir = str(StarTools.get_data_dir(self.plugin_id))
         except Exception:
-            # 极少数情况：StarTools 未初始化或环境异常，回退到旧的硬编码路径
-            logger.warning(f"无法使用 StarTools.get_data_dir('{self.plugin_id}'), 将回退到旧的 'data/' 目录。")
-            self.data_dir = "data"
-        
+            legacy_data_dir = None
+
+        self.data_dir = local_data_dir
+        os.makedirs(self.data_dir, exist_ok=True)
         self.tmp_dir = os.path.join(self.data_dir, "tmp")
         os.makedirs(self.tmp_dir, exist_ok=True)
 
         db_path = os.path.join(self.data_dir, "fish.db")
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        legacy_db_path = os.path.join(legacy_data_dir, "fish.db") if legacy_data_dir else None
+        if (
+            legacy_db_path
+            and os.path.abspath(legacy_db_path) != os.path.abspath(db_path)
+            and not os.path.exists(db_path)
+            and os.path.exists(legacy_db_path)
+        ):
+            shutil.copy2(legacy_db_path, db_path)
+            logger.warning(
+                "检测到旧版 AstrBot 标准数据目录中的数据库，已迁移到插件本地 data 目录：%s -> %s",
+                legacy_db_path,
+                db_path,
+            )
         
         # --- 1.2. 配置数据完整性检查注释 ---
         # 以下配置项必须在此处从 AstrBotConfig 中提取并放入 game_config，
@@ -276,7 +290,6 @@ class FishingPlugin(Star):
         self.market_repo = SqliteMarketRepository(db_path)
         self.shop_repo = SqliteShopRepository(db_path)
         self.log_repo = SqliteLogRepository(db_path)
-        self.achievement_repo = SqliteAchievementRepository(db_path)
         self.buff_repo = SqliteUserBuffRepository(db_path)
         self.exchange_repo = SqliteExchangeRepository(db_path)
         self.aquarium_income_repo = SqliteAquariumIncomeRepository(db_path)
@@ -305,11 +318,10 @@ class FishingPlugin(Star):
             self.inventory_repo,
             self.item_template_repo,
             self.log_repo,
-            self.achievement_repo,
             self.game_config,
         )
         # UserService 依赖 GachaService，因此在 GachaService 之后实例化
-        self.user_service = UserService(self.user_repo, self.log_repo, self.inventory_repo, self.item_template_repo, self.gacha_service, self.game_config, self.achievement_repo)
+        self.user_service = UserService(self.user_repo, self.log_repo, self.inventory_repo, self.item_template_repo, self.gacha_service, self.game_config)
         self.account_service = AccountService(
             db_path,
             self.user_repo,
@@ -329,8 +341,6 @@ class FishingPlugin(Star):
         # MarketService 依赖 exchange_repo
         self.market_service = MarketService(self.market_repo, self.inventory_repo, self.user_repo, self.log_repo,
                                            self.item_template_repo, self.exchange_repo, self.game_config)
-        self.achievement_service = AchievementService(self.achievement_repo, self.user_repo, self.inventory_repo,
-                                                     self.item_template_repo, self.log_repo, self.game_config)
         
         # 初始化科考服务
         from .core.services.expedition_service import ExpeditionService
@@ -355,6 +365,15 @@ class FishingPlugin(Star):
             item_template_repo=self.item_template_repo,
             cthulhu_repo=self.cthulhu_repo,
             cultivation_service=self.cultivation_service,
+        )
+        self.gameplay_title_service = GameplayTitleService(
+            user_repo=self.user_repo,
+            inventory_repo=self.inventory_repo,
+            scifi_service=self.scifi_service,
+            cultivation_service=self.cultivation_service,
+            team_battle_repo=self.team_battle_repo,
+            cthulhu_repo=self.cthulhu_repo,
+            game_config=self.game_config,
         )
 
         self.fishing_service = FishingService(
@@ -383,9 +402,21 @@ class FishingPlugin(Star):
         # 注入到 fishing_service 以便心跳调用 tick
         self.fishing_service.tribulation_service = self.tribulation_service
 
-        # 魔幻团战 V2：图片 Provider（本期 NullProvider 占位）
-        from .core.services.boss_image_provider import NullBossImageProvider
-        self.boss_image_provider = NullBossImageProvider()
+        # 魔幻团战 V2：图片 Provider（按配置读取 AstrBot provider，未配置时保留占位）
+        from .core.services.boss_image_provider import (
+            AstrBotConfiguredOpenAIImageProvider,
+            NullBossImageProvider,
+        )
+        team_battle_cfg = self.game_config.get("team_battle", {}) if isinstance(self.game_config, dict) else {}
+        image_provider_id = str(team_battle_cfg.get("image_provider_id", "") or "").strip()
+        if image_provider_id:
+            self.boss_image_provider = AstrBotConfiguredOpenAIImageProvider(
+                plugin_root_dir=plugin_root_dir,
+                game_config=self.game_config,
+                output_dir=os.path.join(self.data_dir, "team_battle_boss"),
+            )
+        else:
+            self.boss_image_provider = NullBossImageProvider()
 
         # 魔幻团战 V2：核心服务
         from .core.services.team_battle_service import TeamBattleService
@@ -461,7 +492,6 @@ class FishingPlugin(Star):
                 "fishing_service": self.fishing_service,
                 "log_repo": self.log_repo,
                 "game_config": self.game_config,
-                "achievement_repo": self.achievement_repo,
                 "item_template_repo": self.item_template_repo,
                 "inventory_repo": self.inventory_repo,
                 "cthulhu_repo": self.cthulhu_repo,
@@ -477,7 +507,7 @@ class FishingPlugin(Star):
         self.fishing_service.start_auto_fishing_task()
         if self.is_tax:
             self.fishing_service.start_daily_tax_task()  # 启动独立的税收线程
-        self.achievement_service.start_achievement_check_task()
+        self.gameplay_title_service.start_daily_refresh_task()
         self.exchange_service.start_daily_price_update_task() # 启动交易所后台任务
         self.aquarium_quips_service.start_daily_refresh_task()  # 启动水族箱短评每日刷新任务
         self.wal_maintenance_service.start()
@@ -884,7 +914,7 @@ class FishingPlugin(Star):
 
     @filter.command("初始密码获取", alias={"初始密码", "获取初始密码", "登录密钥", "获取密钥"})
     async def get_initial_password(self, event: AstrMessageEvent):
-        """私聊查看新的 WebUI 密码设置方式"""
+        """私聊生成 WebUI 初始密码"""
         if self._is_group_message_event(event):
             yield event.plain_result("❌ 为保护账号安全，请在私聊中使用“初始密码获取”。")
             return
@@ -895,11 +925,16 @@ class FishingPlugin(Star):
         if self.account_service.has_password(user_id):
             yield event.plain_result("你的 WebUI 密码已设置，请直接使用现有密码登录；若忘记密码，请私聊使用“重置密码”。")
             return
-        yield event.plain_result("你当前还没有设置 WebUI 密码。请前往网页登录页，输入用户ID和你想设置的新密码，系统会在首次登录时直接完成设置。")
+        password = self.account_service.issue_new_webui_password(user_id)
+        yield event.plain_result(
+            "已为你生成新的 WebUI 初始密码：\n"
+            f"{password}\n"
+            "请尽快登录，并在登录后到个人页修改密码。"
+        )
 
     @filter.command("重置密码", alias={"重置初始密码", "重置登录密码"})
     async def reset_player_password(self, event: AstrMessageEvent):
-        """私聊清空当前 WebUI 密码，下次登录时重新设置"""
+        """私聊重置并生成新的 WebUI 密码"""
         if self._is_group_message_event(event):
             yield event.plain_result("❌ 为保护账号安全，请在私聊中使用“重置密码”。")
             return
@@ -907,8 +942,12 @@ class FishingPlugin(Star):
         if not self.user_repo.check_exists(user_id):
             yield event.plain_result("❌ 你还没有注册，请先使用“注册”。")
             return
-        self.account_service.clear_user_password(user_id)
-        yield event.plain_result("你的 WebUI 密码已清空。下次在登录页输入用户ID和新密码时，系统会把这次输入直接保存为新的登录密码。")
+        password = self.account_service.issue_new_webui_password(user_id)
+        yield event.plain_result(
+            "已重置你的 WebUI 密码，新密码为：\n"
+            f"{password}\n"
+            "旧密码已失效，请尽快登录并在个人页修改密码。"
+        )
 
     @filter.command("邀请码")
     async def invitation_code(self, event: AstrMessageEvent):
@@ -1180,12 +1219,6 @@ class FishingPlugin(Star):
     async def use_title(self, event: AstrMessageEvent):
         """装备或卸下称号。用法：使用称号 称号编号"""
         async for r in social_handlers.use_title(self, event):
-            yield r
-
-    @filter.command("查看成就", alias={"成就"})
-    async def view_achievements(self, event: AstrMessageEvent):
-        """查看你的成就完成情况"""
-        async for r in social_handlers.view_achievements(self, event):
             yield r
 
     @filter.command("税收记录")
@@ -1496,7 +1529,7 @@ class FishingPlugin(Star):
         logger.info("钓鱼插件正在终止...")
         self.fishing_service.stop_auto_fishing_task()
         self.fishing_service.stop_daily_tax_task()  # 终止独立的税收线程
-        self.achievement_service.stop_achievement_check_task()
+        self.gameplay_title_service.stop_daily_refresh_task()
         self.exchange_service.stop_daily_price_update_task() # 终止交易所后台任务
         try:
             self.team_battle_service.stop_daily_settle_task()
@@ -1537,7 +1570,6 @@ class FishingPlugin(Star):
             "market_repo",
             "shop_repo",
             "log_repo",
-            "achievement_repo",
             "buff_repo",
             "exchange_repo",
             "aquarium_income_repo",

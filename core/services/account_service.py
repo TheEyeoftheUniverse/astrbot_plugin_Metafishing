@@ -17,6 +17,8 @@ from ..utils import get_now
 LOCAL_TIMEZONE = timezone(timedelta(hours=8))
 INVITATION_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 INVITATION_CODE_LENGTH = 8
+WEBUI_PASSWORD_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789abcdefghjkmnpqrstuvwxyz"
+WEBUI_PASSWORD_LENGTH = 6
 DEFAULT_INVITATION_FAILURE_LIMIT = 5
 DEFAULT_INVITATION_FAILURE_COOLDOWN_SECONDS = 600
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9]+$")
@@ -53,7 +55,7 @@ class AccountService:
             "require_invitation": bool(registration.get("require_invitation", True)),
             "username_min_length": int(registration.get("username_min_length", 5) or 5),
             "username_max_length": int(registration.get("username_max_length", 12) or 12),
-            "password_min_length": int(registration.get("password_min_length", 6) or 6),
+            "password_min_length": WEBUI_PASSWORD_LENGTH,
             "invitation_quota": int(registration.get("invitation_quota", 5) or 5),
             "invitation_cost_premium": int(registration.get("invitation_cost_premium", 15) or 15),
             "invitation_ttl_days": int(registration.get("invitation_ttl_days", 0) or 0),
@@ -108,6 +110,15 @@ class AccountService:
             conn.commit()
         logger.info("用户 %s 的 WebUI 密码已清空，等待下次重新设置", user_id)
 
+    def issue_new_webui_password(self, user_id: str) -> str:
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValueError("用户不存在")
+        password = "".join(secrets.choice(WEBUI_PASSWORD_ALPHABET) for _ in range(WEBUI_PASSWORD_LENGTH))
+        self._update_password_hash(user_id, self.password_hasher.hash(password))
+        logger.info("用户 %s 已生成新的 WebUI 初始密码", user_id)
+        return password
+
     def authenticate_password_login(self, raw_user_id: str, password: str) -> Dict[str, Any]:
         login_user_id = self.resolve_login_user_id(raw_user_id)
         user = self.user_repo.get_by_id(login_user_id)
@@ -115,31 +126,17 @@ class AccountService:
             return {"success": False, "message": "🎣 你不是我们的钓鱼佬，去别处钓鱼吧！"}
 
         if not getattr(user, "password_hash", None):
-            try:
-                self.set_user_password(user.user_id, password)
-            except ValueError as exc:
-                return {
-                    "success": False,
-                    "message": str(exc),
-                    "first_login": True,
-                    "login_user_id": user.user_id,
-                    "user": user,
-                }
-            refreshed_user = self.user_repo.get_by_id(user.user_id) or user
-            logger.info("用户 %s 首次设置 WebUI 密码并登录成功", user.user_id)
             return {
-                "success": True,
-                "message": f"首次登录密码已设置，欢迎来到钓鱼世界，{refreshed_user.nickname or refreshed_user.user_id}！",
-                "first_login": True,
-                "login_user_id": refreshed_user.user_id,
-                "user": refreshed_user,
+                "success": False,
+                "message": "该账号尚未领取 WebUI 初始密码，请私聊机器人使用“初始密码获取”。",
+                "login_user_id": user.user_id,
+                "user": user,
             }
 
         if not self.verify_user_password(user.user_id, password):
             return {
                 "success": False,
                 "message": "密钥错误",
-                "first_login": False,
                 "login_user_id": user.user_id,
                 "user": user,
             }
@@ -147,7 +144,6 @@ class AccountService:
         return {
             "success": True,
             "message": f"欢迎回来，{user.nickname or user.user_id}！",
-            "first_login": False,
             "login_user_id": user.user_id,
             "user": user,
         }

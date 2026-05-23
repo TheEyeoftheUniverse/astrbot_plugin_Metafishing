@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 
 from astrbot.api import logger
+from ..database.seed_bundle import build_seed_sql
 
 from ..repositories.abstract_repository import (
     AbstractGachaRepository,
@@ -24,9 +25,7 @@ class DataSetupService:
         self.item_template_repo = item_template_repo
         self.shop_repo = shop_repo
         self.db_path = db_path
-        self.seed_sql_path = (
-            Path(__file__).resolve().parent.parent / "database" / "seeds" / "initial_seed.sql"
-        )
+        self.seed_sql_bundle_root = Path(__file__).resolve().parent.parent / "database" / "seeds"
 
     def setup_initial_data(self):
         """
@@ -68,10 +67,10 @@ class DataSetupService:
             return cursor.fetchone() is not None
 
     def _apply_seed_sql(self) -> None:
-        if not self.seed_sql_path.exists():
-            raise FileNotFoundError(f"种子文件不存在: {self.seed_sql_path}")
+        if not self.seed_sql_bundle_root.exists():
+            raise FileNotFoundError(f"种子目录不存在: {self.seed_sql_bundle_root}")
 
-        sql = self.seed_sql_path.read_text(encoding="utf-8")
+        sql = build_seed_sql()
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             conn.executescript(sql)

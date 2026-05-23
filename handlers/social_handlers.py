@@ -137,7 +137,7 @@ async def view_titles(plugin: "FishingPlugin", event: AstrMessageEvent):
             message += f"- {title['name']} (ID: {title['title_id']}){status}\n- 描述: {title['description']}\n\n"
         yield event.plain_result(message)
     else:
-        yield event.plain_result("❌ 您还没有任何称号，快去完成成就或参与活动获取吧！")
+        yield event.plain_result("❌ 您还没有任何称号，快去参与玩法、商店或活动获取吧！")
 
 
 async def use_title(plugin: "FishingPlugin", event: AstrMessageEvent):
@@ -153,32 +153,6 @@ async def use_title(plugin: "FishingPlugin", event: AstrMessageEvent):
         return
     result = plugin.user_service.use_title(user_id, int(title_id_str))
     yield event.plain_result(result["message"])
-
-
-async def view_achievements(plugin: "FishingPlugin", event: AstrMessageEvent):
-    """查看用户成就"""
-    from ..utils import safe_datetime_handler
-
-    user_id = plugin._get_effective_user_id(event)
-    achievements = plugin.achievement_service.get_user_achievements(user_id).get(
-        "achievements", []
-    )
-    if achievements:
-        message = "【🏆 您的成就】\n"
-        for ach in achievements:
-            message += f"- {ach['name']} (ID: {ach['id']})\n"
-            message += f"  描述: {ach['description']}\n"
-            if ach.get("completed_at"):
-                message += f"  完成时间: {safe_datetime_handler(ach['completed_at'])}\n"
-            else:
-                message += "  进度: {}/{}\n".format(
-                    ach.get("progress", 0), ach.get("target", 1)
-                )
-        message += "请继续努力完成更多成就！"
-        yield event.plain_result(message)
-    else:
-        yield event.plain_result("❌ 您还没有任何成就，快去完成任务或参与活动获取吧！")
-
 
 async def tax_record(plugin: "FishingPlugin", event: AstrMessageEvent):
     """查看税收记录"""

@@ -1,0 +1,16 @@
+-- Generated from fish_db.xlsx sheet: exchange_prices_initial
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (1, '1970-01-01', '00:00:00', 'dried_fish', 600, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (2, '1970-01-01', '00:00:00', 'fish_roe', 1200, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (3, '1970-01-01', '00:00:00', 'fish_oil', 1000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (4, '1970-01-01', '00:00:00', 'fantasy_stable', 5000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (5, '1970-01-01', '00:00:00', 'fantasy_high_risk', 8000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (6, '1970-01-01', '00:00:00', 'fantasy_speculative', 10000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (7, '1970-01-01', '00:00:00', 'scifi_stable', 100000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (8, '1970-01-01', '00:00:00', 'scifi_high_risk', 100000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (9, '1970-01-01', '00:00:00', 'scifi_speculative', 100000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (10, '1970-01-01', '00:00:00', 'xuanhuan_stable', 40000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (11, '1970-01-01', '00:00:00', 'xuanhuan_high_risk', 60000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (12, '1970-01-01', '00:00:00', 'xuanhuan_speculative', 50000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (13, '1970-01-01', '00:00:00', 'cthulhu_stable', 70000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (14, '1970-01-01', '00:00:00', 'cthulhu_high_risk', 50000, 'initial', '1970-01-01T00:00:00');
+INSERT INTO "exchange_prices" ("price_id", "date", "time", "commodity_id", "price", "update_type", "created_at") VALUES (15, '1970-01-01', '00:00:00', 'cthulhu_speculative', 30000, 'initial', '1970-01-01T00:00:00');

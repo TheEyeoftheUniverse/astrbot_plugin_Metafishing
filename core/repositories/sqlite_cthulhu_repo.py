@@ -13,6 +13,15 @@ def _row_to_dict(row: sqlite3.Row | None) -> Optional[Dict[str, Any]]:
     return {key: row[key] for key in row.keys()}
 
 
+def _load_json_field(value: Any, default: Any) -> Any:
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
+
 class SqliteCthulhuRepository:
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -49,14 +58,14 @@ class SqliteCthulhuRepository:
             if row is None:
                 raise ValueError(f"cthulhu state not found for {user_id}")
             data = _row_to_dict(row) or {}
-            candidates = data.get("pending_predict_candidates")
-            if candidates:
-                try:
-                    data["pending_predict_candidates"] = json.loads(candidates)
-                except Exception:
-                    data["pending_predict_candidates"] = []
-            else:
-                    data["pending_predict_candidates"] = []
+            data["pending_predict_candidates"] = _load_json_field(
+                data.get("pending_predict_candidates"),
+                [],
+            )
+            data["pending_event_snapshot"] = _load_json_field(
+                data.get("pending_event_snapshot"),
+                None,
+            )
             return data
 
     def update_state_fields(self, user_id: str, **fields: Any) -> None:
@@ -67,6 +76,11 @@ class SqliteCthulhuRepository:
             normalized["pending_predict_candidates"] = json.dumps(
                 normalized["pending_predict_candidates"] or [],
                 ensure_ascii=False,
+            )
+        if "pending_event_snapshot" in normalized:
+            snapshot = normalized["pending_event_snapshot"]
+            normalized["pending_event_snapshot"] = (
+                json.dumps(snapshot, ensure_ascii=False) if snapshot is not None else None
             )
         assignments = ", ".join(f"{key} = ?" for key in normalized.keys())
         params = list(normalized.values()) + [user_id]
@@ -88,14 +102,14 @@ class SqliteCthulhuRepository:
             result = []
             for row in rows:
                 data = _row_to_dict(row) or {}
-                candidates = data.get("pending_predict_candidates")
-                if candidates:
-                    try:
-                        data["pending_predict_candidates"] = json.loads(candidates)
-                    except Exception:
-                        data["pending_predict_candidates"] = []
-                else:
-                    data["pending_predict_candidates"] = []
+                data["pending_predict_candidates"] = _load_json_field(
+                    data.get("pending_predict_candidates"),
+                    [],
+                )
+                data["pending_event_snapshot"] = _load_json_field(
+                    data.get("pending_event_snapshot"),
+                    None,
+                )
                 result.append(data)
             return result
 
@@ -110,6 +124,7 @@ class SqliteCthulhuRepository:
                     pending_event_force_pollute = 0,
                     pending_event_choice = NULL,
                     last_daily_reset_at = ?,
+                    pending_event_snapshot = NULL,
                     pending_predict_candidates = NULL,
                     pending_predict_expires_at = NULL
                 """,

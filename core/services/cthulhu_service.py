@@ -49,6 +49,13 @@ POLLUTION_TEXT_PREFIXES = [
 ]
 ZALGO_MARKS = ["\u0300", "\u0301", "\u0302", "\u0303", "\u0304", "\u0307", "\u0308", "\u0323", "\u0330", "\u0336"]
 NUMERAL_GLYPHS = {"0": "𒐀", "1": "𒐁", "2": "𒐂", "3": "𒐃", "4": "𒐄", "5": "𒐅", "6": "𒐆", "7": "𒐇", "8": "𒐈", "9": "𒐉"}
+TRUE_NAME_PATTERN_DEFAULTS = {
+    "a_plus_a": 18,
+    "a_plus_abc": 26,
+    "single_a": 12,
+    "single_abc": 14,
+    "legacy_a_plus_abc_plus_zhi_a": 30,
+}
 
 
 class CthulhuService:
@@ -87,6 +94,12 @@ class CthulhuService:
         self.root_pool = list(name_pools["root"])
         self.suffix_pool = list(name_pools["suffix"])
         self.daily_reset_hour = int(self.game_config.get("daily_reset_hour", 0) or 0)
+        cthulhu_config = self.game_config.get("cthulhu", {}) if isinstance(self.game_config, dict) else {}
+        configured_weights = cthulhu_config.get("true_name_pattern_weights", {}) if isinstance(cthulhu_config, dict) else {}
+        self.true_name_pattern_weights = {
+            key: int(configured_weights.get(key, default) or default)
+            for key, default in TRUE_NAME_PATTERN_DEFAULTS.items()
+        }
 
     def _now_iso(self) -> str:
         return get_now().isoformat(timespec="seconds")
@@ -139,13 +152,32 @@ class CthulhuService:
     def _grant_item(self, user_id: str, item_id: int, quantity: int = 1) -> None:
         self.inventory_repo.update_item_quantity(user_id, int(item_id), int(quantity))
 
+    def _build_true_name_parts(self) -> tuple[str, str]:
+        a = random.choice(self.prefix_pool)
+        abc = random.choice(self.root_pool) + random.choice(self.suffix_pool)
+        return a, abc
+
+    def _generate_true_name_candidate(self) -> str:
+        patterns = list(self.true_name_pattern_weights.keys())
+        weights = [max(0, int(self.true_name_pattern_weights.get(pattern, 0) or 0)) for pattern in patterns]
+        if sum(weights) <= 0:
+            patterns = ["legacy_a_plus_abc_plus_zhi_a"]
+            weights = [1]
+        pattern = random.choices(patterns, weights=weights, k=1)[0]
+        a, abc = self._build_true_name_parts()
+        if pattern == "a_plus_a":
+            return a + random.choice(self.prefix_pool)
+        if pattern == "a_plus_abc":
+            return a + abc
+        if pattern == "single_a":
+            return a
+        if pattern == "single_abc":
+            return abc
+        return a + abc + "之" + random.choice(self.prefix_pool)
+
     def _generate_unique_name(self) -> str:
         for _ in range(100):
-            candidate = (
-                random.choice(self.prefix_pool)
-                + random.choice(self.root_pool)
-                + random.choice(self.suffix_pool)
-            )
+            candidate = self._generate_true_name_candidate()
             if not self.repo.true_name_exists(candidate):
                 return candidate
         raise RuntimeError("true_name_generation_exhausted")
@@ -170,6 +202,58 @@ class CthulhuService:
             "threshold": self._threshold_for_tier(tier),
         }
 
+    def _normalize_choice_label(self, label: str, tier: str) -> str:
+        raw = str(label or "").strip()
+        if not raw:
+            return f"未知权柄（{TIER_SHORT_DISPLAY.get(tier, tier)}）"
+        replacements = {
+            "upper": "上",
+            "middle": "中",
+            "lower": "下",
+        }
+        marker = replacements.get(tier, tier)
+        raw = raw.replace("·上）", f"·{marker}）").replace("·中）", f"·{marker}）").replace("·下）", f"·{marker}）")
+        raw = raw.replace("·上", f"·{marker}").replace("·中", f"·{marker}").replace("·下", f"·{marker}")
+        return raw
+
+    def _build_pending_event_snapshot(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        choices = [dict(choice) for choice in event.get("choices", [])]
+        if not choices:
+            raise ValueError("event_choices_missing")
+
+        if str(event.get("tier")) == "upper" and sum(1 for choice in choices if choice.get("tier", "upper") == "upper") > 1:
+            upper_index = random.randrange(len(choices))
+            for idx, choice in enumerate(choices):
+                choice["tier"] = "upper" if idx == upper_index else "middle"
+        else:
+            for choice in choices:
+                choice.setdefault("tier", str(event.get("tier") or "lower"))
+
+        upper_count = sum(1 for choice in choices if choice.get("tier") == "upper")
+        if upper_count > 1:
+            kept = False
+            for choice in choices:
+                if choice.get("tier") == "upper":
+                    if not kept:
+                        kept = True
+                    else:
+                        choice["tier"] = "middle"
+
+        for choice in choices:
+            tier = str(choice.get("tier") or "lower")
+            god_type = str(choice.get("god_type") or "")
+            choice["difficulty"] = DIFFICULTY_BY_TIER[tier][god_type]
+            choice["label"] = self._normalize_choice_label(choice.get("label", ""), tier)
+            choice["probability_percent"] = float(choice["difficulty"])
+
+        return {
+            "event_id": event["event_id"],
+            "title": event["title"],
+            "scene_text": event["scene_text"],
+            "tier": event.get("tier"),
+            "choices": choices,
+        }
+
     def try_enter_deepdive(self, user_id: str) -> Dict[str, Any]:
         state = self._get_state(user_id)
         if state["is_in_deepdive_today"]:
@@ -181,6 +265,7 @@ class CthulhuService:
         if state.get("sci_fi_apex_abyss_unity", False):
             force_pollute = True
         event = random.choice(self.events_by_tier[tier])
+        snapshot = self._build_pending_event_snapshot(event)
         self._save_state(
             user_id,
             is_in_deepdive_today=1,
@@ -188,11 +273,12 @@ class CthulhuService:
             pending_event_tier=tier,
             pending_event_force_pollute=1 if force_pollute else 0,
             pending_event_choice=None,
+            pending_event_snapshot=snapshot,
         )
         return {
             "success": True,
             "deepdive_started": True,
-            "event": event,
+            "event": snapshot,
             "great_failure_pending": force_pollute,
         }
 
@@ -200,7 +286,7 @@ class CthulhuService:
         state = self._get_state(user_id)
         if not state.get("pending_event_id"):
             return {"success": False, "message": "当前没有待抉择的深潜事件。"}
-        event = self.events_by_id.get(state["pending_event_id"])
+        event = state.get("pending_event_snapshot") or self.events_by_id.get(state["pending_event_id"])
         if event is None:
             return {"success": False, "message": "深潜事件数据缺失。"}
         choice_id = str(choice_id or "").strip().upper()
@@ -212,7 +298,7 @@ class CthulhuService:
         return {"success": True, "message": "你已下注，等潮汐归位时见分晓。"}
 
     def _resolve_pending_event(self, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        event = self.events_by_id.get(state["pending_event_id"])
+        event = state.get("pending_event_snapshot") or self.events_by_id.get(state["pending_event_id"])
         if event is None:
             return None
         choice_id = state.get("pending_event_choice")
@@ -224,7 +310,7 @@ class CthulhuService:
         other = next(choice for choice in event["choices"] if choice["choice_id"] != choice_id)
         roll = random.randint(1, 100)
         landed = chosen if roll <= int(chosen["difficulty"]) else other
-        granted = self._grant_true_name(state["user_id"], event["tier"], landed["god_type"])
+        granted = self._grant_true_name(state["user_id"], landed["tier"], landed["god_type"])
 
         san_delta = 0
         result = "success" if landed["choice_id"] == choice_id else "failure"
@@ -452,7 +538,9 @@ class CthulhuService:
             self._grant_item(user_id, 57, state["pending_san_cap_tokens"])
             self._save_state(user_id, pending_san_cap_tokens=0)
             state["pending_san_cap_tokens"] = 0
-        pending_event = self.events_by_id.get(state["pending_event_id"]) if state.get("pending_event_id") else None
+        pending_event = state.get("pending_event_snapshot")
+        if pending_event is None and state.get("pending_event_id"):
+            pending_event = self.events_by_id.get(state["pending_event_id"])
         return {
             "success": True,
             "state": {
