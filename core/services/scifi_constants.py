@@ -39,20 +39,20 @@ TEAM_BATTLE_D20_PENALTY = {0: 0, 1: 0, 2: 0, 3: 1, 4: 3, 5: 5}
 
 APEX_ABYSS_OFFSET = {
     "singularity": 2,
-    "abyss_unity": 0,
-    "fate_solitude": 5,
-    "resonance_summit": 5,
+    "abyss_unity": 5,
+    "fate_solitude": 0,
+    "resonance_summit": 0,
 }
 APEX_TRIBULATION_MULTIPLIER = {
     "singularity": 0.98,
-    "abyss_unity": 0.85,
-    "fate_solitude": 0.75,
-    "resonance_summit": 0.85,
+    "abyss_unity": 1.0,
+    "fate_solitude": 0.85,
+    "resonance_summit": 1.0,
 }
 APEX_D20_PENALTY = {
     "singularity": 1,
-    "abyss_unity": 3,
-    "fate_solitude": 3,
+    "abyss_unity": 0,
+    "fate_solitude": 0,
     "resonance_summit": 5,
 }
 
@@ -76,9 +76,9 @@ APEX_DISPLAY = {
 
 APEX_SIDE_EFFECTS = {
     APEX_SINGULARITY: "深渊偏移 +2 / 渡劫乘区 ×0.98 / 讨伐 d20 -1",
-    APEX_ABYSS_UNITY: "渡劫乘区 ×0.85 / 讨伐 d20 -3",
-    APEX_FATE_SOLITUDE: "深渊偏移 +5 / 讨伐 d20 -3",
-    APEX_RESONANCE_SUMMIT: "深渊偏移 +5 / 渡劫乘区 ×0.85",
+    APEX_ABYSS_UNITY: "深渊偏移 +5",
+    APEX_FATE_SOLITUDE: "渡劫乘区 ×0.85",
+    APEX_RESONANCE_SUMMIT: "讨伐 d20 -5",
 }
 
 APEX_APPEND_RATE_BP = {
