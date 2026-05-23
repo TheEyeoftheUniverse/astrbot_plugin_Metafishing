@@ -1,31 +1,30 @@
 """迁移 013：为 user_cultivation 和 cthulhu_state 添加觉醒协议字段。"""
 
 from __future__ import annotations
+import sqlite3
 
 
-def up(conn) -> None:
-    cur = conn.cursor()
-
+def up(cursor: sqlite3.Cursor) -> None:
     # user_cultivation 表添加四个觉醒协议字段
-    cur.execute(
+    cursor.execute(
         """
         ALTER TABLE user_cultivation
         ADD COLUMN sci_fi_apex_singularity INTEGER NOT NULL DEFAULT 0
         """
     )
-    cur.execute(
+    cursor.execute(
         """
         ALTER TABLE user_cultivation
         ADD COLUMN sci_fi_apex_abyss_unity INTEGER NOT NULL DEFAULT 0
         """
     )
-    cur.execute(
+    cursor.execute(
         """
         ALTER TABLE user_cultivation
         ADD COLUMN sci_fi_apex_fate_solitude INTEGER NOT NULL DEFAULT 0
         """
     )
-    cur.execute(
+    cursor.execute(
         """
         ALTER TABLE user_cultivation
         ADD COLUMN sci_fi_apex_resonance_summit INTEGER NOT NULL DEFAULT 0
@@ -33,28 +32,24 @@ def up(conn) -> None:
     )
 
     # cthulhu_state 表添加两个觉醒协议字段（singularity 和 fate_solitude 影响深渊偏移）
-    cur.execute(
+    cursor.execute(
         """
         ALTER TABLE cthulhu_state
         ADD COLUMN sci_fi_apex_singularity INTEGER NOT NULL DEFAULT 0
         """
     )
-    cur.execute(
+    cursor.execute(
         """
         ALTER TABLE cthulhu_state
         ADD COLUMN sci_fi_apex_fate_solitude INTEGER NOT NULL DEFAULT 0
         """
     )
 
-    conn.commit()
 
-
-def down(conn) -> None:
-    cur = conn.cursor()
-
+def down(cursor: sqlite3.Cursor) -> None:
     # SQLite 不支持 DROP COLUMN，需要重建表
     # 这里简化处理，实际生产环境可能需要更复杂的回滚逻辑
-    cur.execute(
+    cursor.execute(
         """
         CREATE TABLE user_cultivation_backup AS
         SELECT
@@ -67,10 +62,10 @@ def down(conn) -> None:
         FROM user_cultivation
         """
     )
-    cur.execute("DROP TABLE user_cultivation")
-    cur.execute("ALTER TABLE user_cultivation_backup RENAME TO user_cultivation")
+    cursor.execute("DROP TABLE user_cultivation")
+    cursor.execute("ALTER TABLE user_cultivation_backup RENAME TO user_cultivation")
 
-    cur.execute(
+    cursor.execute(
         """
         CREATE TABLE cthulhu_state_backup AS
         SELECT
@@ -83,7 +78,5 @@ def down(conn) -> None:
         FROM cthulhu_state
         """
     )
-    cur.execute("DROP TABLE cthulhu_state")
-    cur.execute("ALTER TABLE cthulhu_state_backup RENAME TO cthulhu_state")
-
-    conn.commit()
+    cursor.execute("DROP TABLE cthulhu_state")
+    cursor.execute("ALTER TABLE cthulhu_state_backup RENAME TO cthulhu_state")
