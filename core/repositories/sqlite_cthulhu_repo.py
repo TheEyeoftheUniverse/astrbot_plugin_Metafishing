@@ -211,6 +211,13 @@ class SqliteCthulhuRepository:
             )
             conn.commit()
 
+    def delete_inventory_true_name_by_id(self, name_id: int) -> None:
+        """删除指定 name_id 的真名（呼唤完成后从背包移除）。"""
+        with self._cm.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM true_names WHERE name_id = ?", (name_id,))
+            conn.commit()
+
     def get_true_name(self, name_id: int) -> Optional[Dict[str, Any]]:
         with self._cm.get_connection() as conn:
             conn.row_factory = sqlite3.Row

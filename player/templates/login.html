@@ -1,6 +1,12 @@
 {% extends "layout.html" %}
 
 {% block title %}登录 - MetaFishing！{% endblock %}
+{% if login_random_theme %}
+{% block body_class %}theme-{{ login_random_theme }}{% endblock %}
+{% endif %}
+{% if login_random_zone_id %}
+{% block body_data_zone %}data-zone-id="{{ login_random_zone_id }}"{% endblock %}
+{% endif %}
 
 {% block content %}
 <div class="row justify-content-center mt-4">
@@ -88,7 +94,7 @@
                 </div>
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i>
-                    老玩家可继续使用 <code>,注册</code> 创建的游戏账号；首次使用 WebUI 前，请先私聊机器人领取初始密码
+                    首次使用 WebUI 前，请先私聊机器人领取初始密码
                 </small>
             </div>
         </section>

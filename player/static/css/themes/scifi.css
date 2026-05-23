@@ -71,7 +71,7 @@ body.theme-scifi .player-main::after {
     left: 0; right: 0; height: 2px;
     background: linear-gradient(90deg, transparent, var(--hud-cyan-soft), transparent);
     pointer-events: none;
-    z-index: 1;
+    z-index: 9999;
     animation: hud-scan 6s linear infinite;
     opacity: 0.55;
 }
@@ -151,6 +151,20 @@ body.theme-scifi .player-topbar .player-account-trigger:hover {
 body.theme-scifi .editorial-footer {
     background: transparent;
     color: var(--hud-text-dim);
+}
+
+/* ============================================================
+   钓鱼仪盘表数字增强
+   ============================================================ */
+body.theme-scifi .stat-dashboard-cell strong {
+    color: var(--hud-cyan) !important;
+    text-shadow: 0 0 8px var(--hud-cyan-glow);
+}
+body.theme-scifi .stat-line-label {
+    color: var(--hud-text) !important;
+}
+body.theme-scifi .stat-line-note {
+    color: var(--hud-text-dim) !important;
 }
 
 /* ============================================================
@@ -577,6 +591,77 @@ body.theme-scifi p, body.theme-scifi span:not(.badge):not(.btn span) { color: in
 body.theme-scifi a { color: var(--hud-cyan); }
 body.theme-scifi a:hover { color: #aef0ff; text-shadow: 0 0 6px var(--hud-cyan-glow); }
 body.theme-scifi hr { border-color: var(--hud-line); opacity: 0.6; }
+
+/* ============================================================
+   主页 hero 状态行：科幻 HUD 终端风格
+   ============================================================ */
+body.theme-scifi .hero-status-block {
+    font-family: "Rajdhani", "Orbitron", ui-monospace, monospace;
+}
+body.theme-scifi .hero-status-line {
+    color: var(--hud-text);
+    font-size: 0.94rem;
+    letter-spacing: 0.02em;
+}
+body.theme-scifi .hero-status-prompt {
+    color: var(--hud-cyan);
+    text-shadow: 0 0 4px var(--hud-cyan-glow);
+}
+body.theme-scifi .hero-status-text {
+    color: var(--hud-text);
+    text-shadow: 0 0 8px var(--hud-cyan-glow);
+}
+body.theme-scifi .hero-status-action {
+    color: var(--hud-cyan);
+    text-shadow: 0 0 6px var(--hud-cyan-glow);
+    border-bottom-color: var(--hud-cyan);
+}
+body.theme-scifi .hero-status-action:hover:not(.is-done):not(:disabled) {
+    color: var(--hud-magenta);
+    text-shadow: 0 0 8px rgba(176, 97, 255, 0.5);
+    border-bottom-color: var(--hud-magenta);
+}
+body.theme-scifi .hero-status-action.is-done {
+    color: var(--hud-text-dim);
+    text-shadow: none;
+}
+
+/* 科幻终端打字动画（仅首页 index.html 的 .hero-status-line） */
+body.theme-scifi .hero-status-text {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 0;
+    animation: scifi-typewriter 1.4s steps(30) forwards;
+}
+body.theme-scifi .hero-status-line[data-status-row="1"] .hero-status-text {
+    animation-delay: 0.2s;
+}
+body.theme-scifi .hero-status-line[data-status-row="2"] .hero-status-text {
+    animation-delay: 1.5s;
+}
+@keyframes scifi-typewriter {
+    to { max-width: 100%; }
+}
+body.theme-scifi .hero-status-text::after {
+    content: "▏";
+    color: var(--hud-cyan);
+    animation: scifi-cursor 0.9s steps(2) infinite;
+}
+@keyframes scifi-cursor {
+    50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.theme-scifi .hero-status-text {
+        animation: none;
+        max-width: none;
+    }
+    body.theme-scifi .hero-status-text::after {
+        animation: none;
+        opacity: 0;
+    }
+}
 
 /* ============================================================
    响应式：移动端

@@ -152,7 +152,7 @@
     <div class="col-12">
         <div class="card border-info">
             <div class="card-header bg-info text-white wendao-status-header">
-                <span><i class="fas fa-mountain"></i> 修行状态</span>
+                <span><i class="fas fa-mountain"></i>修行状态</span>
                 <span class="wendao-status-meta">
                     <span><span class="meta-key">劫痕未消</span><span class="meta-val">{{ summary.consecutive_failures }} 层</span></span>
                     <span><span class="meta-key">今日护法</span><span class="meta-val">{{ summary.daily_guard_reward_count }} / 3</span></span>
@@ -169,14 +169,33 @@
                     </span>
                     <span class="wendao-realm-flavor">{{ realm_flavors.get(summary.current_realm, '') }}</span>
                 </div>
-                <div class="progress mb-3" style="height: 24px;">
+
+                {% if summary.realm_history %}
+                <div class="wendao-base-attrs mb-3">
+                    <strong style="color: var(--wendao-cinnabar, #b22d3f);">境界加成：</strong>
+                    {% set total_bonus = 0.0 %}
+                    {% for realm, quality in summary.realm_history.items() %}
+                        {% if quality == 'fanxue' %}{% set total_bonus = total_bonus + 0.1 %}
+                        {% elif quality == 'lingyun' %}{% set total_bonus = total_bonus + 0.2 %}
+                        {% elif quality == 'zhenyi' %}{% set total_bonus = total_bonus + 0.3 %}
+                        {% elif quality == 'tiancheng' %}{% set total_bonus = total_bonus + 0.5 %}
+                        {% endif %}
+                    {% endfor %}
+                    <span style="color: var(--wendao-ink, #1c1b18);">价值 +{{ "%.1f"|format(total_bonus) }}%、数量 +{{ "%.1f"|format(total_bonus) }}%、品质 +{{ "%.1f"|format(total_bonus) }}%、稀有 +{{ "%.1f"|format(total_bonus) }}%</span>
+                </div>
+                {% endif %}
+
+                <div class="wendao-cultivation-bar" role="progressbar"
+                     aria-valuenow="{{ summary.accumulated_xiuwei }}"
+                     aria-valuemin="0"
+                     aria-valuemax="{{ summary.xiuwei_cap }}">
                     {% set ratio = (summary.accumulated_xiuwei / summary.xiuwei_cap * 100) if summary.xiuwei_cap > 0 else 0 %}
-                    <div class="progress-bar progress-bar-striped {% if summary.is_full %}bg-success{% else %}bg-info{% endif %}"
-                         role="progressbar"
-                         style="width: {{ ratio }}%;">
+                    <div class="wendao-cultivation-fill {% if summary.is_full %}is-full{% endif %}"
+                         style="width: {{ ratio }}%;"></div>
+                    <span class="wendao-cultivation-num">
                         {{ summary.accumulated_xiuwei }} / {{ summary.xiuwei_cap }} 修为
                         {% if summary.is_full %}（已圆满，可渡劫）{% endif %}
-                    </div>
+                    </span>
                 </div>
                 {% if summary.tiancheng_protection %}
                 <hr>
@@ -215,7 +234,7 @@
     <div class="col-12">
         <div class="card border-warning">
             <div class="card-header bg-warning">
-                <i class="fas fa-fire"></i> 发起渡劫
+                <i class="fas fa-fire"></i>发起渡劫
             </div>
             <div class="card-body">
                 {% if eligible_items %}
@@ -251,7 +270,7 @@
 <div class="row">
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><i class="fas fa-broadcast-tower"></i> 何方道友在此渡劫？</div>
+            <div class="card-header"><i class="fas fa-broadcast-tower"></i>何方道友在此渡劫？</div>
             <div class="card-body">
                 {% if active_events %}
                 <table class="table table-sm">

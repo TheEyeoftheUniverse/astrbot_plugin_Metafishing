@@ -306,6 +306,8 @@ a:hover {
     display: inline-flex;
     align-items: baseline;
     flex-wrap: wrap;
+    min-width: 0;
+    white-space: normal;
     opacity: 0;
     transform: translateY(-4px);
     animation: hero-status-fade 0.55s ease forwards;
@@ -320,9 +322,13 @@ a:hover {
     opacity: 0.55;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-style: normal;
+    flex: 0 0 auto;
 }
 .hero-status-text {
     color: var(--muted, #71685c);
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .hero-status-action {
     appearance: none;
@@ -349,6 +355,13 @@ a:hover {
 .hero-status-action:disabled {
     cursor: not-allowed;
     opacity: 0.4;
+}
+
+@media (max-width: 540px) {
+    .hero-status-line {
+        flex-wrap: wrap;
+        white-space: normal;
+    }
 }
 
 .section-title {
@@ -880,6 +893,7 @@ a:hover {
     font-size: 0.76rem;
     line-height: 1.35;
     color: var(--muted);
+    white-space: nowrap;
 }
 
 .stat-dashboard-cell strong {

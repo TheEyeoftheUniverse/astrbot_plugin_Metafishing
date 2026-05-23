@@ -31,7 +31,7 @@ body.theme-wendao {
     background: transparent;
 }
 
-/* zone-6 全屏底图 + 水墨纸色叠加（强制显示） */
+/* zone-6 全屏底图 + 水墨纸色叠加 */
 body.theme-wendao::after {
     content: "";
     position: fixed;
@@ -48,22 +48,32 @@ body.theme-wendao::after {
         /* 底图：zone-6 */
         url("../../img/zones/zone-6.png");
     background-size: cover, cover, cover, cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
+    background-position: center, center, center, center;
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+    background-attachment: fixed, fixed, fixed, fixed;
     opacity: 1;
 }
 
-/* 云纹覆盖层 */
+/* 云纹覆盖层 + 八卦图 */
 body.theme-wendao::before {
     content: "";
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'><g fill='none' stroke='%231c1b18' stroke-width='1.2' opacity='0.5'><path d='M30 100 Q55 70 80 95 T130 100 Q150 80 170 100'/><path d='M40 110 Q60 95 85 108 T130 112'/><path d='M180 220 Q205 195 230 215 T280 220 Q295 205 310 220'/><path d='M190 230 Q210 215 235 228 T280 232'/><path d='M70 240 Q90 220 115 235 T160 240'/><path d='M210 70 Q230 50 255 65 T300 70'/></g></svg>");
-    background-size: 320px 320px;
+    background-image:
+        /* 八卦图（淡墨，静止） */
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><g fill='none' stroke='%231c1b18' stroke-width='1.2' opacity='0.06'><circle cx='100' cy='100' r='80'/><circle cx='100' cy='100' r='60'/><circle cx='100' cy='100' r='40'/><line x1='100' y1='20' x2='100' y2='180'/><line x1='20' y1='100' x2='180' y2='100'/><line x1='35' y1='35' x2='165' y2='165'/><line x1='165' y1='35' x2='35' y2='165'/><circle cx='100' cy='40' r='8' fill='%23a0392e'/><circle cx='100' cy='160' r='8' fill='%23a0392e'/><circle cx='40' cy='100' r='8' fill='%23a0392e'/><circle cx='160' cy='100' r='8' fill='%23a0392e'/></g></svg>"),
+        /* 云纹（横向飘动） */
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'><g fill='none' stroke='%231c1b18' stroke-width='1.2' opacity='0.5'><path d='M30 100 Q55 70 80 95 T130 100 Q150 80 170 100'/><path d='M40 110 Q60 95 85 108 T130 112'/><path d='M180 220 Q205 195 230 215 T280 220 Q295 205 310 220'/><path d='M190 230 Q210 215 235 228 T280 232'/><path d='M70 240 Q90 220 115 235 T160 240'/><path d='M210 70 Q230 50 255 65 T300 70'/></g></svg>");
+    background-size: 400px 400px, 320px 320px;
+    background-position: center, 0 0;
+    background-repeat: no-repeat, repeat;
     opacity: 0.07;
+    animation: wendao-cloud-drift 60s linear infinite;
+}
+@keyframes wendao-cloud-drift {
+    to { background-position: center, 320px 0; }
 }
 
 body.theme-wendao .container-fluid,
@@ -150,6 +160,9 @@ body.theme-wendao .card-header {
     font-family: "Wendao Serif", "STKaiti", "KaiTi", serif;
     font-weight: 600;
     letter-spacing: 0.1em;
+}
+body.theme-wendao .card-header > i:first-child {
+    margin-right: 0.5em;
 }
 body.theme-wendao .card-header.bg-info,
 body.theme-wendao .card-header.bg-warning,
@@ -464,4 +477,86 @@ body.theme-wendao .wendao-scroll-title i {
     color: var(--wendao-cinnabar);
     margin-right: 0.5em;
     font-size: 0.85em;
+}
+
+/* ============================================================
+   主页 hero 状态行：问道主题覆写
+   ============================================================ */
+body.theme-wendao .hero-status-block {
+    font-family: "Wendao Serif", "STKaiti", "KaiTi", serif;
+}
+body.theme-wendao .hero-status-line {
+    color: var(--wendao-ink);
+}
+body.theme-wendao .hero-status-prompt {
+    color: var(--wendao-ink-soft);
+}
+body.theme-wendao .hero-status-text {
+    color: var(--wendao-muted);
+}
+body.theme-wendao .hero-status-action {
+    color: var(--wendao-cinnabar);
+}
+body.theme-wendao .hero-status-action:hover:not(.is-done):not(:disabled) {
+    color: var(--wendao-ink);
+}
+body.theme-wendao .hero-status-action.is-done {
+    color: var(--wendao-muted);
+}
+
+/* ============================================================
+   问道渡劫页：修为进度条
+   ============================================================ */
+body.theme-wendao .wendao-cultivation-bar {
+    position: relative;
+    height: 28px;
+    margin-bottom: 1rem;
+    background: linear-gradient(90deg,
+        rgba(28, 27, 24, 0.04) 0%,
+        rgba(160, 57, 46, 0.08) 50%,
+        rgba(28, 27, 24, 0.04) 100%);
+    border: 1px solid var(--wendao-hairline-strong);
+    border-radius: 2px;
+    overflow: visible;
+}
+body.theme-wendao .wendao-cultivation-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: linear-gradient(90deg,
+        rgba(160, 57, 46, 0.3) 0%,
+        rgba(160, 57, 46, 0.5) 50%,
+        rgba(160, 57, 46, 0.3) 100%);
+    transition: width 0.6s ease;
+    border-right: 2px solid var(--wendao-cinnabar);
+}
+body.theme-wendao .wendao-cultivation-fill.is-full {
+    background: linear-gradient(90deg,
+        rgba(70, 120, 50, 0.3) 0%,
+        rgba(70, 120, 50, 0.5) 50%,
+        rgba(70, 120, 50, 0.3) 100%);
+    border-right-color: #5a8a45;
+}
+body.theme-wendao .wendao-cultivation-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--wendao-ink);
+    text-shadow: 0 0 4px rgba(245, 241, 232, 0.8);
+}
+
+/* ============================================================
+   动画偏好
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    body.theme-wendao::before,
+    body.theme-wendao::after {
+        animation: none;
+    }
 }

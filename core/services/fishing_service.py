@@ -216,6 +216,24 @@ class FishingService:
 
         active_buffs = self.buff_repo.get_all_active_by_user(user_id)
 
+        # 获取境界加成（玄幻渡劫）
+        realm_bonus = 0.0
+        if self.cultivation_service is not None:
+            try:
+                summary = self.cultivation_service.get_status_summary(user_id)
+                realm_history = summary.get("realm_history", {})
+                for realm, quality in realm_history.items():
+                    if quality == "fanxue":
+                        realm_bonus += 0.001  # 0.1%
+                    elif quality == "lingyun":
+                        realm_bonus += 0.002  # 0.2%
+                    elif quality == "zhenyi":
+                        realm_bonus += 0.003  # 0.3%
+                    elif quality == "tiancheng":
+                        realm_bonus += 0.005  # 0.5%
+            except Exception as exc:
+                logger.warning(f"[cultivation] 获取境界加成失败: {exc}")
+
         # 获取装备鱼竿并应用加成
         equipped_rod_instance = self.inventory_repo.get_user_equipped_rod(user.user_id)
         if equipped_rod_instance:
@@ -268,6 +286,13 @@ class FishingService:
                         rarity=acc_template.rarity,
                     )
                 )
+
+        # 应用境界加成到基础属性
+        quality_bonus_total += realm_bonus
+        quantity_bonus_total += realm_bonus
+        value_bonus += realm_bonus
+        rare_chance += realm_bonus
+
         # 获取鱼饵并应用加成
         cur_bait_id = user.current_bait_id
         garbage_reduction_modifier = None

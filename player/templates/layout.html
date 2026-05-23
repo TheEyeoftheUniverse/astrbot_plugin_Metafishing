@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/mahuan.css', v='20260523a') }}">
     {% block extra_css %}{% endblock %}
 </head>
-<body class="player-ui {% block body_class %}{% if nav_zone_id == 5 %}theme-scifi{% elif nav_zone_id == 6 %}theme-wendao{% elif nav_zone_id == 7 %}theme-cthulhu{% elif nav_zone_id == 8 %}theme-mahuan{% endif %}{% endblock %}" {% if nav_zone_id %}data-zone-id="{{ nav_zone_id }}"{% endif %}>
+<body class="player-ui {% block body_class %}{% if nav_zone_id == 5 %}theme-scifi{% elif nav_zone_id == 6 %}theme-wendao{% elif nav_zone_id == 7 %}theme-cthulhu{% elif nav_zone_id == 8 %}theme-mahuan{% endif %}{% endblock %}" {% block body_data_zone %}{% if nav_zone_id %}data-zone-id="{{ nav_zone_id }}"{% endif %}{% endblock %}>
 {% if session.get('user_id') %}
 <nav class="navbar navbar-expand-lg navbar-light player-topbar fixed-top">
     <div class="container-fluid">
@@ -1009,29 +1009,36 @@ loadCthulhuPollution();
     const eyes = document.querySelectorAll('.abyss-eye');
     if (!eyes.length) return;
     const MAX_OFFSET = 16; // SVG user units
-    let targetX = 0, targetY = 0;
     let rafPending = false;
 
     function update(e) {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        const nx = (e.clientX / w) * 2 - 1;
-        const ny = (e.clientY / h) * 2 - 1;
-        targetX = nx * MAX_OFFSET;
-        targetY = ny * MAX_OFFSET;
         if (!rafPending) {
             rafPending = true;
-            requestAnimationFrame(apply);
-        }
-    }
-
-    function apply() {
-        eyes.forEach((eye) => {
-            eye.querySelectorAll('.abyss-pupil').forEach((p) => {
-                p.setAttribute('transform', `translate(${targetX} ${targetY})`);
+            requestAnimationFrame(() => {
+                eyes.forEach((eye) => {
+                    const rect = eye.getBoundingClientRect();
+                    const eyeCenterX = rect.left + rect.width / 2;
+                    const eyeCenterY = rect.top + rect.height / 2;
+                    const dx = e.clientX - eyeCenterX;
+                    const dy = e.clientY - eyeCenterY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance === 0) {
+                        eye.querySelectorAll('.abyss-pupil').forEach((p) => {
+                            p.setAttribute('transform', `translate(0 0)`);
+                        });
+                        return;
+                    }
+                    const maxDistance = Math.max(rect.width, rect.height);
+                    const ratio = Math.min(distance / maxDistance, 1);
+                    const offsetX = (dx / distance) * ratio * MAX_OFFSET;
+                    const offsetY = (dy / distance) * ratio * MAX_OFFSET;
+                    eye.querySelectorAll('.abyss-pupil').forEach((p) => {
+                        p.setAttribute('transform', `translate(${offsetX || 0} ${offsetY || 0})`);
+                    });
+                });
+                rafPending = false;
             });
-        });
-        rafPending = false;
+        }
     }
 
     document.addEventListener('mousemove', update, { passive: true });

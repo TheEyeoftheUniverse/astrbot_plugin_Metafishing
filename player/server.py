@@ -1202,8 +1202,22 @@ async def _complete_linuxdo_login(user):
 
 
 def _get_login_template_context(**kwargs):
+    import random
     oauth_config = _get_linuxdo_oauth_config()
     registration_config = _get_registration_config()
+
+    # Random zone selection for login page visual variety (exclude zone 3 and 4 for text readability)
+    random_zone_id = random.choice([1, 2, 5, 6, 7, 8])
+    random_theme = None
+    if random_zone_id == 5:
+        random_theme = "scifi"
+    elif random_zone_id == 6:
+        random_theme = "wendao"
+    elif random_zone_id == 7:
+        random_theme = "mahuan"
+    elif random_zone_id == 8:
+        random_theme = "cthulhu"
+
     context = {
         "first_login": False,
         "oauth_enabled": oauth_config.get("enabled", False),
@@ -1213,6 +1227,8 @@ def _get_login_template_context(**kwargs):
         "oauth_login_url": url_for("player_bp.login_with_linuxdo", flow="webui") if oauth_config.get("login_entry_enabled", False) else None,
         "registration_enabled": bool(registration_config.get("enabled", True)),
         "password_min_length": int(registration_config.get("password_min_length", 6) or 6),
+        "login_random_zone_id": random_zone_id,
+        "login_random_theme": random_theme,
     }
     context.update(_get_player_link_config())
     context.update(kwargs)

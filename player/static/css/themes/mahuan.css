@@ -732,10 +732,10 @@ body.theme-mahuan .hero-status-block::before {
 body.theme-mahuan .hero-status-line {
     font-family: "Cinzel", "Trajan Pro", "EB Garamond", "Georgia", serif;
     font-style: normal;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     color: var(--magic-parchment);
-    letter-spacing: 0.10em;
-    line-height: 2;
+    letter-spacing: 0.04em;
+    line-height: 1.85;
     text-shadow: 0 0 6px rgba(255, 106, 26, 0.18);
 
     /* 咒文显现：blur + scale + 透明度 */

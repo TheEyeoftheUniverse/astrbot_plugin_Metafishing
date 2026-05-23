@@ -100,6 +100,23 @@ class CthulhuService:
             key: int(configured_weights.get(key, default) or default)
             for key, default in TRUE_NAME_PATTERN_DEFAULTS.items()
         }
+        if any(self.true_name_pattern_weights.values()):
+            logger.warning("[cthulhu] true_name_pattern_weights 配置已废弃，现按 tier 硬绑定生成模式。")
+
+        # 合并单字池：prefix ∪ root_stripped ∪ suffix_stripped，仅保留单字
+        merged = set(self.prefix_pool)
+        for s in self.root_pool:
+            stripped = s.lstrip("·").strip()
+            if stripped and len(stripped) == 1:
+                merged.add(stripped)
+        for s in self.suffix_pool:
+            stripped = s.lstrip("·").strip()
+            if stripped and len(stripped) == 1:
+                merged.add(stripped)
+        self.merged_single_pool = sorted(merged)
+        if len(self.merged_single_pool) < 30:
+            logger.warning("[cthulhu] 合并单字池容量不足 (%d)，回退到 prefix_pool", len(self.merged_single_pool))
+            self.merged_single_pool = self.prefix_pool
 
     def _now_iso(self) -> str:
         return get_now().isoformat(timespec="seconds")
@@ -152,32 +169,24 @@ class CthulhuService:
     def _grant_item(self, user_id: str, item_id: int, quantity: int = 1) -> None:
         self.inventory_repo.update_item_quantity(user_id, int(item_id), int(quantity))
 
-    def _build_true_name_parts(self) -> tuple[str, str]:
-        a = random.choice(self.prefix_pool)
-        abc = random.choice(self.root_pool) + random.choice(self.suffix_pool)
-        return a, abc
-
-    def _generate_true_name_candidate(self) -> str:
-        patterns = list(self.true_name_pattern_weights.keys())
-        weights = [max(0, int(self.true_name_pattern_weights.get(pattern, 0) or 0)) for pattern in patterns]
-        if sum(weights) <= 0:
-            patterns = ["legacy_a_plus_abc_plus_zhi_a"]
-            weights = [1]
-        pattern = random.choices(patterns, weights=weights, k=1)[0]
-        a, abc = self._build_true_name_parts()
-        if pattern == "a_plus_a":
-            return a + random.choice(self.prefix_pool)
-        if pattern == "a_plus_abc":
-            return a + abc
-        if pattern == "single_a":
+    def _generate_true_name_candidate(self, tier: str) -> str:
+        """按 tier 硬绑定生成真名：
+        - lower: 单字（从 merged_single_pool 选）
+        - middle: 单字 + 中间名（x·abc）
+        - upper: 单字 + 中间名 + 之单字（x·abc之y）
+        """
+        a = random.choice(self.merged_single_pool)
+        if tier == "lower":
             return a
-        if pattern == "single_abc":
-            return abc
-        return a + abc + "之" + random.choice(self.prefix_pool)
+        abc = random.choice(self.root_pool)
+        if tier == "middle":
+            return a + abc
+        z = random.choice(self.merged_single_pool)
+        return a + abc + "之" + z
 
-    def _generate_unique_name(self) -> str:
+    def _generate_unique_name(self, tier: str) -> str:
         for _ in range(100):
-            candidate = self._generate_true_name_candidate()
+            candidate = self._generate_true_name_candidate(tier)
             if not self.repo.true_name_exists(candidate):
                 return candidate
         raise RuntimeError("true_name_generation_exhausted")
@@ -185,7 +194,7 @@ class CthulhuService:
     def _grant_true_name(self, user_id: str, tier: str, god_type: str) -> Dict[str, Any]:
         if self.repo.count_inventory_true_names(user_id) >= 10:
             self.repo.delete_oldest_inventory_true_name(user_id)
-        name_string = self._generate_unique_name()
+        name_string = self._generate_unique_name(tier)
         name_id = self.repo.insert_true_name(
             name_string=name_string,
             god_type=god_type,
@@ -455,6 +464,7 @@ class CthulhuService:
         activated_pollution = self.repo.activate_random_inactive_pollution(name_id, self._now_iso())
         reward_summary = self._distribute_global_rewards(name_id, name["tier"], initiator)
         self.repo.consume_true_name(name_id, self._now_iso())
+        self.repo.delete_inventory_true_name_by_id(name_id)
         message = (
             f"{AUTHORITY_DISPLAY[name['god_type']]}·{TIER_DISPLAY[name['tier']]} 权柄已易位。"
             if old_holder and old_holder != initiator

@@ -105,7 +105,7 @@
     border: 1px solid rgba(196, 50, 50, 0.4);
     color: var(--abyss-bone, #c9c0a8);
     font-family: "Georgia", "STKaiti", serif;
-    text-align: left;
+    text-align: center;
     cursor: pointer;
     transition: all .3s;
     position: relative;
@@ -113,9 +113,9 @@
 .abyss-choice::before {
     content: "✦";
     position: absolute;
-    left: 0.6rem;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 50%;
+    top: 0.4rem;
+    transform: translateX(-50%);
     color: rgba(196, 50, 50, 0.4);
     font-size: 0.7rem;
     transition: all .3s;
@@ -125,11 +125,9 @@
     border-color: var(--abyss-blood, #c43232);
     color: #fff;
     box-shadow: 0 0 14px rgba(196, 50, 50, 0.5);
-    padding-left: 1.6rem;
 }
 .abyss-choice:hover::before {
     color: var(--abyss-blood, #c43232);
-    left: 0.85rem;
 }
 .abyss-choice .choice-text { font-size: 0.96rem; letter-spacing: 0.04em; }
 .abyss-choice .choice-prob { font-size: 0.78rem; opacity: 0.5; margin-left: 0.6rem; font-family: monospace; }
@@ -654,7 +652,7 @@ function renderCthulhu() {
     `).join('') : '<div class="abyss-call-progress">深渊一时寂静，无人在呼唤。</div>';
 
     const progressLine = lastCallProgress
-        ? `<div class="abyss-call-progress">${lastCallProgress.text}（${lastCallProgress.current}/${lastCallProgress.threshold}）</div>`
+        ? `<div class="abyss-call-progress">${lastCallProgress.text}</div>`
         : '';
 
     document.getElementById('cthulhuNamingCard').innerHTML = `
