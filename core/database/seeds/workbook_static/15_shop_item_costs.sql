@@ -187,3 +187,11 @@ INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount",
 INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (305, 30, 'fish', 1, 351, 'and', NULL, 0);
 INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (306, 34, 'fish', 1, 345, 'and', NULL, 0);
 INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (307, 20, 'coins', 40000, NULL, 'and', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (308, 129, 'item', 10, 47, 'or', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (309, 129, 'item', 5, 48, 'or', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (310, 130, 'item', 10, 49, 'or', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (311, 130, 'item', 5, 50, 'or', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (312, 131, 'item', 10, 51, 'or', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (313, 131, 'item', 5, 52, 'or', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (314, 132, 'item', 10, 53, 'or', 1, 0);
+INSERT INTO "shop_item_costs" ("cost_id", "item_id", "cost_type", "cost_amount", "cost_item_id", "cost_relation", "group_id", "quality_level") VALUES (315, 132, 'item', 5, 54, 'or', 1, 0);

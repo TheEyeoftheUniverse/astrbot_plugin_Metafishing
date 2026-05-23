@@ -24,8 +24,8 @@ INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_typ
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (23, 2, 'item', 7, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (24, 2, 'item', 14, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (25, 2, 'item', 21, 1, 60);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (26, 2, 'bait', 16, 100, 60000);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (27, 2, 'bait', 12, 300, 524880);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (26, 2, 'bait', 20, 100, 60000);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (27, 2, 'bait', 16, 300, 524880);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (28, 3, 'rod', 10, 1, 2000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (29, 3, 'rod', 11, 1, 2000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (30, 3, 'rod', 12, 1, 2000);
@@ -51,8 +51,8 @@ INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_typ
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (50, 4, 'item', 7, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (51, 4, 'item', 15, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (52, 4, 'item', 22, 1, 60);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (53, 4, 'bait', 17, 100, 60000);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (54, 4, 'bait', 13, 300, 524880);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (53, 4, 'bait', 21, 100, 60000);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (54, 4, 'bait', 17, 300, 524880);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (55, 5, 'rod', 7, 1, 2000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (56, 5, 'rod', 8, 1, 2000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (57, 5, 'rod', 9, 1, 2000);
@@ -78,8 +78,8 @@ INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_typ
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (77, 6, 'item', 7, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (78, 6, 'item', 16, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (79, 6, 'item', 23, 1, 60);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (80, 6, 'bait', 18, 100, 60000);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (81, 6, 'bait', 14, 300, 524880);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (80, 6, 'bait', 22, 100, 60000);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (81, 6, 'bait', 18, 300, 524880);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (82, 7, 'rod', 13, 1, 2000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (83, 7, 'rod', 14, 1, 2000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (84, 7, 'rod', 15, 1, 2000);
@@ -105,5 +105,5 @@ INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_typ
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (104, 8, 'item', 7, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (105, 8, 'item', 17, 1, 6000);
 INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (106, 8, 'item', 24, 1, 60);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (107, 8, 'bait', 15, 100, 60000);
-INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (108, 8, 'bait', 11, 300, 524880);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (107, 8, 'bait', 19, 100, 60000);
+INSERT INTO "gacha_pool_items" ("gacha_pool_item_id", "gacha_pool_id", "item_type", "item_id", "quantity", "weight") VALUES (108, 8, 'bait', 15, 300, 524880);

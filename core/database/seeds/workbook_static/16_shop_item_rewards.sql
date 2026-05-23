@@ -127,3 +127,7 @@ INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_
 INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_item_id", "reward_quantity", "reward_refine_level", "quality_level") VALUES (191, 30, 'item', 11, 1, NULL, 0);
 INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_item_id", "reward_quantity", "reward_refine_level", "quality_level") VALUES (192, 34, 'item', 11, 6, NULL, 0);
 INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_item_id", "reward_quantity", "reward_refine_level", "quality_level") VALUES (193, 20, 'item', 12, 1, NULL, 0);
+INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_item_id", "reward_quantity", "reward_refine_level", "quality_level") VALUES (194, 129, 'item', 14, 1, NULL, 0);
+INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_item_id", "reward_quantity", "reward_refine_level", "quality_level") VALUES (195, 130, 'item', 15, 1, NULL, 0);
+INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_item_id", "reward_quantity", "reward_refine_level", "quality_level") VALUES (196, 131, 'item', 16, 1, NULL, 0);
+INSERT INTO "shop_item_rewards" ("reward_id", "item_id", "reward_type", "reward_item_id", "reward_quantity", "reward_refine_level", "quality_level") VALUES (197, 132, 'item', 17, 1, NULL, 0);
