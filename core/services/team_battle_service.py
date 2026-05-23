@@ -6,7 +6,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
+import re
+import shutil
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -16,10 +19,11 @@ from astrbot.api import logger
 
 from ..utils import get_now, get_current_daily_marker, get_last_reset_time
 from . import team_battle_constants as C
-from .boss_image_provider import BossImageProvider, NullBossImageProvider
 
 
 _DATETIME_FMT = "%Y-%m-%dT%H:%M:%S"
+_MANUAL_BOSS_IMAGE_FILENAME = "current_boss.png"
+_IMAGE_SIZE_RE = re.compile(r"^\s*(\d{2,5})\s*[xX×]\s*(\d{2,5})\s*$")
 
 
 def _now_iso() -> str:
@@ -53,7 +57,6 @@ class TeamBattleService:
         log_repo,
         game_config: Dict[str, Any],
         context=None,
-        image_provider: Optional[BossImageProvider] = None,
     ):
         self.repo = team_battle_repo
         self.user_repo = user_repo
@@ -62,12 +65,11 @@ class TeamBattleService:
         self.log_repo = log_repo
         self.game_config = game_config
         self.context = context
-        self.image_provider = image_provider or NullBossImageProvider()
         self.scifi_service = None
 
         tb_cfg = self.game_config.get("team_battle", {}) if isinstance(self.game_config, dict) else {}
         self._settle_offset_minutes = int(tb_cfg.get("settle_offset_minutes", 2))
-        self._image_retry = int(tb_cfg.get("image_retry", C.IMAGE_RETRY_DEFAULT))
+        self._manual_image_size = self._normalize_manual_image_size(tb_cfg.get("manual_image_size", "1792x1024"))
         self._enable_llm_text = bool(tb_cfg.get("enable_llm_text", True))
 
         self._stop_event = threading.Event()
@@ -79,6 +81,19 @@ class TeamBattleService:
     # ---------------------------------------------------------------------
     def _daily_reset_hour(self) -> int:
         return int(self.game_config.get("daily_reset_hour", 0) or 0)
+
+    @staticmethod
+    def _normalize_manual_image_size(value: Any) -> str:
+        match = _IMAGE_SIZE_RE.match(str(value or ""))
+        if match:
+            return f"{int(match.group(1))}x{int(match.group(2))}"
+        return "1792x1024"
+
+    def get_manual_boss_image_aspect_ratio_css(self) -> str:
+        match = _IMAGE_SIZE_RE.match(self._manual_image_size)
+        if not match:
+            return "7 / 4"
+        return f"{int(match.group(1))} / {int(match.group(2))}"
 
     def _current_marker(self, now: Optional[datetime] = None) -> date:
         # get_current_daily_marker 只考虑当前时间，传入 now 时需手工计算
@@ -168,24 +183,10 @@ class TeamBattleService:
         return self._spawn_new_boss(region, star)
 
     def _spawn_new_boss(self, region_key: str, boss_star: int) -> Dict[str, Any]:
+        self._clear_boss_image_dir()
         fish = self._pick_boss_fish(region_key, boss_star)
         boss_name = self._build_boss_name(fish, region_key, boss_star)
         max_hp = C.BOSS_HP_BY_STAR[boss_star]
-
-        # 图片：本期 NullProvider → None
-        image_path: Optional[str] = None
-        try:
-            prompt = self._build_image_prompt(fish, region_key, boss_star)
-            image_path = self.image_provider.generate(
-                prompt=prompt,
-                region_key=region_key,
-                boss_name=boss_name,
-                boss_star=boss_star,
-                max_retries=self._image_retry,
-            )
-        except Exception as exc:
-            logger.warning(f"[team_battle] 图片生成异常: {exc}")
-            image_path = None
 
         # 登场 LLM 文本：失败兜底静态模板
         intro_story, intro_quote = self._request_intro_llm_text(fish, region_key, boss_name, boss_star)
@@ -197,7 +198,7 @@ class TeamBattleService:
             boss_star=boss_star,
             max_hp=max_hp,
             spawned_at=_now_iso(),
-            image_path=image_path,
+            image_path=None,
             intro_story=intro_story,
             intro_quote=intro_quote,
         )
@@ -205,6 +206,28 @@ class TeamBattleService:
             f"[team_battle] Boss spawned id={boss_id} region={region_key} star={boss_star} name={boss_name}"
         )
         return self.repo.get_boss_by_id(boss_id)
+
+    def _boss_image_dir(self) -> str:
+        data_dir = os.path.dirname(os.path.abspath(self.repo.db_path))
+        return os.path.abspath(os.path.join(data_dir, "team_battle_boss"))
+
+    def get_manual_boss_image_path(self) -> str:
+        image_dir = self._boss_image_dir()
+        os.makedirs(image_dir, exist_ok=True)
+        return os.path.join(image_dir, _MANUAL_BOSS_IMAGE_FILENAME)
+
+    def _clear_boss_image_dir(self) -> None:
+        image_dir = self._boss_image_dir()
+        os.makedirs(image_dir, exist_ok=True)
+        for name in os.listdir(image_dir):
+            path = os.path.join(image_dir, name)
+            try:
+                if os.path.isdir(path) and not os.path.islink(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+            except OSError as exc:
+                logger.warning("[team_battle] 清理 Boss 图片失败 path=%s: %s", path, exc)
 
     @staticmethod
     def _pick_region() -> str:
@@ -284,6 +307,49 @@ class TeamBattleService:
             f"{star_block}\n"
             f"high quality, detailed, single subject"
         )
+
+    def get_active_boss_manual_image_prompt_info(self) -> Optional[Dict[str, str]]:
+        boss = self.repo.get_active_boss()
+        if boss is None:
+            return None
+        fish = self._get_boss_fish_for_prompt(boss)
+        region_key = str(boss.get("region_key") or "")
+        boss_star = int(boss.get("boss_star", 0) or 0)
+        prompt = (
+            f"{self._build_image_prompt(fish, region_key, boss_star)}\n"
+            f"required image size: {self._manual_image_size}"
+        )
+        return {
+            "boss_name": str(boss.get("boss_name") or ""),
+            "fish_name": str(fish.get("name") or ""),
+            "fish_description": str(fish.get("description") or ""),
+            "region_label": C.REGION_DISPLAY_NAME.get(region_key, region_key),
+            "style_keywords": C.STYLE_KEYWORDS.get(region_key, ""),
+            "prompt": prompt,
+            "resolution": self._manual_image_size,
+            "upload_path": self.get_manual_boss_image_path(),
+        }
+
+    def _get_boss_fish_for_prompt(self, boss: Dict[str, Any]) -> Dict[str, Any]:
+        fish_id = int(boss.get("fish_id", 0) or 0)
+        if fish_id > 0:
+            try:
+                fish = self.item_template_repo.get_fish_by_id(fish_id)
+            except Exception:
+                fish = None
+            if fish:
+                return {
+                    "fish_id": fish_id,
+                    "name": getattr(fish, "name", "未知"),
+                    "description": getattr(fish, "description", ""),
+                    "rarity": int(getattr(fish, "rarity", boss.get("boss_star", 0)) or 0),
+                }
+        return {
+            "fish_id": fish_id,
+            "name": str(boss.get("boss_name") or "未知"),
+            "description": "",
+            "rarity": int(boss.get("boss_star", 0) or 0),
+        }
 
     # =====================================================================
     # 当日结算
@@ -873,6 +939,8 @@ class TeamBattleService:
                 "my_rank": None,
                 "unclaimed": self.repo.get_unclaimed_rewards(user_id),
             }
+        manual_image_path = self.get_active_boss_image_file(int(boss["id"]))
+        boss["image_path"] = manual_image_path or None
         rank_all = self.repo.get_damage_rank(boss["id"])
         rank_index_map = {r["user_id"]: idx for idx, r in enumerate(rank_all, start=1)}
         my = self.repo.get_player_damage(boss["id"], user_id)
@@ -889,6 +957,19 @@ class TeamBattleService:
             "unclaimed": unclaimed,
             "history_kills": history,
         }
+
+    def get_active_boss_image_file(self, boss_id: int) -> Optional[str]:
+        boss = self.repo.get_active_boss()
+        if not boss or int(boss.get("id", 0) or 0) != int(boss_id):
+            return None
+        image_dir = self._boss_image_dir()
+        abs_path = os.path.abspath(self.get_manual_boss_image_path())
+        if os.path.commonpath([image_dir, abs_path]) != image_dir:
+            logger.warning("[team_battle] Boss 图片路径越界 boss_id=%s path=%s", boss_id, abs_path)
+            return None
+        if not os.path.exists(abs_path) or not os.path.isfile(abs_path):
+            return None
+        return abs_path
 
     def claim_all_unclaimed(self, user_id: str) -> List[Dict[str, Any]]:
         rewards = self.repo.get_unclaimed_rewards(user_id)

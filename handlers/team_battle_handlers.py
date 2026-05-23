@@ -105,7 +105,29 @@ async def admin_team_battle_refresh(self: "FishingPlugin", event: AstrMessageEve
         f"✅ 新 Boss 已刷新：\n"
         f"  名字：{boss.get('boss_name')}\n"
         f"  风格：{region_label}  ⭐{boss.get('boss_star')}\n"
-        f"  血量：{int(boss.get('max_hp', 0)):,}"
+        f"  血量：{int(boss.get('max_hp', 0)):,}\n"
+        f"  图片目录已清空。使用“管理团战图片提示词”生成手动生图提示。"
+    )
+
+
+async def admin_team_battle_image_prompt(self: "FishingPlugin", event: AstrMessageEvent):
+    """/管理团战图片提示词：输出当前 Boss 的手动生图提示。"""
+    info = self.team_battle_service.get_active_boss_manual_image_prompt_info()
+    if info is None:
+        yield event.plain_result("⚠️ 当前没有活跃 Boss，请先使用“管理团战刷新”。")
+        return
+
+    yield event.plain_result(
+        "🖼️ 当前 Boss 手动生图提示\n"
+        f"名字：{info['boss_name']}\n"
+        f"原型：{info['fish_name']}\n"
+        f"详细介绍：{info['fish_description'] or '无'}\n"
+        f"风格：{info['region_label']}\n"
+        f"风格提示词：{info['style_keywords']}\n"
+        f"分辨率要求：{info['resolution']}\n"
+        f"上传路径：{info['upload_path']}\n\n"
+        "完整提示词：\n"
+        f"{info['prompt']}"
     )
 
 

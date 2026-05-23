@@ -12,7 +12,7 @@ import requests
 
 from quart import (
     Quart, render_template, request, redirect, url_for, session, flash,
-    Blueprint, current_app, jsonify
+    Blueprint, current_app, jsonify, send_file, abort
 )
 from astrbot.api import logger
 from ..manager.user_api import user_api_bp
@@ -1599,6 +1599,21 @@ def create_player_app(services: Dict[str, Any], webui_options: Dict[str, Any] | 
         return "Internal Server Error", 500
     
     return app
+
+
+def _attach_team_battle_image_url(view: Dict[str, Any], team_battle_service) -> Dict[str, Any]:
+    if not view or not view.get("has_active_boss"):
+        return view
+    boss = view.get("boss") or {}
+    boss_id = int(boss.get("id", 0) or 0)
+    if boss_id and team_battle_service.get_active_boss_image_file(boss_id):
+        boss["image_url"] = url_for("player_bp.team_battle_boss_image", boss_id=int(boss["id"]))
+        boss["image_aspect_ratio"] = team_battle_service.get_manual_boss_image_aspect_ratio_css()
+    else:
+        boss["image_url"] = ""
+        boss["image_aspect_ratio"] = ""
+    return view
+
 
 def login_required(f):
     """装饰器：要求用户已登录"""
@@ -4722,7 +4737,7 @@ async def team_battle_page():
     if not team_battle_service:
         return "魔幻团战服务未启用。", 503
 
-    view = team_battle_service.get_player_view(user_id)
+    view = _attach_team_battle_image_url(team_battle_service.get_player_view(user_id), team_battle_service)
     return await render_template(
         "team_battle.html",
         view=view,
@@ -4738,7 +4753,20 @@ async def team_battle_api_state():
     team_battle_service = current_app.config.get("TEAM_BATTLE_SERVICE")
     if not team_battle_service:
         return jsonify({"success": False, "message": "service unavailable"}), 503
-    return jsonify({"success": True, "view": team_battle_service.get_player_view(user_id)})
+    view = _attach_team_battle_image_url(team_battle_service.get_player_view(user_id), team_battle_service)
+    return jsonify({"success": True, "view": view})
+
+
+@player_bp.route("/api/team_battle/boss_image/<int:boss_id>")
+@login_required
+async def team_battle_boss_image(boss_id: int):
+    team_battle_service = current_app.config.get("TEAM_BATTLE_SERVICE")
+    if not team_battle_service:
+        abort(404)
+    image_path = team_battle_service.get_active_boss_image_file(boss_id)
+    if not image_path:
+        abort(404)
+    return await send_file(image_path, mimetype="image/png")
 
 
 @player_bp.route("/api/team_battle/claim_all", methods=["POST"])

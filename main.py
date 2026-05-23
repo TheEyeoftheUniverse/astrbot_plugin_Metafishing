@@ -395,22 +395,6 @@ class FishingPlugin(Star):
         # 注入到 fishing_service 以便心跳调用 tick
         self.fishing_service.tribulation_service = self.tribulation_service
 
-        # 魔幻团战 V2：图片 Provider（按配置读取 AstrBot provider，未配置时保留占位）
-        from .core.services.boss_image_provider import (
-            AstrBotConfiguredOpenAIImageProvider,
-            NullBossImageProvider,
-        )
-        team_battle_cfg = self.game_config.get("team_battle", {}) if isinstance(self.game_config, dict) else {}
-        image_provider_id = str(team_battle_cfg.get("image_provider_id", "") or "").strip()
-        if image_provider_id:
-            self.boss_image_provider = AstrBotConfiguredOpenAIImageProvider(
-                plugin_root_dir=plugin_root_dir,
-                game_config=self.game_config,
-                output_dir=os.path.join(self.data_dir, "team_battle_boss"),
-            )
-        else:
-            self.boss_image_provider = NullBossImageProvider()
-
         # 魔幻团战 V2：核心服务
         from .core.services.team_battle_service import TeamBattleService
         self.team_battle_service = TeamBattleService(
@@ -421,7 +405,6 @@ class FishingPlugin(Star):
             log_repo=self.log_repo,
             game_config=self.game_config,
             context=self.context,
-            image_provider=self.boss_image_provider,
         )
         self.team_battle_service.scifi_service = self.scifi_service
         from .core.services.cthulhu_service import CthulhuService
@@ -1489,6 +1472,13 @@ class FishingPlugin(Star):
     async def admin_team_battle_refresh(self, event: AstrMessageEvent):
         """[管理员] 强制刷新一只新 Boss。用法：管理团战刷新 [region:sci_fi/xianhuan/cthulhu/magic] [star:7-10]"""
         async for r in team_battle_handlers.admin_team_battle_refresh(self, event):
+            yield r
+
+    @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("管理团战图片提示词")
+    async def admin_team_battle_image_prompt(self, event: AstrMessageEvent):
+        """[管理员] 输出当前 Boss 的手动生图提示词和上传路径"""
+        async for r in team_battle_handlers.admin_team_battle_image_prompt(self, event):
             yield r
 
     @filter.permission_type(PermissionType.ADMIN)

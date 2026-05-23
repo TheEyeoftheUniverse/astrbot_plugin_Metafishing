@@ -32,6 +32,8 @@ def _load_json(value: Optional[str], default: Any) -> Any:
 
 
 def _row_to_profile(row) -> CultivationProfile:
+    if not isinstance(row, dict):
+        row = {key: row[key] for key in row.keys()}
     return CultivationProfile(
         user_id=row["user_id"],
         current_realm=row["current_realm"],

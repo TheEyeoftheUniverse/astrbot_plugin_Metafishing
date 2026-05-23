@@ -34,6 +34,21 @@ CTHULHU_UPPER_TITLE_BY_AUTHORITY = {
 REVOCABLE_TITLE_IDS = {22, 23, 24, 25, 26, 27, 28, 33, 34, 35, 36}
 
 
+def _row_to_mapping(row: Any) -> Dict[str, Any]:
+    if isinstance(row, dict):
+        return row
+    keys = getattr(row, "keys", None)
+    if callable(keys):
+        try:
+            return {key: row[key] for key in keys()}
+        except Exception:
+            pass
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
 class GameplayTitleService:
     """仅在每日刷新时扫描活跃玩家，维护玩法专属称号。"""
 
@@ -106,10 +121,17 @@ class GameplayTitleService:
 
     def _refresh_once(self, reset_time: datetime) -> Dict[str, Any]:
         users = self.user_repo.get_all_users(limit=1_000_000, offset=0)
-        settle_rows = self.team_battle_repo.list_recent_settles(limit=1_000_000)
+        settle_rows = [
+            _row_to_mapping(row)
+            for row in self.team_battle_repo.list_recent_settles(limit=1_000_000)
+        ]
+        history_kills = [
+            _row_to_mapping(row)
+            for row in self.team_battle_repo.list_history_kills(limit=1_000_000)
+        ]
         ten_star_boss_ids = {
             int(row.get("boss_id"))
-            for row in self.team_battle_repo.list_history_kills(limit=1_000_000)
+            for row in history_kills
             if int(row.get("boss_star", 0) or 0) == 10 and row.get("boss_id") is not None
         }
 
@@ -160,7 +182,7 @@ class GameplayTitleService:
         user_id = user.user_id
 
         try:
-            scifi_state = self.scifi_service.get_state(user_id)
+            scifi_state = _row_to_mapping(self.scifi_service.get_state(user_id))
             if any(int(scifi_state.get(field, 0) or 0) > 0 for field in (
                 "abyss_compression_level",
                 "fate_severance_level",
@@ -231,13 +253,16 @@ class GameplayTitleService:
         if quality_rank >= QUALITY_ORDER["tiancheng"]:
             titles.add(24)
 
-        scifi_state = self.scifi_service.get_state(user_id)
+        scifi_state = _row_to_mapping(self.scifi_service.get_state(user_id))
         apex_protocol = scifi_state.get("apex_protocol")
         title_id = SCIFI_TITLE_BY_APEX.get(apex_protocol)
         if title_id:
             titles.add(title_id)
 
-        reward_history = self.team_battle_repo.get_rewards_history(user_id, limit=1_000_000)
+        reward_history = [
+            _row_to_mapping(row)
+            for row in self.team_battle_repo.get_rewards_history(user_id, limit=1_000_000)
+        ]
         reward_boss_ids = {
             int(row.get("boss_id"))
             for row in reward_history
@@ -258,7 +283,10 @@ class GameplayTitleService:
 
         held_authorities = {
             row.get("authority_id")
-            for row in self.cthulhu_repo.list_authorities_for_holder(user_id)
+            for row in (
+                _row_to_mapping(item)
+                for item in self.cthulhu_repo.list_authorities_for_holder(user_id)
+            )
         }
         for authority_id, title_id in CTHULHU_UPPER_TITLE_BY_AUTHORITY.items():
             if authority_id in held_authorities:
