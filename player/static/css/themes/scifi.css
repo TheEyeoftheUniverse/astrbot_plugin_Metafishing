@@ -549,7 +549,7 @@ body.theme-scifi #notificationPanel.card { clip-path: none; backdrop-filter: non
    + z-index，让它在 navbar 内独占点击层 === */
 body.theme-scifi .player-topbar .navbar-nav .nav-link {
     position: relative;
-    z-index: 5;
+    z-index: 10000;
     display: inline-flex;
     align-items: center;
 }

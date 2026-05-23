@@ -172,17 +172,17 @@ class CthulhuService:
     def _generate_true_name_candidate(self, tier: str) -> str:
         """按 tier 硬绑定生成真名：
         - lower: 单字（从 merged_single_pool 选）
-        - middle: 单字 + 中间名（x·abc）
-        - upper: 单字 + 中间名 + 之单字（x·abc之y）
+        - middle: 单字 + 中间名（x`abc）
+        - upper: 单字 + 中间名 + 之单字（x`abc之y）
         """
         a = random.choice(self.merged_single_pool)
         if tier == "lower":
             return a
         abc = random.choice(self.root_pool)
         if tier == "middle":
-            return a + abc
+            return a + "`" + abc
         z = random.choice(self.merged_single_pool)
-        return a + abc + "之" + z
+        return a + "`" + abc + "之" + z
 
     def _generate_unique_name(self, tier: str) -> str:
         for _ in range(100):
@@ -319,17 +319,21 @@ class CthulhuService:
         other = next(choice for choice in event["choices"] if choice["choice_id"] != choice_id)
         roll = random.randint(1, 100)
         landed = chosen if roll <= int(chosen["difficulty"]) else other
-        granted = self._grant_true_name(state["user_id"], landed["tier"], landed["god_type"])
 
         san_delta = 0
         result = "success" if landed["choice_id"] == choice_id else "failure"
         updates: Dict[str, Any] = {}
+        granted = None
+
         if int(state.get("pending_event_force_pollute", 0) or 0):
             san_delta -= 25
             forced_until = (get_last_reset_time(self.daily_reset_hour) + timedelta(days=1)).isoformat(timespec="seconds")
             updates["forced_pollution_until"] = forced_until
             self._apply_san_delta(state["user_id"], -25)
             result = "great_failure"
+        else:
+            granted = self._grant_true_name(state["user_id"], landed["tier"], landed["god_type"])
+
         self._save_state(state["user_id"], **updates)
         self.repo.insert_event_log(
             user_id=state["user_id"],
@@ -339,7 +343,7 @@ class CthulhuService:
             d100_roll=roll,
             result=result,
             san_delta=san_delta,
-            granted_name_id=granted["name_id"],
+            granted_name_id=granted["name_id"] if granted else None,
             occurred_at=self._now_iso(),
         )
         return {

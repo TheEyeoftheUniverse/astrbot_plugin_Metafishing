@@ -26,9 +26,9 @@ BRANCH_DISPLAY = {
 }
 
 BRANCH_TARGET_DISPLAY = {
-    BRANCH_ABYSS: "克苏鲁",
-    BRANCH_FATE: "玄幻",
-    BRANCH_RESONANCE: "魔幻",
+    BRANCH_ABYSS: "深渊偏移",
+    BRANCH_FATE: "渡劫乘区",
+    BRANCH_RESONANCE: "讨伐惩罚",
 }
 
 LEVEL_UP_COST = {1: 30, 2: 60, 3: 100, 4: 150, 5: 200}
@@ -53,6 +53,13 @@ APEX_DISPLAY = {
     APEX_ABYSS_UNITY: "深渊归一",
     APEX_FATE_SOLITUDE: "天命独行",
     APEX_RESONANCE_SUMMIT: "共振之巅",
+}
+
+APEX_SIDE_EFFECTS = {
+    APEX_SINGULARITY: "深渊偏移 +2 / 渡劫乘区 ×1.02 / 讨伐 d20 +1",
+    APEX_ABYSS_UNITY: "渡劫乘区 ×1.15 / 讨伐 d20 +3",
+    APEX_FATE_SOLITUDE: "深渊偏移 +5 / 讨伐 d20 +3",
+    APEX_RESONANCE_SUMMIT: "深渊偏移 +5 / 渡劫乘区 ×1.15",
 }
 
 APEX_APPEND_RATE_BP = {

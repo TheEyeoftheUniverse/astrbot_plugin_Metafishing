@@ -439,7 +439,7 @@
 
 {% if view.has_active_boss %}
 {% set boss = view.boss %}
-{% set region_label = {"sci_fi":"科幻","xianhuan":"玄幻","cthulhu":"克苏鲁","magic":"魔幻"}.get(boss.region_key, boss.region_key) %}
+{% set region_label = {"sci_fi":"观测","xianhuan":"问道","cthulhu":"深潜","magic":"讨伐"}.get(boss.region_key, boss.region_key) %}
 <div class="mahuan-boss-stage">
     <div class="mahuan-boss-name">{{ boss.boss_name }}</div>
     <div class="mahuan-boss-meta">
@@ -559,7 +559,7 @@
             <tbody>
                 {% for h in view.history_kills %}
                 <tr>
-                    <td>{{ {"sci_fi": "科幻", "xianhuan": "玄幻", "cthulhu": "克苏鲁", "magic": "魔幻"}.get(h.region_key, h.region_key) }}</td>
+                    <td>{{ {"sci_fi": "观测", "xianhuan": "问道", "cthulhu": "深潜", "magic": "讨伐"}.get(h.region_key, h.region_key) }}</td>
                     <td><strong>{{ h.boss_name }}</strong></td>
                     <td>{% if h.finisher_user_id %}<span class="cthulhu-player-name" data-cthulhu-name="{{ h.finisher_user_id }}">{{ h.finisher_user_id }}</span>{% else %}—{% endif %}</td>
                     <td><small>{{ h.killed_at[:16].replace("T", " ") }}</small></td>

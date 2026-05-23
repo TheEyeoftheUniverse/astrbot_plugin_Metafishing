@@ -647,7 +647,7 @@ function renderCthulhu() {
     const callsHtml = activeCalls.length ? activeCalls.map(call => `
         <div class="abyss-true-name-row in-progress">
             <span class="abyss-true-name-string">??? ??? ???</span>
-            <span class="abyss-true-name-meta">${call.tier_label || ''} · ${call.progress}/${call.threshold}</span>
+            <span class="abyss-true-name-meta">${call.tier_label || ''}</span>
         </div>
     `).join('') : '<div class="abyss-call-progress">深渊一时寂静，无人在呼唤。</div>';
 
