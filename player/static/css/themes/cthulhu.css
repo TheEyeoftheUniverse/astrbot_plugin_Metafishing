@@ -708,6 +708,68 @@ body.theme-cthulhu .modal-title {
     font-family: "EB Garamond", "Cormorant Garamond", "Georgia", serif;
 }
 body.theme-cthulhu .modal-footer { border-top: 1px solid var(--abyss-line); }
+body.theme-cthulhu #shopCatalogModal .shop-modal-section-header {
+    border-bottom: 1px solid var(--abyss-line-strong);
+}
+body.theme-cthulhu #shopCatalogModal .shop-modal-card {
+    background:
+        radial-gradient(ellipse at top left, rgba(46, 138, 141, 0.14), transparent 56%),
+        linear-gradient(180deg, rgba(12, 31, 43, 0.96), rgba(3, 7, 11, 0.98)) !important;
+    border: 1px solid var(--abyss-line-strong) !important;
+    border-radius: 2px !important;
+    color: var(--abyss-bone) !important;
+    box-shadow: var(--abyss-shadow);
+}
+body.theme-cthulhu #shopCatalogModal .shop-modal-card h6 {
+    color: #efe8d3 !important;
+    text-shadow: 0 0 8px rgba(46, 138, 141, 0.24);
+}
+body.theme-cthulhu #shopCatalogModal .shop-modal-card .text-muted,
+body.theme-cthulhu #shopCatalogModal .shop-modal-card .small {
+    color: rgba(201, 192, 168, 0.78) !important;
+}
+body.theme-cthulhu #shopCatalogModal .shop-modal-card .badge.bg-light {
+    background: rgba(46, 138, 141, 0.12) !important;
+    border: 1px solid var(--abyss-line);
+    color: var(--abyss-bone) !important;
+}
+body.theme-cthulhu #shopCatalogModal .shop-chip {
+    background: rgba(46, 138, 141, 0.12) !important;
+    border: 1px solid var(--abyss-line-strong) !important;
+    border-radius: 2px;
+    color: var(--abyss-bone) !important;
+}
+body.theme-cthulhu #shopCatalogModal .shop-chip.reward {
+    background: rgba(90, 58, 122, 0.18) !important;
+    border-color: rgba(90, 58, 122, 0.58) !important;
+    color: #d8c7ee !important;
+}
+body.theme-cthulhu #shopCatalogModal .shop-chip.is-ok {
+    background: rgba(74, 107, 61, 0.18) !important;
+    border-color: rgba(74, 107, 61, 0.54) !important;
+    color: #d6e6c8 !important;
+}
+body.theme-cthulhu #shopCatalogModal .shop-attribute-chip {
+    background: rgba(6, 18, 26, 0.76) !important;
+    border: 1px solid var(--abyss-line-strong) !important;
+    border-radius: 2px;
+    color: var(--abyss-bone) !important;
+}
+body.theme-cthulhu #shopCatalogModal .shop-attribute-chip span,
+body.theme-cthulhu #shopCatalogModal .shop-attribute-chip i {
+    color: inherit !important;
+}
+body.theme-cthulhu #shopCatalogModal .shop-attribute-chip strong {
+    color: #e8f7f4 !important;
+    text-shadow: 0 0 6px var(--abyss-teal-glow);
+}
+body.theme-cthulhu #shopCatalogModal .shop-icon-coins { color: #caa45c !important; }
+body.theme-cthulhu #shopCatalogModal .shop-icon-premium { color: var(--abyss-teal) !important; }
+body.theme-cthulhu #shopCatalogModal .shop-icon-accessory { color: var(--abyss-violet) !important; }
+body.theme-cthulhu #shopCatalogModal .shop-icon-fish { color: #5aa3a6 !important; }
+body.theme-cthulhu #shopCatalogModal .shop-icon-bait { color: var(--abyss-rot) !important; }
+body.theme-cthulhu #shopCatalogModal .shop-icon-rod { color: #b88e7a !important; }
+body.theme-cthulhu #shopCatalogModal .shop-icon-item { color: var(--abyss-bone-dim) !important; }
 
 /* ============================================================
    通知面板

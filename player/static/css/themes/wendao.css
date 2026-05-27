@@ -398,6 +398,57 @@ body.theme-wendao .shop-chip {
     border-radius: 2px;
     font-family: "Wendao Serif", serif;
 }
+body.theme-wendao #shopCatalogModal .shop-modal-section-header {
+    border-bottom: 1px solid var(--wendao-hairline-strong);
+}
+body.theme-wendao #shopCatalogModal .shop-modal-card {
+    background:
+        linear-gradient(180deg, rgba(245, 241, 232, 0.98), rgba(237, 232, 219, 0.96)) !important;
+    border: 1px solid var(--wendao-hairline-strong) !important;
+    border-radius: 2px !important;
+    color: var(--wendao-ink);
+    box-shadow: var(--wendao-shadow);
+}
+body.theme-wendao #shopCatalogModal .shop-modal-card h6 {
+    color: var(--wendao-ink);
+}
+body.theme-wendao #shopCatalogModal .shop-modal-card .text-muted,
+body.theme-wendao #shopCatalogModal .shop-modal-card .small {
+    color: var(--wendao-muted) !important;
+}
+body.theme-wendao #shopCatalogModal .shop-chip {
+    background: rgba(220, 212, 193, 0.62);
+    border: 1px solid var(--wendao-hairline-strong);
+    color: var(--wendao-ink);
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26);
+}
+body.theme-wendao #shopCatalogModal .shop-chip.reward {
+    background: rgba(160, 57, 46, 0.10);
+    border-color: rgba(160, 57, 46, 0.42);
+    color: #6f241c;
+}
+body.theme-wendao #shopCatalogModal .shop-chip.is-ok {
+    background: rgba(74, 107, 61, 0.10);
+    border-color: rgba(74, 107, 61, 0.36);
+    color: #334d2b;
+}
+body.theme-wendao #shopCatalogModal .shop-attribute-chip {
+    background: rgba(245, 241, 232, 0.76);
+    border: 1px solid var(--wendao-hairline-strong);
+    border-radius: 2px;
+    color: var(--wendao-ink);
+}
+body.theme-wendao #shopCatalogModal .shop-attribute-chip strong {
+    color: var(--wendao-cinnabar);
+}
+body.theme-wendao #shopCatalogModal .shop-icon-coins { color: #9a650d; }
+body.theme-wendao #shopCatalogModal .shop-icon-premium { color: #2f7180; }
+body.theme-wendao #shopCatalogModal .shop-icon-accessory { color: var(--wendao-cinnabar); }
+body.theme-wendao #shopCatalogModal .shop-icon-fish { color: #2f5f80; }
+body.theme-wendao #shopCatalogModal .shop-icon-bait { color: #4a6b3d; }
+body.theme-wendao #shopCatalogModal .shop-icon-rod { color: #5b4a7a; }
+body.theme-wendao #shopCatalogModal .shop-icon-item { color: var(--wendao-muted); }
 
 /* ============================================================
    editorial-footer（页脚）
