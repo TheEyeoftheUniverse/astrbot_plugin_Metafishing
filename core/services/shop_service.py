@@ -12,6 +12,7 @@ from ..repositories.abstract_repository import (
     AbstractShopRepository,
 )
 from ..domain.models import Shop, ShopItem, ShopItemCost, ShopItemReward
+from ..utils import calculate_after_refine
 
 
 class ShopService:
@@ -97,6 +98,114 @@ class ShopService:
             return "商品已过期"
         
         return None
+
+    @staticmethod
+    def _format_bonus_percent(value: float) -> str:
+        return f"{value * 100:+.1f}%"
+
+    @staticmethod
+    def _format_multiplier_bonus(value: float) -> str:
+        return f"{(value - 1.0) * 100:+.1f}%"
+
+    @staticmethod
+    def _format_reduction_percent(value: float) -> str:
+        percent = max(0.0, value) * 100
+        if percent == 0:
+            return "0.0%"
+        return f"-{percent:.1f}%"
+
+    @staticmethod
+    def _bait_cooldown_reduction(rarity: int) -> float:
+        if rarity < 5:
+            return 0.0
+        return min((rarity - 4) * 0.1, 0.6)
+
+    @staticmethod
+    def _attribute_chip(label: str, value: str) -> Dict[str, str]:
+        return {"label": label, "value": value}
+
+    @staticmethod
+    def _refined_value(item_template: Any, field_name: str, default: float, refine_level: int, rarity: int) -> float:
+        return calculate_after_refine(
+            getattr(item_template, field_name, default),
+            refine_level=refine_level,
+            rarity=rarity,
+        )
+
+    def _build_reward_attribute_chips(self, reward_type: str, item_template: Any, reward: Dict[str, Any]) -> List[Dict[str, str]]:
+        refine_level = self._coerce_positive_quantity(reward.get("reward_refine_level"), 1)
+        rarity = int(getattr(item_template, "rarity", 0) or 0)
+
+        if reward_type == "rod":
+            return [
+                self._attribute_chip(
+                    "成功率",
+                    self._format_bonus_percent(
+                        self._refined_value(item_template, "success_rate_modifier", 0.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "稀有",
+                    self._format_bonus_percent(
+                        self._refined_value(item_template, "bonus_rare_fish_chance", 0.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "品质",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quality_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "数量",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quantity_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+            ]
+
+        if reward_type == "accessory":
+            return [
+                self._attribute_chip(
+                    "价值",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_coin_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "稀有",
+                    self._format_bonus_percent(
+                        self._refined_value(item_template, "bonus_rare_fish_chance", 0.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "品质",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quality_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "数量",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quantity_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+            ]
+
+        if reward_type == "bait":
+            return [
+                self._attribute_chip("成功率", self._format_bonus_percent(getattr(item_template, "success_rate_modifier", 0.0))),
+                self._attribute_chip("垃圾减少", self._format_reduction_percent(getattr(item_template, "garbage_reduction_modifier", 0.0))),
+                self._attribute_chip("稀有度", self._format_bonus_percent(getattr(item_template, "rare_chance_modifier", 0.0))),
+                self._attribute_chip("CD减少", self._format_reduction_percent(self._bait_cooldown_reduction(rarity))),
+            ]
+
+        if reward_type == "item":
+            effect_description = getattr(item_template, "effect_description", None)
+            if effect_description:
+                return [self._attribute_chip("用途", str(effect_description))]
+
+        return []
 
     # ---- 商店管理 ----
     def get_shops(self) -> Dict[str, Any]:
@@ -200,46 +309,8 @@ class ShopService:
                         if item_template:
                             reward["reward_item_name"] = item_template.name
                     
-                    # 如果是装备或鱼饵，添加属性描述
                     if item_template:
-                        if reward_type == "bait":
-                            attrs = []
-                            if hasattr(item_template, 'success_rate_modifier') and item_template.success_rate_modifier > 0:
-                                attrs.append(f"成功率 +{item_template.success_rate_modifier * 100:.1f}%")
-                            if hasattr(item_template, 'rare_chance_modifier') and item_template.rare_chance_modifier > 0:
-                                attrs.append(f"稀有 +{item_template.rare_chance_modifier * 100:.1f}%")
-                            if hasattr(item_template, 'value_modifier') and item_template.value_modifier != 1.0:
-                                attrs.append(f"价值 +{(item_template.value_modifier - 1) * 100:.1f}%")
-                            if hasattr(item_template, 'quantity_modifier') and item_template.quantity_modifier != 1.0:
-                                attrs.append(f"数量 +{(item_template.quantity_modifier - 1) * 100:.1f}%")
-                            if hasattr(item_template, 'duration_minutes') and item_template.duration_minutes > 0:
-                                attrs.append(f"持续 {item_template.duration_minutes}分钟")
-                            if attrs:
-                                reward["attributes"] = ", ".join(attrs)
-                        elif reward_type == "rod":
-                            attrs = []
-                            if hasattr(item_template, 'success_rate_modifier') and item_template.success_rate_modifier > 0:
-                                attrs.append(f"成功率 +{item_template.success_rate_modifier * 100:.1f}%")
-                            if hasattr(item_template, 'bonus_fish_quality_modifier') and item_template.bonus_fish_quality_modifier != 1.0:
-                                attrs.append(f"品质 +{(item_template.bonus_fish_quality_modifier - 1) * 100:.1f}%")
-                            if hasattr(item_template, 'bonus_fish_quantity_modifier') and item_template.bonus_fish_quantity_modifier != 1.0:
-                                attrs.append(f"数量 +{(item_template.bonus_fish_quantity_modifier - 1) * 100:.1f}%")
-                            if hasattr(item_template, 'bonus_rare_fish_chance') and item_template.bonus_rare_fish_chance > 0:
-                                attrs.append(f"稀有 +{item_template.bonus_rare_fish_chance * 100:.1f}%")
-                            if attrs:
-                                reward["attributes"] = ", ".join(attrs)
-                        elif reward_type == "accessory":
-                            attrs = []
-                            if hasattr(item_template, 'bonus_fish_quality_modifier') and item_template.bonus_fish_quality_modifier != 1.0:
-                                attrs.append(f"品质 +{(item_template.bonus_fish_quality_modifier - 1) * 100:.1f}%")
-                            if hasattr(item_template, 'bonus_fish_quantity_modifier') and item_template.bonus_fish_quantity_modifier != 1.0:
-                                attrs.append(f"数量 +{(item_template.bonus_fish_quantity_modifier - 1) * 100:.1f}%")
-                            if hasattr(item_template, 'bonus_rare_fish_chance') and item_template.bonus_rare_fish_chance > 0:
-                                attrs.append(f"稀有 +{item_template.bonus_rare_fish_chance * 100:.1f}%")
-                            if hasattr(item_template, 'bonus_coin_modifier') and item_template.bonus_coin_modifier != 1.0:
-                                attrs.append(f"金币 +{(item_template.bonus_coin_modifier - 1) * 100:.1f}%")
-                            if attrs:
-                                reward["attributes"] = ", ".join(attrs)
+                        reward["attribute_chips"] = self._build_reward_attribute_chips(reward_type, item_template, reward)
             
             items_with_details.append({
                 "item": item,

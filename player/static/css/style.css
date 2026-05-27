@@ -1699,6 +1699,39 @@ body.cthulhu-u14 .player-main {
     color: #7a4a09;
 }
 
+.shop-reward-list,
+.shop-reward-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.shop-attribute-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.shop-attribute-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 100%;
+    min-height: 1.85rem;
+    padding: 0.26rem 0.55rem;
+    border-radius: 0.5rem;
+    background: rgba(14, 116, 144, 0.08);
+    color: #155e75;
+    font-size: 0.78rem;
+    line-height: 1.2;
+}
+
+.shop-attribute-chip strong {
+    color: #0f172a;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
 .playmode-portal-shell {
     display: grid;
     grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
