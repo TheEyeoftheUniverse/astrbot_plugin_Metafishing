@@ -571,6 +571,27 @@ body.theme-scifi .modal-header {
 }
 body.theme-scifi .modal-title { color: var(--hud-cyan); letter-spacing: 0.1em; }
 body.theme-scifi .modal-footer { border-top: 1px solid var(--hud-line); }
+body.theme-scifi #shopCatalogModal .shop-modal-card {
+    background: rgba(248, 250, 252, 0.96) !important;
+    border: 1px solid rgba(0, 220, 255, 0.30) !important;
+    color: #111827 !important;
+    box-shadow:
+        0 0 0 1px rgba(0, 220, 255, 0.12),
+        0 14px 32px rgba(0, 0, 0, 0.22);
+}
+body.theme-scifi #shopCatalogModal .shop-attribute-chip {
+    background: #e0f2fe !important;
+    border-color: rgba(8, 145, 178, 0.26) !important;
+    color: #0f3d56 !important;
+}
+body.theme-scifi #shopCatalogModal .shop-attribute-chip span,
+body.theme-scifi #shopCatalogModal .shop-attribute-chip strong,
+body.theme-scifi #shopCatalogModal .shop-attribute-chip i {
+    color: inherit !important;
+}
+body.theme-scifi #shopCatalogModal .shop-attribute-chip strong {
+    color: #0f172a !important;
+}
 body.theme-scifi .toast { background: rgba(2, 6, 13, 0.92); border: 1px solid var(--hud-cyan-soft); border-radius: 0; color: var(--hud-text); }
 body.theme-scifi .toast-header { background: rgba(0, 220, 255, 0.10); color: var(--hud-cyan); border-bottom: 1px solid var(--hud-line); }
 
