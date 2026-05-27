@@ -101,15 +101,15 @@ class ShopService:
 
     @staticmethod
     def _format_bonus_percent(value: float) -> str:
-        return f"{value * 100:+.1f}%"
+        return f"{ShopService._coerce_float(value, 0.0) * 100:+.1f}%"
 
     @staticmethod
     def _format_multiplier_bonus(value: float) -> str:
-        return f"{(value - 1.0) * 100:+.1f}%"
+        return f"{(ShopService._coerce_float(value, 1.0) - 1.0) * 100:+.1f}%"
 
     @staticmethod
     def _format_reduction_percent(value: float) -> str:
-        percent = max(0.0, value) * 100
+        percent = max(0.0, ShopService._coerce_float(value, 0.0)) * 100
         if percent == 0:
             return "0.0%"
         return f"-{percent:.1f}%"
@@ -125,9 +125,18 @@ class ShopService:
         return {"label": label, "value": value}
 
     @staticmethod
+    def _coerce_float(value: Any, default: float) -> float:
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
     def _refined_value(item_template: Any, field_name: str, default: float, refine_level: int, rarity: int) -> float:
         return calculate_after_refine(
-            getattr(item_template, field_name, default),
+            ShopService._coerce_float(getattr(item_template, field_name, default), default),
             refine_level=refine_level,
             rarity=rarity,
         )
@@ -194,9 +203,9 @@ class ShopService:
 
         if reward_type == "bait":
             return [
-                self._attribute_chip("成功率", self._format_bonus_percent(getattr(item_template, "success_rate_modifier", 0.0))),
-                self._attribute_chip("垃圾减少", self._format_reduction_percent(getattr(item_template, "garbage_reduction_modifier", 0.0))),
-                self._attribute_chip("稀有度", self._format_bonus_percent(getattr(item_template, "rare_chance_modifier", 0.0))),
+                self._attribute_chip("成功率", self._format_bonus_percent(self._coerce_float(getattr(item_template, "success_rate_modifier", 0.0), 0.0))),
+                self._attribute_chip("垃圾减少", self._format_reduction_percent(self._coerce_float(getattr(item_template, "garbage_reduction_modifier", 0.0), 0.0))),
+                self._attribute_chip("稀有度", self._format_bonus_percent(self._coerce_float(getattr(item_template, "rare_chance_modifier", 0.0), 0.0))),
                 self._attribute_chip("CD减少", self._format_reduction_percent(self._bait_cooldown_reduction(rarity))),
             ]
 
