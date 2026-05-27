@@ -1684,20 +1684,45 @@ body.cthulhu-u14 .player-main {
     gap: 0.35rem;
     padding: 0.35rem 0.7rem;
     border-radius: 999px;
-    background: rgba(38, 58, 71, 0.08);
-    color: #27404e;
+    background: #f8fafc;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    color: #1f2937;
     font-size: 0.82rem;
+    font-weight: 650;
 }
 
 .shop-chip.is-ok {
-    background: rgba(21, 128, 61, 0.12);
-    color: #17603b;
+    background: #ecfdf5;
+    border-color: rgba(21, 128, 61, 0.28);
+    color: #166534;
 }
 
 .shop-chip.reward {
-    background: rgba(180, 120, 24, 0.12);
-    color: #7a4a09;
+    background: #fffbeb;
+    border-color: rgba(180, 83, 9, 0.28);
+    color: #78350f;
 }
+
+.shop-chip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    min-width: 1.1em;
+    color: currentColor;
+}
+
+.shop-chip .icon-fishing-rod {
+    margin-right: 0;
+}
+
+.shop-icon-coins { color: #b45309; }
+.shop-icon-premium,
+.shop-icon-accessory { color: #0891b2; }
+.shop-icon-fish { color: #2563eb; }
+.shop-icon-bait { color: #16a34a; }
+.shop-icon-rod { color: #7c3aed; }
+.shop-icon-item { color: #64748b; }
 
 .shop-reward-list,
 .shop-reward-entry {
@@ -1720,16 +1745,48 @@ body.cthulhu-u14 .player-main {
     min-height: 1.85rem;
     padding: 0.26rem 0.55rem;
     border-radius: 0.5rem;
-    background: rgba(14, 116, 144, 0.08);
-    color: #155e75;
+    background: #eef6ff;
+    border: 1px solid rgba(37, 99, 235, 0.14);
+    color: #1e3a8a;
     font-size: 0.78rem;
     line-height: 1.2;
+    font-weight: 650;
+}
+
+.shop-attribute-icon {
+    width: 1.05em;
+    min-width: 1.05em;
 }
 
 .shop-attribute-chip strong {
     color: #0f172a;
     font-weight: 700;
     overflow-wrap: anywhere;
+}
+
+body.theme-scifi #shopCatalogModal .text-muted,
+body.theme-cthulhu #shopCatalogModal .text-muted,
+body.theme-mahuan #shopCatalogModal .text-muted {
+    color: rgba(248, 250, 252, 0.78) !important;
+}
+
+body.theme-scifi #shopCatalogModal .shop-modal-section-header,
+body.theme-cthulhu #shopCatalogModal .shop-modal-section-header,
+body.theme-mahuan #shopCatalogModal .shop-modal-section-header {
+    border-bottom-color: rgba(248, 250, 252, 0.18);
+}
+
+body.theme-scifi #shopCatalogModal .shop-modal-card,
+body.theme-cthulhu #shopCatalogModal .shop-modal-card,
+body.theme-mahuan #shopCatalogModal .shop-modal-card {
+    background: rgba(248, 250, 252, 0.96);
+    color: #111827;
+}
+
+body.theme-scifi #shopCatalogModal .shop-modal-card .text-muted,
+body.theme-cthulhu #shopCatalogModal .shop-modal-card .text-muted,
+body.theme-mahuan #shopCatalogModal .shop-modal-card .text-muted {
+    color: #64748b !important;
 }
 
 .playmode-portal-shell {

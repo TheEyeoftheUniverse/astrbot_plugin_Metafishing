@@ -6,7 +6,7 @@
     <title>{% block title %}MetaFishing！{% endblock %}</title>
     <link href="{{ url_for('player_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css', v='20260505') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='vendor/fontawesome/css/all.min.css', v='20260505') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260523c') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260527a') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/scifi.css', v='20260523b') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/wendao.css', v='20260523b') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/cthulhu.css', v='20260523a') }}">
@@ -659,6 +659,34 @@ function updateWalletDisplay(wallet) {
     }
 }
 
+function shopTypeIcon(type) {
+    const icons = {
+        coins: '<i class="fas fa-coins shop-chip-icon shop-icon-coins"></i>',
+        premium: '<i class="fas fa-gem shop-chip-icon shop-icon-premium"></i>',
+        item: '<i class="fas fa-box shop-chip-icon shop-icon-item"></i>',
+        fish: '<i class="fas fa-fish shop-chip-icon shop-icon-fish"></i>',
+        bait: '<i class="fas fa-bug shop-chip-icon shop-icon-bait"></i>',
+        rod: '<span class="icon-fishing-rod shop-chip-icon shop-icon-rod" aria-hidden="true"></span>',
+        accessory: '<i class="fas fa-gem shop-chip-icon shop-icon-accessory"></i>',
+    };
+    return icons[type] || '<i class="fas fa-box shop-chip-icon shop-icon-item"></i>';
+}
+
+function shopAttributeIcon(label) {
+    const icons = {
+        '成功率': 'fa-bullseye',
+        '价值': 'fa-coins',
+        'CD减少': 'fa-clock',
+        '数量': 'fa-layer-group',
+        '品质': 'fa-arrow-up',
+        '稀有': 'fa-star',
+        '稀有度': 'fa-star',
+        '垃圾减少': 'fa-trash',
+        '用途': 'fa-wand-magic-sparkles',
+    };
+    return `<i class="fas ${icons[label] || 'fa-circle-info'} shop-attribute-icon"></i>`;
+}
+
 function renderShopCosts(costs) {
     return (costs || []).filter(cost => cost.cost_type && Number(cost.cost_amount || 0) > 0).map(cost => {
         let label = `${cost.cost_amount}`;
@@ -669,7 +697,7 @@ function renderShopCosts(costs) {
         else if (cost.cost_type === 'bait') label = `${cost.cost_item_name || '鱼饵'} ×${cost.cost_amount}`;
         else if (cost.cost_type === 'rod') label = `${cost.cost_item_name || '鱼竿'} ×${cost.cost_amount}`;
         else if (cost.cost_type === 'accessory') label = `${cost.cost_item_name || '饰品'} ×${cost.cost_amount}`;
-        return `<span class="shop-chip ${cost.satisfied ? 'is-ok' : ''}">${label}</span>`;
+        return `<span class="shop-chip ${cost.satisfied ? 'is-ok' : ''}">${shopTypeIcon(cost.cost_type)}<span>${escapeHtml(label)}</span></span>`;
     }).join('');
 }
 
@@ -680,6 +708,7 @@ function renderShopRewardAttributes(reward) {
         <div class="shop-attribute-row">
             ${chips.map(chip => `
                 <span class="shop-attribute-chip">
+                    ${shopAttributeIcon(chip.label)}
                     <span>${escapeHtml(chip.label)}</span>
                     <strong>${escapeHtml(chip.value)}</strong>
                 </span>
@@ -700,7 +729,7 @@ function renderShopRewards(rewards) {
         else if (reward.reward_type === 'accessory') label = `${reward.reward_item_name || '饰品'}${reward.reward_refine_level ? ` +${reward.reward_refine_level}` : ''}`;
         return `
             <div class="shop-reward-entry">
-                <span class="shop-chip reward">${escapeHtml(label)}</span>
+                <span class="shop-chip reward">${shopTypeIcon(reward.reward_type)}<span>${escapeHtml(label)}</span></span>
                 ${renderShopRewardAttributes(reward)}
             </div>
         `;
@@ -737,9 +766,9 @@ function renderShopCatalog(payload) {
                                         </div>
                                         ${stockLeft !== null ? `<span class="badge bg-light text-dark">库存 ${stockLeft}</span>` : ''}
                                     </div>
-                                    <div class="small text-muted mb-2">消耗</div>
+                                    <div class="small text-muted mb-2"><i class="fas fa-receipt me-1"></i> 消耗</div>
                                     <div class="shop-chip-row mb-3">${renderShopCosts(itemData.costs)}</div>
-                                    <div class="small text-muted mb-2">获得</div>
+                                    <div class="small text-muted mb-2"><i class="fas fa-gift me-1"></i> 获得</div>
                                     <div class="shop-reward-list mb-3">${renderShopRewards(itemData.rewards)}</div>
                                     <div class="small text-muted mb-3">${itemData.purchase_disabled_reason || '可连续购买，购买后仅刷新当前弹窗。'} </div>
                                     <div class="mt-auto">
