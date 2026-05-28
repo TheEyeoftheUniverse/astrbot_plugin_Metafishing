@@ -730,17 +730,21 @@ body.theme-mahuan #shopCatalogModal .shop-chip.is-ok {
     border-color: rgba(255, 210, 119, 0.50) !important;
     color: var(--magic-gold) !important;
 }
-body.theme-mahuan #shopCatalogModal .shop-attribute-chip {
+body.theme-mahuan #shopCatalogModal .shop-attribute-chip,
+body.theme-mahuan #marketPage .shop-attribute-chip {
     background: rgba(255, 210, 119, 0.10) !important;
     border: 1px solid var(--magic-line-strong) !important;
     border-radius: 3px;
     color: var(--magic-parchment) !important;
 }
 body.theme-mahuan #shopCatalogModal .shop-attribute-chip span,
-body.theme-mahuan #shopCatalogModal .shop-attribute-chip i {
+body.theme-mahuan #shopCatalogModal .shop-attribute-chip i,
+body.theme-mahuan #marketPage .shop-attribute-chip span,
+body.theme-mahuan #marketPage .shop-attribute-chip i {
     color: inherit !important;
 }
-body.theme-mahuan #shopCatalogModal .shop-attribute-chip strong {
+body.theme-mahuan #shopCatalogModal .shop-attribute-chip strong,
+body.theme-mahuan #marketPage .shop-attribute-chip strong {
     color: var(--magic-gold) !important;
     text-shadow: 0 0 6px var(--magic-ember-glow);
 }

@@ -749,17 +749,21 @@ body.theme-cthulhu #shopCatalogModal .shop-chip.is-ok {
     border-color: rgba(74, 107, 61, 0.54) !important;
     color: #d6e6c8 !important;
 }
-body.theme-cthulhu #shopCatalogModal .shop-attribute-chip {
+body.theme-cthulhu #shopCatalogModal .shop-attribute-chip,
+body.theme-cthulhu #marketPage .shop-attribute-chip {
     background: rgba(6, 18, 26, 0.76) !important;
     border: 1px solid var(--abyss-line-strong) !important;
     border-radius: 2px;
     color: var(--abyss-bone) !important;
 }
 body.theme-cthulhu #shopCatalogModal .shop-attribute-chip span,
-body.theme-cthulhu #shopCatalogModal .shop-attribute-chip i {
+body.theme-cthulhu #shopCatalogModal .shop-attribute-chip i,
+body.theme-cthulhu #marketPage .shop-attribute-chip span,
+body.theme-cthulhu #marketPage .shop-attribute-chip i {
     color: inherit !important;
 }
-body.theme-cthulhu #shopCatalogModal .shop-attribute-chip strong {
+body.theme-cthulhu #shopCatalogModal .shop-attribute-chip strong,
+body.theme-cthulhu #marketPage .shop-attribute-chip strong {
     color: #e8f7f4 !important;
     text-shadow: 0 0 6px var(--abyss-teal-glow);
 }

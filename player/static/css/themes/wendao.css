@@ -433,13 +433,15 @@ body.theme-wendao #shopCatalogModal .shop-chip.is-ok {
     border-color: rgba(74, 107, 61, 0.36);
     color: #334d2b;
 }
-body.theme-wendao #shopCatalogModal .shop-attribute-chip {
+body.theme-wendao #shopCatalogModal .shop-attribute-chip,
+body.theme-wendao #marketPage .shop-attribute-chip {
     background: rgba(245, 241, 232, 0.76);
     border: 1px solid var(--wendao-hairline-strong);
     border-radius: 2px;
     color: var(--wendao-ink);
 }
-body.theme-wendao #shopCatalogModal .shop-attribute-chip strong {
+body.theme-wendao #shopCatalogModal .shop-attribute-chip strong,
+body.theme-wendao #marketPage .shop-attribute-chip strong {
     color: var(--wendao-cinnabar);
 }
 body.theme-wendao #shopCatalogModal .shop-icon-coins { color: #9a650d; }

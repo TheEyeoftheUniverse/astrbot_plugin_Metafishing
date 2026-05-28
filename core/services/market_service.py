@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import random
 import math
@@ -14,6 +14,7 @@ from ..repositories.abstract_repository import (
     AbstractExchangeRepository,
 )
 from ..domain.models import MarketListing, TaxRecord
+from ..utils import calculate_after_refine
 
 
 class MarketService:
@@ -59,6 +60,144 @@ class MarketService:
             self.user_repo.add(market_user)
             logger.info("创建虚拟市场用户(MARKET)用于托管上架装备")
 
+    @staticmethod
+    def _coerce_float(value: Any, default: float) -> float:
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _format_bonus_percent(value: float) -> str:
+        return f"{MarketService._coerce_float(value, 0.0) * 100:+.1f}%"
+
+    @staticmethod
+    def _format_multiplier_bonus(value: float) -> str:
+        return f"{(MarketService._coerce_float(value, 1.0) - 1.0) * 100:+.1f}%"
+
+    @staticmethod
+    def _attribute_chip(label: str, value: str) -> Dict[str, str]:
+        return {"label": label, "value": value}
+
+    @staticmethod
+    def _refined_value(item_template: Any, field_name: str, default: float, refine_level: int, rarity: int) -> float:
+        return calculate_after_refine(
+            MarketService._coerce_float(getattr(item_template, field_name, default), default),
+            refine_level=refine_level,
+            rarity=rarity,
+        )
+
+    def _get_listing_template(self, listing: MarketListing) -> Optional[Any]:
+        if listing.item_type == "rod":
+            return self.item_template_repo.get_rod_by_id(listing.item_id)
+        if listing.item_type == "accessory":
+            return self.item_template_repo.get_accessory_by_id(listing.item_id)
+        if listing.item_type == "item":
+            return self.item_template_repo.get_item_by_id(listing.item_id)
+        return None
+
+    def _attach_rod_durability_fields(self, listing: MarketListing, item_template: Any, refine_level: int) -> None:
+        if listing.item_instance_id is None:
+            return
+
+        rod_instance = self.inventory_repo.get_user_rod_instance_by_id("MARKET", listing.item_instance_id)
+        if not rod_instance:
+            return
+
+        current_durability = getattr(rod_instance, "current_durability", None)
+        listing.current_durability = current_durability
+
+        if current_durability is None:
+            listing.max_durability = None
+            return
+
+        template_durability = getattr(item_template, "durability", None)
+        if template_durability is None:
+            listing.max_durability = None
+            return
+
+        listing.max_durability = int(template_durability * (1.5 ** (refine_level - 1)))
+
+    def _build_listing_attribute_chips(self, listing: MarketListing, item_template: Any) -> List[Dict[str, str]]:
+        refine_level = max(1, int(getattr(listing, "refine_level", 1) or 1))
+        rarity = int(getattr(item_template, "rarity", getattr(listing, "rarity", 0)) or 0)
+
+        if listing.item_type == "rod":
+            chips = [
+                self._attribute_chip(
+                    "成功率",
+                    self._format_bonus_percent(
+                        self._refined_value(item_template, "success_rate_modifier", 0.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "稀有",
+                    self._format_bonus_percent(
+                        self._refined_value(item_template, "bonus_rare_fish_chance", 0.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "品质",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quality_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "数量",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quantity_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+            ]
+            self._attach_rod_durability_fields(listing, item_template, refine_level)
+            return chips
+
+        if listing.item_type == "accessory":
+            return [
+                self._attribute_chip(
+                    "价值",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_coin_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "稀有",
+                    self._format_bonus_percent(
+                        self._refined_value(item_template, "bonus_rare_fish_chance", 0.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "品质",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quality_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+                self._attribute_chip(
+                    "数量",
+                    self._format_multiplier_bonus(
+                        self._refined_value(item_template, "bonus_fish_quantity_modifier", 1.0, refine_level, rarity)
+                    ),
+                ),
+            ]
+
+        if listing.item_type == "item":
+            effect_description = getattr(item_template, "effect_description", None)
+            if effect_description:
+                return [self._attribute_chip("用途", str(effect_description))]
+
+        return []
+
+    def _attach_listing_attribute_chips(self, listings: List[MarketListing]) -> None:
+        for listing in listings:
+            if listing.item_type not in {"rod", "accessory", "item"}:
+                continue
+            item_template = self._get_listing_template(listing)
+            if not item_template:
+                continue
+            listing.attribute_chips = self._build_listing_attribute_chips(listing, item_template)
+
     def cleanup_expired_listings(self):
         """
         清理过期的市场挂单。
@@ -98,6 +237,7 @@ class MarketService:
 
             # 获取所有商品（不分页）
             listings, _ = self.market_repo.get_all_listings()
+            self._attach_listing_attribute_chips(listings)
             # 按物品类型分组，便于前端展示
             rods = [item for item in listings if item.item_type == "rod"]
             accessories = [item for item in listings if item.item_type == "accessory"]

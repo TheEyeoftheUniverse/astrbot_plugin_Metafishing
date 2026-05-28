@@ -617,7 +617,8 @@ body.theme-scifi #shopCatalogModal .shop-icon-fish { color: #73d9ff !important; 
 body.theme-scifi #shopCatalogModal .shop-icon-bait { color: #46f5a0 !important; }
 body.theme-scifi #shopCatalogModal .shop-icon-rod { color: #c7a4ff !important; }
 body.theme-scifi #shopCatalogModal .shop-icon-item { color: #d6e8ff !important; }
-body.theme-scifi #shopCatalogModal .shop-attribute-chip {
+body.theme-scifi #shopCatalogModal .shop-attribute-chip,
+body.theme-scifi #marketPage .shop-attribute-chip {
     background: rgba(0, 220, 255, 0.12) !important;
     border-color: rgba(0, 220, 255, 0.38) !important;
     color: #e8fbff !important;
@@ -625,10 +626,14 @@ body.theme-scifi #shopCatalogModal .shop-attribute-chip {
 }
 body.theme-scifi #shopCatalogModal .shop-attribute-chip span,
 body.theme-scifi #shopCatalogModal .shop-attribute-chip strong,
-body.theme-scifi #shopCatalogModal .shop-attribute-chip i {
+body.theme-scifi #shopCatalogModal .shop-attribute-chip i,
+body.theme-scifi #marketPage .shop-attribute-chip span,
+body.theme-scifi #marketPage .shop-attribute-chip strong,
+body.theme-scifi #marketPage .shop-attribute-chip i {
     color: inherit !important;
 }
-body.theme-scifi #shopCatalogModal .shop-attribute-chip strong {
+body.theme-scifi #shopCatalogModal .shop-attribute-chip strong,
+body.theme-scifi #marketPage .shop-attribute-chip strong {
     color: #ffffff !important;
     text-shadow: 0 0 6px rgba(0, 220, 255, 0.22);
 }

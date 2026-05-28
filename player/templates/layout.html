@@ -6,11 +6,11 @@
     <title>{% block title %}MetaFishing！{% endblock %}</title>
     <link href="{{ url_for('player_bp.static', filename='vendor/bootswatch/litera.bootstrap.min.css', v='20260505') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='vendor/fontawesome/css/all.min.css', v='20260505') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260527b') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/scifi.css', v='20260527b') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/wendao.css', v='20260527a') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/cthulhu.css', v='20260527a') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/mahuan.css', v='20260527a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260528a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/scifi.css', v='20260528a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/wendao.css', v='20260528a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/cthulhu.css', v='20260528a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/mahuan.css', v='20260528a') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body class="player-ui {% block body_class %}{% if nav_zone_id == 5 %}theme-scifi{% elif nav_zone_id == 6 %}theme-wendao{% elif nav_zone_id == 7 %}theme-cthulhu{% elif nav_zone_id == 8 %}theme-mahuan{% endif %}{% endblock %}" {% block body_data_zone %}{% if nav_zone_id %}data-zone-id="{{ nav_zone_id }}"{% endif %}{% endblock %}>

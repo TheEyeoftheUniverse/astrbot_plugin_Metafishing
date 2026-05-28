@@ -1764,6 +1764,14 @@ body.cthulhu-u14 .player-main {
     overflow-wrap: anywhere;
 }
 
+.market-page .market-attribute-row {
+    margin-top: 0.35rem;
+}
+
+.market-page .shop-attribute-chip {
+    min-width: 0;
+}
+
 body.theme-scifi #shopCatalogModal .text-muted,
 body.theme-cthulhu #shopCatalogModal .text-muted,
 body.theme-mahuan #shopCatalogModal .text-muted {

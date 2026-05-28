@@ -4,6 +4,31 @@
 
 {% block content %}
 {% macro star_label(value) -%}{{ value }}{% if value <= 5 %}☆{% else %}★{% endif %}{%- endmacro %}
+{% macro market_attribute_icon(label) -%}
+    {%- set icons = {
+        '成功率': 'fa-bullseye',
+        '价值': 'fa-coins',
+        '数量': 'fa-layer-group',
+        '品质': 'fa-arrow-up',
+        '稀有': 'fa-star',
+        '用途': 'fa-wand-magic-sparkles'
+    } -%}
+    <i class="fas {{ icons.get(label, 'fa-circle-info') }} shop-attribute-icon"></i>
+{%- endmacro %}
+{% macro market_attribute_chips(chips) -%}
+    {%- if chips -%}
+    <div class="shop-attribute-row market-attribute-row mb-2">
+        {%- for chip in chips %}
+        <span class="shop-attribute-chip">
+            {{ market_attribute_icon(chip.label) }}
+            <span>{{ chip.label }}</span>
+            <strong>{{ chip.value }}</strong>
+        </span>
+        {%- endfor %}
+    </div>
+    {%- endif -%}
+{%- endmacro %}
+<div id="marketPage" class="market-page">
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-0">
@@ -73,8 +98,20 @@
                                             </div>
                                         </div>
                                         <p class="text-muted small mb-2">{{ listing.description or '暂无描述' }}</p>
-                                        {% if listing.attributes %}
-                                        <div class="small text-info mb-2">{{ listing.attributes }}</div>
+                                        {{ market_attribute_chips(listing.attribute_chips) }}
+                                        {% if listing.current_durability is defined %}
+                                            {% if listing.current_durability is none %}
+                                            <p class="mb-2 small"><i class="fas fa-heart text-success"></i> 耐久: 永久耐久</p>
+                                            {% elif listing.max_durability %}
+                                            <div class="mb-2 small">
+                                                <i class="fas fa-heart"></i> 耐久: {{ listing.current_durability }} / {{ listing.max_durability }}
+                                                <div class="progress" style="height: 5px;">
+                                                    <div class="progress-bar bg-success" style="width: {{ (listing.current_durability / listing.max_durability * 100) if listing.max_durability > 0 else 0 }}%"></div>
+                                                </div>
+                                            </div>
+                                            {% else %}
+                                            <p class="mb-2 small"><i class="fas fa-heart"></i> 耐久: {{ listing.current_durability }}</p>
+                                            {% endif %}
                                         {% endif %}
                                         {% if listing.seller_id != user_id %}
                                         <button class="btn btn-success btn-sm w-100" onclick="buyMarketItem({{ listing.market_id }}, '{{ listing.item_name }}', {{ listing.price }})">
@@ -123,9 +160,7 @@
                                             </div>
                                         </div>
                                         <p class="text-muted small mb-2">{{ listing.description or '暂无描述' }}</p>
-                                        {% if listing.attributes %}
-                                        <div class="small text-info mb-2">{{ listing.attributes }}</div>
-                                        {% endif %}
+                                        {{ market_attribute_chips(listing.attribute_chips) }}
                                         {% if listing.seller_id != user_id %}
                                         <button class="btn btn-success btn-sm w-100" onclick="buyMarketItem({{ listing.market_id }}, '{{ listing.item_name }}', {{ listing.price }})">
                                             <i class="fas fa-shopping-cart"></i> 购买
@@ -219,6 +254,7 @@
                                             </div>
                                         </div>
                                         <p class="text-muted small mb-2">{{ listing.description or '暂无描述' }}</p>
+                                        {{ market_attribute_chips(listing.attribute_chips) }}
                                         {% if listing.seller_id != user_id %}
                                         <button class="btn btn-success btn-sm w-100" onclick="buyMarketItem({{ listing.market_id }}, '{{ listing.item_name }}', {{ listing.price }})">
                                             <i class="fas fa-shopping-cart"></i> 购买
@@ -343,6 +379,7 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 {% endblock %}
 
