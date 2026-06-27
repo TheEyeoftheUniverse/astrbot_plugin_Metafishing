@@ -9,6 +9,7 @@ from astrbot.api import logger
 from .abstract_repository import AbstractInventoryRepository
 from ..domain.models import UserFishInventoryItem, UserAquariumItem, UserRodInstance, UserAccessoryInstance, FishingZone, AquariumUpgrade
 from ..database.connection_manager import DatabaseConnectionManager
+from ..utils import get_now
 
 LOCAL_TIMEZONE = timezone(timedelta(hours=8))
 
@@ -1003,10 +1004,10 @@ class SqliteInventoryRepository(AbstractInventoryRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO user_aquarium (user_id, fish_id, quality_level, quantity, added_at)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(user_id, fish_id, quality_level) DO UPDATE SET 
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, fish_id, quality_level) DO UPDATE SET
                     quantity = quantity + excluded.quantity
-            """, (user_id, fish_id, quality_level, quantity))
+            """, (user_id, fish_id, quality_level, quantity, get_now().strftime("%Y-%m-%d %H:%M:%S")))
             conn.commit()
 
     def remove_fish_from_aquarium(self, user_id: str, fish_id: int, quantity: int = 1, quality_level: int = 0) -> None:
