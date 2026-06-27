@@ -729,13 +729,24 @@ def _build_tavern_board_listing(
             reverse=True,
         )
 
-    total_messages = len(normalized_messages)
+    # 按当前分类过滤（counts 仍基于全量，供分类标签角标使用）
+    if category and category != "all":
+        filtered_messages = [m for m in normalized_messages if m.get("category") == category]
+    else:
+        filtered_messages = normalized_messages
+
+    # 真分页：之前直接返回全量导致留言多时整页卡顿
+    total_messages = len(filtered_messages)
+    total_pages = max(1, (total_messages + per_page - 1) // per_page)
+    page = max(1, min(int(page or 1), total_pages))
+    start = (page - 1) * per_page
+    paged_messages = filtered_messages[start:start + per_page]
 
     return {
-        "messages": normalized_messages,
+        "messages": paged_messages,
         "counts": counts,
-        "page": 1,
-        "total_pages": 1,
+        "page": page,
+        "total_pages": total_pages,
         "total_messages": total_messages,
     }
 

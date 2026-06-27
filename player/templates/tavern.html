@@ -714,6 +714,17 @@
                     <div class="alert alert-info text-center {% if messages %}d-none{% endif %}" id="messageEmptyState">
                         <i class="fas fa-inbox"></i> 当前分区还没有主题，快来开第一帖吧！
                     </div>
+                    {% if total_pages and total_pages > 1 %}
+                    <nav class="d-flex justify-content-between align-items-center mt-3" aria-label="留言板分页">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigateBoard({ page: {{ page - 1 }} })" {% if page <= 1 %}disabled{% endif %}>
+                            <i class="fas fa-chevron-left"></i> 上一页
+                        </button>
+                        <span class="text-muted small">第 {{ page }} / {{ total_pages }} 页（共 {{ filtered_message_count }} 条）</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigateBoard({ page: {{ page + 1 }} })" {% if page >= total_pages %}disabled{% endif %}>
+                            下一页 <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </nav>
+                    {% endif %}
                 </div>
             </div>
             </div>
@@ -1091,17 +1102,28 @@ document.querySelectorAll('.tavern-reply-input').forEach((input) => {
     });
 });
 
+// 切换分类 / 排序：带参刷新页面，由服务端过滤 + 分页（避免一次性渲染全部留言卡导致卡顿）
+function navigateBoard(params) {
+    const url = new URL(window.location.href);
+    Object.entries(params).forEach(([key, value]) => {
+        if (value === null || value === undefined) {
+            url.searchParams.delete(key);
+        } else {
+            url.searchParams.set(key, value);
+        }
+    });
+    window.location.href = url.toString();
+}
+
 categoryFilterButtons.forEach((button) => {
     button.addEventListener('click', function() {
-        boardState.category = this.dataset.categoryFilter || 'all';
-        applyBoardState();
+        navigateBoard({ category: this.dataset.categoryFilter || 'all', page: null });
     });
 });
 
 if (boardSortSelect) {
     boardSortSelect.addEventListener('change', function() {
-        boardState.sort = this.value || 'latest';
-        applyBoardState();
+        navigateBoard({ sort: this.value || 'latest', page: null });
     });
 }
 
