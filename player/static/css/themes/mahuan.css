@@ -890,3 +890,35 @@ body.theme-mahuan .hero-status-action.is-done {
     body.theme-mahuan .hero-status-line { animation: none; }
     body.theme-mahuan .hero-status-line { opacity: 1; transform: none; filter: none; }
 }
+
+/* 酒馆楼中楼 + 抽卡单抽/十连格子：贴合熔岩底色，避免奶白底压住主题文字 */
+body.theme-mahuan .reply-thread-card {
+    background:
+        radial-gradient(ellipse at top left, rgba(255, 106, 26, 0.08), transparent 60%),
+        linear-gradient(180deg, rgba(27, 20, 16, 0.92), rgba(14, 10, 8, 0.96)) !important;
+    border: 1px solid var(--magic-line-strong) !important;
+    border-radius: 3px !important;
+    color: var(--magic-parchment);
+    box-shadow:
+        inset 0 0 24px rgba(255, 106, 26, 0.06),
+        0 10px 24px rgba(0, 0, 0, 0.35);
+}
+body.theme-mahuan .reply-thread-item + .reply-thread-item {
+    border-top-color: rgba(255, 210, 119, 0.28);
+}
+body.theme-mahuan .tavern-reply-input {
+    background: rgba(14, 10, 8, 0.72) !important;
+    border-color: var(--magic-line-strong) !important;
+    color: var(--magic-parchment) !important;
+}
+body.theme-mahuan .tavern-reply-input::placeholder {
+    color: var(--magic-parchment-dim);
+}
+body.theme-mahuan .gacha-cost-grid {
+    background: var(--magic-line) !important;
+    border-color: var(--magic-line-strong) !important;
+}
+body.theme-mahuan .gacha-cost-grid > div {
+    background: rgba(14, 10, 8, 0.72) !important;
+    color: var(--magic-parchment);
+}

@@ -948,3 +948,13 @@ body.theme-cthulhu .hero-status-action.is-done {
    默认（非克苏鲁主题）：眼球不显示
    ============================================================ */
 .abyss-eye { display: none; }
+
+/* 抽卡单抽/十连格子：贴合深渊底色，避免奶白底压住主题文字 */
+body.theme-cthulhu .gacha-cost-grid {
+    background: var(--abyss-line) !important;
+    border-color: var(--abyss-line-strong) !important;
+}
+body.theme-cthulhu .gacha-cost-grid > div {
+    background: rgba(3, 7, 11, 0.72) !important;
+    color: var(--abyss-bone);
+}

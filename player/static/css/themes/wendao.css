@@ -613,3 +613,30 @@ body.theme-wendao .wendao-cultivation-num {
         animation: none;
     }
 }
+
+/* 酒馆楼中楼 + 抽卡单抽/十连格子：贴合宣纸底色（浅色主题，保持墨字可读） */
+body.theme-wendao .reply-thread-card {
+    background: var(--wendao-paper-soft) !important;
+    border: 1px solid var(--wendao-hairline-strong) !important;
+    border-radius: 4px !important;
+    color: var(--wendao-ink);
+}
+body.theme-wendao .reply-thread-item + .reply-thread-item {
+    border-top-color: var(--wendao-hairline-strong);
+}
+body.theme-wendao .tavern-reply-input {
+    background: var(--wendao-paper) !important;
+    border-color: var(--wendao-hairline-strong) !important;
+    color: var(--wendao-ink) !important;
+}
+body.theme-wendao .tavern-reply-input::placeholder {
+    color: var(--wendao-muted);
+}
+body.theme-wendao .gacha-cost-grid {
+    background: var(--wendao-hairline) !important;
+    border-color: var(--wendao-hairline-strong) !important;
+}
+body.theme-wendao .gacha-cost-grid > div {
+    background: var(--wendao-paper-soft) !important;
+    color: var(--wendao-ink);
+}
