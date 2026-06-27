@@ -1037,6 +1037,8 @@ def _bind_linuxdo_account(profile: Dict[str, Any], game_user_id: str):
 
 
 def _login_player_session(user, auth_provider: str = "password"):
+    # 持久化登录态：cookie 保留 permanent_session_lifetime（30 天），关闭浏览器也不会立刻掉线
+    session.permanent = True
     session["user_id"] = user.user_id
     session["nickname"] = user.nickname or user.user_id
     session["auth_provider"] = auth_provider
@@ -1571,7 +1573,24 @@ def create_player_app(services: Dict[str, Any], webui_options: Dict[str, Any] | 
         services: 包含所有需要注入的服务实例的字典。
     """
     app = Quart(__name__)
-    app.secret_key = os.urandom(24)
+    # 稳定的 secret_key：持久化到 data 目录，避免每次重启都让全部登录态失效。
+    _data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+    _secret_key_path = os.path.join(_data_dir, "player_web_secret.key")
+    try:
+        os.makedirs(_data_dir, exist_ok=True)
+        if os.path.exists(_secret_key_path):
+            with open(_secret_key_path, "rb") as _f:
+                app.secret_key = _f.read()
+        else:
+            _new_key = os.urandom(32)
+            with open(_secret_key_path, "wb") as _f:
+                _f.write(_new_key)
+            os.chmod(_secret_key_path, 0o600)
+            app.secret_key = _new_key
+    except Exception:
+        app.secret_key = os.urandom(24)
+    # 登录态保留 30 天（配合 _login_player_session 中的 session.permanent）
+    app.permanent_session_lifetime = timedelta(days=30)
     webui_options = webui_options or {}
 
     # 将服务实例存入app配置
@@ -4012,6 +4031,7 @@ async def market():
     import json
     user_inventory_json = json.dumps(user_inventory)
     
+    listing_tax_percent = int(round(market_service.get_listing_tax_rate() * 100))
     return await render_template("market.html",
                                   rods=market_result.get("rods", []),
                                   accessories=market_result.get("accessories", []),
@@ -4019,6 +4039,7 @@ async def market():
                                   items=market_result.get("items", []),
                                   my_listings=my_listings_result.get("listings", []),
                                   user_inventory_json=user_inventory_json,
+                                  listing_tax_percent=listing_tax_percent,
                                   user_id=user_id)
 
 @player_bp.route("/shop")

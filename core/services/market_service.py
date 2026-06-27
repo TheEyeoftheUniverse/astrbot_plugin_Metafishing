@@ -385,6 +385,10 @@ class MarketService:
         elif item_type == "commodity":
             self.exchange_repo.delete_user_commodity(item_instance_id)
 
+    def get_listing_tax_rate(self) -> float:
+        """市场上架手续费率（来自配置 market.listing_tax_rate，默认 0.02）。"""
+        return float(self.config.get("market", {}).get("listing_tax_rate", 0.02))
+
     def put_item_on_sale(self, user_id: str, item_type: str, item_instance_id: int, price: int, is_anonymous: bool = False, quantity: int = 1, quality_level: int = 0) -> Dict[str, Any]:
         """
         处理上架物品到市场的逻辑。
@@ -409,7 +413,7 @@ class MarketService:
             return {"success": False, "message": "用户不存在"}
 
         # 计算并检查上架税
-        tax_rate = self.config.get("market", {}).get("listing_tax_rate", 0.02)
+        tax_rate = self.get_listing_tax_rate()
         tax_cost = int(price * tax_rate)
         if not seller.can_afford(tax_cost):
             return {"success": False, "message": f"金币不足以支付上架手续费: {tax_cost} 金币"}
@@ -693,11 +697,28 @@ class MarketService:
         # 将物品返还给用户
         try:
             self._return_listing_to_seller(listing)
+
+            # 下架返还上架手续费（按当前费率计算）
+            tax_rate = self.get_listing_tax_rate()
+            refund = int(listing.price * tax_rate)
+            refund_text = ""
+            if refund > 0:
+                seller = self.user_repo.get_by_id(user_id)
+                if seller:
+                    seller.coins += refund
+                    self.user_repo.update(seller)
+                    self.log_repo.add_tax_record(TaxRecord(
+                        tax_id=0, user_id=user_id, tax_amount=-refund, tax_rate=tax_rate,
+                        original_amount=listing.price, balance_after=seller.coins,
+                        tax_type="市场上架手续费返还", timestamp=datetime.now(),
+                    ))
+                    refund_text = f"，返还手续费 {refund} 金币"
+
             self.market_repo.remove_listing(market_id)
 
             quantity_text = f" x{listing.quantity}" if listing.quantity > 1 else ""
 
-            return {"success": True, "message": f"✅ 成功下架【{listing.item_name}】{quantity_text}，物品已返还到背包/水族箱"}
+            return {"success": True, "message": f"✅ 成功下架【{listing.item_name}】{quantity_text}，物品已返还到背包/水族箱{refund_text}"}
 
         except Exception as e:
             logger.error(f"下架物品时发生错误: {e}")
