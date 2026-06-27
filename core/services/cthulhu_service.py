@@ -16,7 +16,7 @@ from ..utils import get_now, get_current_daily_marker, get_last_reset_time
 AUTHORITY_SAN_COST = {
     "predict": 5,
     "time": 10,
-    "pollute": 5,
+    "pollute": 25,
 }
 
 THRESHOLD_BY_TIER = {"upper": 200, "middle": 80, "lower": 30}
@@ -126,8 +126,8 @@ class CthulhuService:
 
     def _sanitize_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
         state = dict(state)
-        state["current_san"] = int(state.get("current_san", 50) or 50)
-        state["max_san"] = int(state.get("max_san", 50) or 50)
+        state["current_san"] = self._state_int(state, "current_san", 50)
+        state["max_san"] = self._state_int(state, "max_san", 50)
         state["pending_san_cap_tokens"] = int(state.get("pending_san_cap_tokens", 0) or 0)
         state["sci_fi_intervention_level"] = int(state.get("sci_fi_intervention_level", 0) or 0)
         state["sci_fi_apex_singularity"] = bool(state.get("sci_fi_apex_singularity", 0))
@@ -135,6 +135,12 @@ class CthulhuService:
         state["sci_fi_apex_fate_solitude"] = bool(state.get("sci_fi_apex_fate_solitude", 0))
         state["pending_predict_candidates"] = state.get("pending_predict_candidates") or []
         return state
+
+    def _state_int(self, state: Dict[str, Any], key: str, default: int) -> int:
+        value = state.get(key)
+        if value is None or value == "":
+            return int(default)
+        return int(value)
 
     def _get_state(self, user_id: str) -> Dict[str, Any]:
         return self._sanitize_state(self.repo.ensure_state(user_id))
@@ -518,8 +524,11 @@ class CthulhuService:
         now_text = self._now_iso()
         if forced_until and forced_until > now_text:
             return {
-                "visible_pollutions": active,
+                "visible_pollutions": [],
+                "global_pollutions": active,
+                "forced_pollutions": [],
                 "applied_reason": "forced",
+                "forced_pollution_until": forced_until,
                 "current_san": state["current_san"],
                 "max_san": state["max_san"],
             }
@@ -731,7 +740,7 @@ class CthulhuService:
         if state["current_san"] < AUTHORITY_SAN_COST["pollute"]:
             return {"success": False, "message": "SAN 不足。"}
         self._apply_san_delta(user_id, -AUTHORITY_SAN_COST["pollute"])
-        sample_count = {"upper": 10, "middle": 5, "lower": 1}[authority["tier"]]
+        sample_count = {"upper": 3, "middle": 2, "lower": 1}[authority["tier"]]
         marker = self._current_marker()
         candidates = [uid for uid in self.repo.get_signed_in_user_ids(marker) if uid != user_id]
         random.shuffle(candidates)
