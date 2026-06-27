@@ -3,7 +3,12 @@ from astrbot.api.event import filter, AstrMessageEvent
 from ..draw.help import draw_help_image
 from ..draw.state import draw_state_image, get_user_state_data
 from ..core.utils import get_now
-from ..utils import parse_target_user_id, parse_amount, detect_event_account_provider
+from ..utils import (
+    parse_target_user_id,
+    parse_amount,
+    detect_event_account_provider,
+    get_user_account_bindings,
+)
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -70,6 +75,14 @@ async def state(self: "FishingPlugin", event: AstrMessageEvent):
     if not user_data:
         yield event.plain_result('❌ 用户不存在，请先发送"注册"来开始游戏')
         return
+
+    bindings = get_user_account_bindings(user_id)
+    qq_avatar_id = str(bindings.get("qq", "") or "").strip()
+    if qq_avatar_id:
+        user_data["avatar_user_id"] = qq_avatar_id
+    elif detect_event_account_provider(event) == "qq" and user_id == str(event.get_sender_id()):
+        user_data["avatar_user_id"] = user_id
+
     # 生成状态图像
     image = await draw_state_image(user_data, self.data_dir)
     # 保存图像到临时文件

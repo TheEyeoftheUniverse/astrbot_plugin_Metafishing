@@ -179,6 +179,7 @@ async def draw_state_image(user_data: Dict[str, Any], data_dir: str) -> Image.Im
     total_fishing = int(user_data.get('total_fishing_count', 0) or 0)
     nickname = str(user_data.get('nickname', '未知用户'))
     user_id_value = user_data.get('user_id')
+    avatar_user_id = user_data.get('avatar_user_id')
     current_title = user_data.get('current_title')
     current_rod = user_data.get('current_rod') or {}
     current_accessory = user_data.get('current_accessory') or {}
@@ -282,8 +283,8 @@ async def draw_state_image(user_data: Dict[str, Any], data_dir: str) -> Image.Im
     avatar_x = MARGIN_X + CARD_PAD_X
     avatar_y = user_inner_y - 4
     name_x = avatar_x
-    if user_id_value:
-        avatar = await get_user_avatar(user_id_value, data_dir, avatar_size)
+    if avatar_user_id:
+        avatar = await get_user_avatar(avatar_user_id, data_dir, avatar_size)
         if avatar:
             image.paste(avatar, (avatar_x, avatar_y), avatar)
             name_x = avatar_x + avatar_size + 16
