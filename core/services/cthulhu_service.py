@@ -186,13 +186,14 @@ class CthulhuService:
 
     def _generate_true_name_candidate(self, tier: str) -> str:
         """按 tier 硬绑定生成真名：
-        - lower: 单字（从 merged_single_pool 选）
+        - lower: 双字组合（merged_single_pool 拼接，命名空间 ~N²≈900，
+          避免单字全局唯一过快耗尽）
         - middle: 单字 + 中间名（x`abc）
         - upper: 单字 + 中间名 + 之单字（x`abc之y）
         """
         a = random.choice(self.merged_single_pool)
         if tier == "lower":
-            return a
+            return a + random.choice(self.merged_single_pool)
         abc = random.choice(self.root_pool)
         if tier == "middle":
             return a + "`" + abc
@@ -200,7 +201,7 @@ class CthulhuService:
         return a + "`" + abc + "之" + z
 
     def _generate_unique_name(self, tier: str) -> str:
-        for _ in range(100):
+        for _ in range(200):
             candidate = self._generate_true_name_candidate(tier)
             if not self.repo.true_name_exists(candidate):
                 return candidate
