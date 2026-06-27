@@ -11,6 +11,18 @@
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/wendao.css', v='20260627a') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/cthulhu.css', v='20260627a') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/mahuan.css', v='20260627a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/night.css', v='20260627a') }}">
+    <script>
+      // 夜间模式：仅区域 1~4 生效；尽早设置 data-bs-theme，避免刷新闪烁
+      (function () {
+        try {
+          var zoneId = {{ nav_zone_id | default(0) | int }};
+          if (zoneId >= 1 && zoneId <= 4 && localStorage.getItem('playerNightTheme') === '1') {
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
     {% block extra_css %}{% endblock %}
 </head>
 <body class="player-ui {% block body_class %}{% if nav_zone_id == 5 %}theme-scifi{% elif nav_zone_id == 6 %}theme-wendao{% elif nav_zone_id == 7 %}theme-cthulhu{% elif nav_zone_id == 8 %}theme-mahuan{% endif %}{% endblock %}" {% block body_data_zone %}{% if nav_zone_id %}data-zone-id="{{ nav_zone_id }}"{% endif %}{% endblock %}>
@@ -97,6 +109,13 @@
                             <i class="fas fa-id-card"></i> 个人信息
                         </a>
                     </li>
+                    {% if nav_zone_id and nav_zone_id <= 4 %}
+                    <li>
+                        <button class="dropdown-item" type="button" id="nightThemeToggle" onclick="toggleNightTheme()">
+                            <i class="fas fa-moon"></i> <span>夜间模式</span>
+                        </button>
+                    </li>
+                    {% endif %}
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <a class="dropdown-item text-danger" href="{{ url_for('player_bp.logout') }}">
@@ -861,6 +880,14 @@ async function buyShopCatalogItem(itemId, itemName) {
 }
 
 async function goToPortalZone(zoneId, zoneName) {
+    {% if has_active_temp_zone_pass %}
+    // 当前区域有生效中的临时通行证：切到别的区域会损失剩余驻留时间，需二次确认
+    if (zoneId !== {{ nav_zone_id }}) {
+        if (!await webuiConfirm('当前区域临时通行证仍在生效', '切换到其他区域将损失当前剩余的临时驻留时间，确定要切换吗？')) {
+            return;
+        }
+    }
+    {% endif %}
     const formData = new FormData();
     formData.append('zone_id', zoneId);
     try {
@@ -883,6 +910,30 @@ async function goToPortalZone(zoneId, zoneName) {
 window.openShopCatalog = openShopCatalog;
 window.buyShopCatalogItem = buyShopCatalogItem;
 window.goToPortalZone = goToPortalZone;
+
+// 夜间模式开关（仅区域 1~4；开关按钮也只在 1~4 区渲染，5~8 锁定特殊主题）
+function toggleNightTheme() {
+    var next = document.documentElement.getAttribute('data-bs-theme') !== 'dark';
+    try { localStorage.setItem('playerNightTheme', next ? '1' : '0'); } catch (e) {}
+    var zoneId = {{ nav_zone_id | default(0) | int }};
+    if (zoneId >= 1 && zoneId <= 4) {
+        document.documentElement.setAttribute('data-bs-theme', next ? 'dark' : 'light');
+    }
+    applyNightThemeUI();
+}
+
+function applyNightThemeUI() {
+    var btn = document.getElementById('nightThemeToggle');
+    if (!btn) return;
+    var enabled = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    var icon = btn.querySelector('i');
+    var label = btn.querySelector('span');
+    if (icon) icon.className = enabled ? 'fas fa-sun' : 'fas fa-moon';
+    if (label) label.textContent = enabled ? '日间模式' : '夜间模式';
+}
+
+window.toggleNightTheme = toggleNightTheme;
+document.addEventListener('DOMContentLoaded', applyNightThemeUI);
 
 async function loadCthulhuPollution() {
     const numeralGlyphs = {'0': '𒐀', '1': '𒐁', '2': '𒐂', '3': '𒐃', '4': '𒐄', '5': '𒐅', '6': '𒐆', '7': '𒐇', '8': '𒐈', '9': '𒐉'};

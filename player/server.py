@@ -46,23 +46,33 @@ def inject_player_wallet():
     """为所有玩家页面提供导航栏钱包数据。"""
     user_id = session.get("user_id")
     if not user_id:
-        return {"nav_wallet": None, "nav_zone_id": None}
+        return {"nav_wallet": None, "nav_zone_id": None, "has_active_temp_zone_pass": False}
 
     try:
         user_repo = current_app.config.get("USER_REPO")
         user = user_repo.get_by_id(user_id) if user_repo else None
         if not user:
-            return {"nav_wallet": None, "nav_zone_id": None}
+            return {"nav_wallet": None, "nav_zone_id": None, "has_active_temp_zone_pass": False}
+
+        has_temp_pass = False
+        fishing_service = current_app.config.get("FISHING_SERVICE")
+        if fishing_service:
+            try:
+                has_temp_pass = fishing_service.has_active_temp_zone_pass(user_id)
+            except Exception:
+                has_temp_pass = False
+
         return {
             "nav_wallet": {
                 "coins": int(getattr(user, "coins", 0) or 0),
                 "premium_currency": int(getattr(user, "premium_currency", 0) or 0),
             },
             "nav_zone_id": int(getattr(user, "fishing_zone_id", 1) or 1),
+            "has_active_temp_zone_pass": bool(has_temp_pass),
         }
     except Exception as e:
         logger.warning(f"获取导航栏钱包数据失败: {e}")
-        return {"nav_wallet": None, "nav_zone_id": None}
+        return {"nav_wallet": None, "nav_zone_id": None, "has_active_temp_zone_pass": False}
 
 LINUXDO_AUTHORIZE_URL = "https://connect.linux.do/oauth2/authorize"
 LINUXDO_TOKEN_URL = "https://connect.linux.do/oauth2/token"

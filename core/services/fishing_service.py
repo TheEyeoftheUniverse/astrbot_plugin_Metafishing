@@ -1358,6 +1358,20 @@ class FishingService:
         expires_at = stay.get("expires_at")
         return bool(expires_at and expires_at > now)
 
+    def has_active_temp_zone_pass(self, user_id: str) -> bool:
+        """当前区域是否有生效中的临时通行证驻留（切走到别的区域会损失剩余驻留时间）。"""
+        try:
+            user = self.user_repo.get_by_id(user_id)
+            if not user:
+                return False
+            zone = self.inventory_repo.get_zone_by_id(user.fishing_zone_id)
+            if not zone or not getattr(zone, "requires_pass", False):
+                return False
+            stay = self.inventory_repo.get_user_zone_stay(user_id, zone.id)
+            return self._is_stay_active(stay, get_now())
+        except Exception:
+            return False
+
     def _get_safe_zone_after_pass_expiry(self) -> Optional[FishingZone]:
         for zone_id in (2, 1):
             try:

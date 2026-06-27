@@ -1,0 +1,90 @@
+/* 夜间模式：仅区域 1~4 通过 <html data-bs-theme="dark"> 启用。
+   区域 5~8 的特殊主题不走此样式（JS 不会在那里设置 dark）。
+   核心：Bootstrap 5.3 的 data-bs-theme=dark 已自动深色化 .card/.modal/.form-control/
+   .navbar/.dropdown 等组件；这里只补自定义浅色面与根变量。 */
+
+html[data-bs-theme="dark"] {
+    --paper: #15151a;
+    --paper-soft: #1d1d24;
+    --paper-deep: #26262f;
+    --ink: #e8e6df;
+    --muted: #9a958c;
+    --hairline: rgba(255, 255, 255, 0.10);
+    --shadow-soft: 0 16px 44px rgba(0, 0, 0, 0.45);
+}
+
+html[data-bs-theme="dark"] body {
+    background:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(40, 40, 52, 0.55), rgba(20, 20, 26, 0.1) 20rem),
+        var(--paper);
+    background-size: 28px 28px, 28px 28px, auto, auto;
+    color: var(--ink);
+}
+
+/* 区域 1~4 的装饰性叠层在夜间压暗，避免亮色抢眼 */
+html[data-bs-theme="dark"] body::after {
+    opacity: 0.22;
+}
+
+html[data-bs-theme="dark"] .player-topbar {
+    background: rgba(22, 22, 28, 0.92) !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html[data-bs-theme="dark"] .player-topbar .player-wallet-pill.btn.btn-sm,
+html[data-bs-theme="dark"] .player-topbar .player-account-trigger.btn.btn-sm,
+html[data-bs-theme="dark"] .player-topbar .player-wallet-pill.btn.btn-sm:hover {
+    background: rgba(40, 40, 48, 0.72) !important;
+    color: var(--ink) !important;
+    border-color: var(--hairline) !important;
+}
+
+html[data-bs-theme="dark"] .player-main {
+    background: rgba(22, 22, 28, 0.66) !important;
+}
+
+html[data-bs-theme="dark"] .dropdown-menu {
+    background: #1d1d24 !important;
+    color: var(--ink) !important;
+}
+
+html[data-bs-theme="dark"] .dropdown-item {
+    color: var(--ink) !important;
+}
+
+html[data-bs-theme="dark"] .dropdown-item:hover,
+html[data-bs-theme="dark"] .dropdown-item:focus {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+}
+
+html[data-bs-theme="dark"] .editorial-metric {
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-bs-theme="dark"] .card:hover {
+    background: rgba(40, 40, 48, 0.92) !important;
+}
+
+/* 商店卡片头等仍是奶白，统一压暗 */
+html[data-bs-theme="dark"] .shop-item-card .card-header,
+html[data-bs-theme="dark"] #shopCatalogModal .shop-modal-card .card-header {
+    background: rgba(30, 30, 38, 0.72) !important;
+    color: var(--ink) !important;
+}
+
+html[data-bs-theme="dark"] .text-muted {
+    color: var(--muted) !important;
+}
+
+html[data-bs-theme="dark"] a {
+    color: #8ab4ff;
+}
+
+/* 通用兜底：仍残留明显白底的自定义容器 */
+html[data-bs-theme="dark"] .player-main .card,
+html[data-bs-theme="dark"] .player-main .list-group-item {
+    background-color: rgba(30, 30, 38, 0.72);
+}
