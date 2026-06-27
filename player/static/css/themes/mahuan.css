@@ -134,7 +134,6 @@ body.theme-mahuan .player-topbar {
     box-shadow:
         0 2px 12px rgba(0, 0, 0, 0.6),
         0 -1px 0 rgba(255, 210, 119, 0.18) inset;
-    backdrop-filter: blur(10px);
 }
 body.theme-mahuan .player-topbar.navbar-light .navbar-brand,
 body.theme-mahuan .player-topbar.navbar-light .navbar-nav .nav-link,
@@ -213,7 +212,6 @@ body.theme-mahuan .card {
     border-radius: 3px !important;
     color: var(--magic-parchment);
     box-shadow: var(--magic-shadow) !important;
-    backdrop-filter: blur(4px);
     transition: box-shadow .3s ease, border-color .3s ease, transform .3s ease;
     position: relative;
 }
@@ -763,7 +761,6 @@ body.theme-mahuan #notificationPanel.card {
     background: linear-gradient(180deg, rgba(27, 20, 16, 0.95), rgba(14, 10, 8, 0.95)) !important;
     border: 1px solid var(--magic-line-strong) !important;
     box-shadow: var(--magic-shadow);
-    backdrop-filter: blur(8px);
 }
 body.theme-mahuan #notificationPanel .card-header {
     cursor: pointer;

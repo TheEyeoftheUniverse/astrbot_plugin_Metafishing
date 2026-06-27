@@ -89,7 +89,6 @@ body.theme-scifi .player-main > * { position: relative; z-index: 2; }
 body.theme-scifi .player-topbar {
     background: rgba(2, 6, 13, 0.88) !important;
     border-bottom: 1px solid rgba(0, 220, 255, 0.35);
-    backdrop-filter: blur(10px);
 }
 body.theme-scifi .player-topbar.navbar-light .navbar-brand,
 body.theme-scifi .player-topbar.navbar-light .navbar-nav .nav-link,
@@ -234,7 +233,6 @@ body.theme-scifi .card {
     border: 1px solid var(--hud-line) !important;
     border-radius: 0 !important;
     color: var(--hud-text);
-    backdrop-filter: blur(10px);
     box-shadow:
         0 0 0 1px rgba(0, 220, 255, 0.08),
         0 0 24px rgba(0, 220, 255, 0.08),

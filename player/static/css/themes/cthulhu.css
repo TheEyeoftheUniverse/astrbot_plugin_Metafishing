@@ -178,7 +178,6 @@ body.theme-cthulhu .player-topbar {
     box-shadow:
         0 2px 16px rgba(0, 0, 0, 0.65),
         0 -1px 0 rgba(46, 138, 141, 0.18) inset;
-    backdrop-filter: blur(10px);
 }
 body.theme-cthulhu .player-topbar.navbar-light .navbar-brand,
 body.theme-cthulhu .player-topbar.navbar-light .navbar-nav .nav-link,
@@ -253,7 +252,6 @@ body.theme-cthulhu .card {
     border-radius: 2px !important;
     color: var(--abyss-bone);
     box-shadow: var(--abyss-shadow) !important;
-    backdrop-filter: blur(4px);
     transition: box-shadow .3s ease, border-color .3s ease;
     position: relative;
 }
@@ -814,7 +812,6 @@ body.theme-cthulhu #notificationPanel.card {
     background: linear-gradient(180deg, rgba(12, 31, 43, 0.95), rgba(3, 7, 11, 0.95)) !important;
     border: 1px solid var(--abyss-line-strong) !important;
     box-shadow: var(--abyss-shadow);
-    backdrop-filter: blur(8px);
 }
 body.theme-cthulhu #notificationPanel .card-header {
     cursor: pointer;

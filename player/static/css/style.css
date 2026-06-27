@@ -167,7 +167,6 @@ a:hover {
 .player-topbar {
     border-bottom: 1px solid var(--hairline);
     background: rgba(255, 248, 236, 0.92);
-    backdrop-filter: blur(14px);
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
