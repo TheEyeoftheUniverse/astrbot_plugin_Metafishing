@@ -355,13 +355,13 @@ class TribulationService:
         )
         # 科幻觉醒协议渡劫乘区惩罚
         if profile.sci_fi_apex_singularity:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["singularity"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["singularity"]
         elif profile.sci_fi_apex_abyss_unity:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["abyss_unity"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["abyss_unity"]
         elif profile.sci_fi_apex_fate_solitude:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["fate_solitude"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["fate_solitude"]
         elif profile.sci_fi_apex_resonance_summit:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["resonance_summit"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["resonance_summit"]
 
         return {
             "success": True,
@@ -565,13 +565,13 @@ class TribulationService:
         )
         # 科幻觉醒协议渡劫乘区惩罚
         if profile.sci_fi_apex_singularity:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["singularity"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["singularity"]
         elif profile.sci_fi_apex_abyss_unity:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["abyss_unity"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["abyss_unity"]
         elif profile.sci_fi_apex_fate_solitude:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["fate_solitude"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["fate_solitude"]
         elif profile.sci_fi_apex_resonance_summit:
-            success_rate *= C.APEX_TRIBULATION_MULTIPLIER["resonance_summit"]
+            success_rate *= SCIFI.APEX_TRIBULATION_MULTIPLIER["resonance_summit"]
 
         # §6.5.2 天成自动成功
         if final_quality == "tiancheng":
