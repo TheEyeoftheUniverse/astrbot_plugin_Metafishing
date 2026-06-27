@@ -404,6 +404,28 @@ def _get_tavern_admin_user_id() -> str:
     return configured or DEFAULT_TAVERN_ADMIN_USER_ID
 
 
+def _get_tavern_admin_game_user_ids() -> set[str]:
+    configured = _get_tavern_admin_user_id()
+    admin_ids = {configured} if configured else set()
+    resolved_qq_user_id = resolve_bound_game_user_id(configured, "qq")
+    if resolved_qq_user_id:
+        admin_ids.add(resolved_qq_user_id)
+    return admin_ids
+
+
+def _is_tavern_admin_user(user_id: str) -> bool:
+    normalized_user_id = str(user_id or "").strip()
+    if not normalized_user_id:
+        return False
+
+    admin_user_id = _get_tavern_admin_user_id()
+    if normalized_user_id in _get_tavern_admin_game_user_ids():
+        return True
+
+    bindings = get_user_account_bindings(normalized_user_id)
+    return str(bindings.get("qq", "") or "").strip() == admin_user_id
+
+
 def _get_tavern_messages_file() -> str:
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
     os.makedirs(data_dir, exist_ok=True)
@@ -3070,7 +3092,7 @@ async def api_post_message():
 async def api_delete_message():
     """删除留言API"""
     user_id = session.get("user_id")
-    admin_user_id = _get_tavern_admin_user_id()
+    is_admin = _is_tavern_admin_user(user_id)
     
     try:
         data = await request.get_json()
@@ -3089,7 +3111,7 @@ async def api_delete_message():
             return jsonify({"success": False, "message": "留言不存在"}), 404
         
         # 检查权限（只能删除自己的留言或管理员可以删除所有）
-        if message_to_delete.get("user_id") != user_id and user_id != admin_user_id:
+        if message_to_delete.get("user_id") != user_id and not is_admin:
             return jsonify({"success": False, "message": "无权删除此留言"}), 403
         
         # 删除留言
@@ -3197,7 +3219,7 @@ async def api_reply_message():
 async def api_delete_message_reply():
     """删除楼中楼回复。"""
     user_id = session.get("user_id")
-    admin_user_id = _get_tavern_admin_user_id()
+    is_admin = _is_tavern_admin_user(user_id)
 
     try:
         data = await request.get_json()
@@ -3221,7 +3243,7 @@ async def api_delete_message_reply():
 
         if reply_to_delete is None:
             return jsonify({"success": False, "message": "回复不存在"}), 404
-        if reply_to_delete.get("user_id") != user_id and user_id != admin_user_id:
+        if reply_to_delete.get("user_id") != user_id and not is_admin:
             return jsonify({"success": False, "message": "无权删除此回复"}), 403
 
         message["replies"] = [reply for reply in replies if str(reply.get("id", "") or "").strip() != reply_id]
@@ -3239,9 +3261,8 @@ async def api_delete_message_reply():
 async def api_update_announcement():
     """更新公告API（仅管理员）"""
     user_id = session.get("user_id")
-    admin_user_id = _get_tavern_admin_user_id()
 
-    if user_id != admin_user_id:
+    if not _is_tavern_admin_user(user_id):
         return jsonify({"success": False, "message": "无权限操作"}), 403
     
     try:
@@ -4218,7 +4239,8 @@ async def tavern():
         return redirect(url_for("player_bp.logout"))
     
     tavern_admin_user_id = _get_tavern_admin_user_id()
-    is_admin = user_id == tavern_admin_user_id
+    tavern_admin_user_ids = sorted(_get_tavern_admin_game_user_ids())
+    is_admin = _is_tavern_admin_user(user_id)
     
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
     os.makedirs(data_dir, exist_ok=True)
@@ -4280,6 +4302,7 @@ async def tavern():
                                   filtered_message_count=listing["counts"].get(current_category, listing["total_messages"]),
                                   is_admin=is_admin,
                                   tavern_admin_user_id=tavern_admin_user_id,
+                                  tavern_admin_user_ids=tavern_admin_user_ids,
                                   current_user_id=user_id,
                                   page=listing["page"],
                                   total_pages=listing["total_pages"],

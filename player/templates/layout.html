@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/style.css', v='20260528a') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/scifi.css', v='20260528a') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/wendao.css', v='20260528a') }}">
-    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/cthulhu.css', v='20260528a') }}">
+    <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/cthulhu.css', v='20260604a') }}">
     <link rel="stylesheet" href="{{ url_for('player_bp.static', filename='css/themes/mahuan.css', v='20260528a') }}">
     {% block extra_css %}{% endblock %}
 </head>
@@ -401,11 +401,10 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast(message, type);
     });
 
-    const shopCatalogModalEl = document.getElementById('shopCatalogModal');
     const actionModalEl = document.getElementById('webuiActionModal');
-    if (shopCatalogModalEl && actionModalEl) {
+    const shopCatalogModalEl = document.getElementById('shopCatalogModal');
+    if (actionModalEl) {
         actionModalEl.addEventListener('shown.bs.modal', () => {
-            if (!shopCatalogModalEl.classList.contains('show')) return;
             actionModalEl.classList.add('modal-stack-front');
             const backdrops = document.querySelectorAll('.modal-backdrop');
             const topBackdrop = backdrops[backdrops.length - 1];
@@ -418,7 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.modal-backdrop.modal-stack-front-backdrop').forEach((backdrop) => {
                 backdrop.classList.remove('modal-stack-front-backdrop');
             });
-            if (shopCatalogModalEl.classList.contains('show')) {
+            if (shopCatalogModalEl && shopCatalogModalEl.classList.contains('show')) {
                 document.body.classList.add('modal-open');
             }
         });
@@ -987,17 +986,18 @@ async function loadCthulhuPollution() {
         if (!response.ok) return;
         const data = await response.json();
         const visible = data.visible_pollutions || [];
+        const isForcedPollution = data.applied_reason === 'forced';
         const body = document.body;
         const noise = document.getElementById('cthulhuNoiseOverlay');
         body.classList.remove('cthulhu-u8-red', 'cthulhu-u8-green', 'cthulhu-u8-purple', 'cthulhu-u11', 'cthulhu-u14');
         if (noise) noise.classList.add('d-none');
-        // 克苏鲁污染优先于区域主题：任意污染可见时取消区域主题
-        if (visible.length > 0) {
+        // 克苏鲁污染优先于区域主题：强制污染或任意可见污染切换到克苏鲁主题
+        if (isForcedPollution || visible.length > 0) {
             body.classList.add('has-cthulhu-pollution');
             body.classList.remove('theme-scifi');
             body.classList.remove('theme-wendao');
-            body.classList.remove('theme-cthulhu');
             body.classList.remove('theme-mahuan');
+            body.classList.add('theme-cthulhu');
         } else {
             body.classList.remove('has-cthulhu-pollution');
         }

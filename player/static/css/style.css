@@ -1634,7 +1634,7 @@ body.cthulhu-u8-purple {
     inset: 0;
     pointer-events: none;
     opacity: 0.12;
-    z-index: 9998;
+    z-index: 1040;
     background-image:
         linear-gradient(transparent 0, rgba(255,255,255,0.08) 50%, transparent 100%),
         radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18) 0 1px, transparent 1px),
@@ -2109,11 +2109,11 @@ body.theme-mahuan #shopCatalogModal .shop-modal-card .text-muted {
 }
 
 #webuiActionModal.modal-stack-front {
-    z-index: 1085;
+    z-index: 11020;
 }
 
 .modal-backdrop.modal-stack-front-backdrop {
-    z-index: 1080;
+    z-index: 11010;
 }
 
 @media (max-width: 991.98px) {

@@ -333,14 +333,15 @@
         <div class="card border-info">
             <div class="card-header bg-info text-white">
                 <button class="btn btn-link text-white text-decoration-none w-100 text-start p-0"
-                        type="button" data-bs-toggle="collapse" data-bs-target="#exhibitionCollapse">
+                        type="button" data-bs-toggle="collapse" data-bs-target="#exhibitionCollapse"
+                        aria-expanded="false" aria-controls="exhibitionCollapse">
                     <h5 class="mb-0">
                         <i class="fas fa-fish"></i> 今日水族箱展览会
                         <i class="fas fa-chevron-down ms-2"></i>
                     </h5>
                 </button>
             </div>
-            <div class="collapse show" id="exhibitionCollapse">
+            <div class="collapse" id="exhibitionCollapse">
                 <div class="card-body">
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-star"></i> 今日展览者：
@@ -573,7 +574,7 @@
                             <small class="text-muted">
                                 <span id="charCount">0</span>/500 字
                             </small>
-                            <button class="btn btn-primary" onclick="postTavernMessage()">
+                            <button class="btn btn-primary" id="messageSubmitButton" onclick="postTavernMessage(this)">
                                 <i class="fas fa-paper-plane"></i> 发送
                             </button>
                         </div>
@@ -622,7 +623,7 @@
                                                 {{ msg.username }}
                                             </strong>
                                             {{ tavern_category_badge(msg.category) }}
-                                            {% if msg.user_id == tavern_admin_user_id %}
+                                            {% if msg.user_id in tavern_admin_user_ids %}
                                             <span class="badge bg-danger">管理员</span>
                                             {% endif %}
                                         </div>
@@ -668,7 +669,7 @@
                                                             <span class="badge tavern-title-badge">{{ reply.title_name }}</span>
                                                             {% endif %}
                                                             <strong>{{ reply.username }}</strong>
-                                                            {% if reply.user_id == tavern_admin_user_id %}
+                                                            {% if reply.user_id in tavern_admin_user_ids %}
                                                             <span class="badge bg-danger">管理员</span>
                                                             {% endif %}
                                                             <span class="small text-muted">{{ reply.timestamp }}</span>
@@ -699,7 +700,7 @@
                                                       placeholder="回复楼主……"></textarea>
                                             <div class="d-flex justify-content-between align-items-center mt-2">
                                                 <span></span>
-                                                <button class="btn btn-sm btn-primary" onclick="postMessageReply('{{ msg.id }}')">
+                                                <button class="btn btn-sm btn-primary tavern-reply-submit" onclick="postMessageReply('{{ msg.id }}', this)">
                                                     <i class="fas fa-reply"></i> 回复
                                                 </button>
                                             </div>
@@ -758,6 +759,8 @@ const boardCountBadge = document.getElementById('messageBoardCountBadge');
 const boardEmptyState = document.getElementById('messageEmptyState');
 const messageCategoryHint = document.getElementById('messageCategoryHint');
 const categoryFilterButtons = Array.from(document.querySelectorAll('[data-category-filter]'));
+let tavernMessagePosting = false;
+const tavernReplyPostingIds = new Set();
 const boardState = {
     category: '{{ current_category }}',
     sort: '{{ current_sort }}',
@@ -866,7 +869,23 @@ if (messageCategorySelect) {
 }
 
 // 发表留言
-async function postTavernMessage() {
+function setButtonBusy(button, busy, busyText = '发送中...') {
+    if (!button) return;
+    if (busy) {
+        button.dataset.originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = `<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>${busyText}`;
+    } else {
+        button.disabled = false;
+        if (button.dataset.originalHtml) {
+            button.innerHTML = button.dataset.originalHtml;
+            delete button.dataset.originalHtml;
+        }
+    }
+}
+
+async function postTavernMessage(button = null) {
+    if (tavernMessagePosting) return;
     const content = messageInput.value.trim();
     const category = messageCategorySelect ? messageCategorySelect.value : 'casual';
 
@@ -880,6 +899,9 @@ async function postTavernMessage() {
         return;
     }
 
+    tavernMessagePosting = true;
+    const submitButton = button || document.getElementById('messageSubmitButton');
+    setButtonBusy(submitButton, true);
     try {
         const response = await fetch('{{ url_for("player_bp.api_post_message") }}', {
             method: 'POST',
@@ -897,6 +919,9 @@ async function postTavernMessage() {
         }
     } catch (error) {
         showToast('网络错误，请稍后重试', 'error');
+    } finally {
+        tavernMessagePosting = false;
+        setButtonBusy(submitButton, false);
     }
 }
 
@@ -920,7 +945,8 @@ async function toggleMessageLike(messageId) {
     }
 }
 
-async function postMessageReply(messageId) {
+async function postMessageReply(messageId, button = null) {
+    if (tavernReplyPostingIds.has(messageId)) return;
     const input = document.getElementById(`replyInput-${messageId}`);
     const content = input ? input.value.trim() : '';
 
@@ -934,6 +960,9 @@ async function postMessageReply(messageId) {
         return;
     }
 
+    tavernReplyPostingIds.add(messageId);
+    const submitButton = button || input?.closest('.reply-thread-editor')?.querySelector('.tavern-reply-submit');
+    setButtonBusy(submitButton, true, '回复中...');
     try {
         const response = await fetch('{{ url_for("player_bp.api_reply_message") }}', {
             method: 'POST',
@@ -950,6 +979,9 @@ async function postMessageReply(messageId) {
         }
     } catch (error) {
         showToast('网络错误，请稍后重试', 'error');
+    } finally {
+        tavernReplyPostingIds.delete(messageId);
+        setButtonBusy(submitButton, false);
     }
 }
 
@@ -1045,7 +1077,7 @@ async function saveAnnouncement() {
 if (messageInput) {
     messageInput.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.key === 'Enter') {
-            postTavernMessage();
+            postTavernMessage(document.getElementById('messageSubmitButton'));
         }
     });
 }
@@ -1053,7 +1085,8 @@ if (messageInput) {
 document.querySelectorAll('.tavern-reply-input').forEach((input) => {
     input.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.key === 'Enter') {
-            postMessageReply(this.dataset.messageId);
+            const button = this.closest('.reply-thread-editor')?.querySelector('.tavern-reply-submit');
+            postMessageReply(this.dataset.messageId, button);
         }
     });
 });
