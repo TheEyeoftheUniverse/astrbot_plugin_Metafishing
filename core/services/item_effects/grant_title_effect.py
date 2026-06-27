@@ -21,10 +21,10 @@ class _GrantTitleBaseEffect(AbstractItemEffect):
         if title_id > 0:
             return title_id
 
-        item_id = int(getattr(item_template, "item_id", 0) or 0)
-        if item_id > 0 and self.item_template_repo and self.item_template_repo.get_title_by_id(item_id):
-            return item_id
-
+        # 优先按名称匹配：称号道具名去掉 "称号·" 前缀即为目标称号名。
+        # 必须排在 item_id 兜底之前——称号道具的 item_id(30~46) 与团战称号的
+        # title_id(30~36) 重叠，若先按 item_id 解析，会把「称号·鱼甄选CEO」等
+        # 错发成团战称号（战团老狗/战团团长/…）。
         raw_name = getattr(item_template, "name", "") or ""
         candidate_names = [raw_name]
         if raw_name.startswith("称号·"):
@@ -35,6 +35,11 @@ class _GrantTitleBaseEffect(AbstractItemEffect):
                 title = self.item_template_repo.get_title_by_name(name)
                 if title:
                     return title.title_id
+
+        # 退化兜底：item_id 恰好等于 title_id（仅在名称匹配失败时使用）
+        item_id = int(getattr(item_template, "item_id", 0) or 0)
+        if item_id > 0 and self.item_template_repo and self.item_template_repo.get_title_by_id(item_id):
+            return item_id
 
         return None
 
