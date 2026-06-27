@@ -104,6 +104,15 @@ class TeamBattleService:
         adjusted = now - timedelta(hours=reset_hour)
         return adjusted.date()
 
+    def _last_completed_marker(self, now: Optional[datetime] = None) -> date:
+        """最近一个已经结束的签到周期标记。
+
+        结算在每日刷新边界之后触发，此时 ``_current_marker`` 已经跳到新周期；
+        而需要结算的是「刚刚结束的那个周期」内签到的玩家（玩家眼中的「昨天」），
+        因此结算标记要回退一天，否则只会收集到新周期刚开始的少数签到玩家。
+        """
+        return self._current_marker(now) - timedelta(days=1)
+
     # ---------------------------------------------------------------------
     # 启动 / 关闭后台任务
     # ---------------------------------------------------------------------
@@ -137,16 +146,16 @@ class TeamBattleService:
                 reset_hour = self._daily_reset_hour()
                 reset_time = get_last_reset_time(reset_hour)
                 target_time = reset_time + timedelta(minutes=self._settle_offset_minutes)
-                today_marker = self._current_marker(now)
+                completed_marker = self._last_completed_marker(now)
 
-                if now >= target_time and last_processed_marker != today_marker:
-                    if not self.repo.is_daily_settled(_marker_str(today_marker)):
-                        logger.info(f"[team_battle] 触发当日结算 marker={today_marker}")
+                if now >= target_time and last_processed_marker != completed_marker:
+                    if not self.repo.is_daily_settled(_marker_str(completed_marker)):
+                        logger.info(f"[team_battle] 触发结算 marker={completed_marker}")
                         try:
                             self.settle_daily()
                         except Exception as exc:
-                            logger.error(f"[team_battle] 当日结算异常: {exc}")
-                    last_processed_marker = today_marker
+                            logger.error(f"[team_battle] 结算异常: {exc}")
+                    last_processed_marker = completed_marker
             except Exception as exc:
                 logger.error(f"[team_battle] settle loop 异常: {exc}")
             # 10 分钟轮询，足够及时
@@ -156,11 +165,11 @@ class TeamBattleService:
         """启动时若当日未结算且早已过 daily_reset_hour+offset，补结算一次。"""
         try:
             now = get_now()
-            today_marker = self._current_marker(now)
+            completed_marker = self._last_completed_marker(now)
             reset_time = get_last_reset_time(self._daily_reset_hour())
             target_time = reset_time + timedelta(minutes=self._settle_offset_minutes)
-            if now >= target_time and not self.repo.is_daily_settled(_marker_str(today_marker)):
-                logger.info(f"[team_battle] 启动扫描发现漏结算 marker={today_marker}，立即补结算")
+            if now >= target_time and not self.repo.is_daily_settled(_marker_str(completed_marker)):
+                logger.info(f"[team_battle] 启动扫描发现漏结算 marker={completed_marker}，立即补结算")
                 return self.settle_daily()
         except Exception as exc:
             logger.warning(f"[team_battle] scan_overdue_on_startup 异常: {exc}")
@@ -357,7 +366,7 @@ class TeamBattleService:
     def settle_daily(self, force: bool = False) -> Dict[str, Any]:
         with self._settle_lock:
             now = get_now()
-            marker = self._current_marker(now)
+            marker = self._last_completed_marker(now)
             marker_s = _marker_str(marker)
             if not force and self.repo.is_daily_settled(marker_s):
                 logger.info(f"[team_battle] marker={marker_s} 已结算，跳过")
@@ -762,7 +771,9 @@ class TeamBattleService:
         # 策划案 §12：奖励保留到"下次 Boss 击杀结算前"。
         # 因此在发放本次击杀奖励之前，先把过往所有未领奖励标记过期，
         # 然后再发本 Boss 的固定 / 阶段非装备 / 随机池奖励。
-        self.repo.expire_all_unclaimed(_now_iso())
+        # 注意：只过期"其它 Boss"的遗留奖励，保留当前 Boss 自己的阶段奖励。
+        # 否则 Boss 被快速击杀时（25% 与击杀同结算触发），刚发放的阶段奖励会被立刻清空。
+        self.repo.expire_all_unclaimed(_now_iso(), except_boss_id=boss["id"])
 
         # 1) 第 4 件固定装备
         already_won = self._collect_users_with_fixed_in_settle(boss["id"], C.STAGE_KILL, all_stages_this_settle)
@@ -930,6 +941,23 @@ class TeamBattleService:
     def get_player_view(self, user_id: str) -> Dict[str, Any]:
         boss = self.repo.get_active_boss()
         history = self.repo.list_history_kills(limit=5)
+
+        # 界面需展示昵称而非数字 ID：同一玩家可能在排行与击杀史册中重复出现，
+        # 用缓存去重，避免对同一 user_id 反复查询。
+        nickname_cache: Dict[str, str] = {}
+
+        def _display_name(uid: Optional[str]) -> str:
+            if not uid:
+                return ""
+            cached = nickname_cache.get(uid)
+            if cached is None:
+                cached = self._lookup_nickname(uid)
+                nickname_cache[uid] = cached
+            return cached
+
+        for h in history:
+            h["finisher_nickname"] = _display_name(h.get("finisher_user_id"))
+
         if boss is None:
             return {
                 "has_active_boss": False,
@@ -946,11 +974,14 @@ class TeamBattleService:
         my = self.repo.get_player_damage(boss["id"], user_id)
         unclaimed = self.repo.get_unclaimed_rewards(user_id)
         opening = self._render_opening(boss, rank_all)
+        rank_top10 = rank_all[:10]
+        for r in rank_top10:
+            r["nickname"] = _display_name(r["user_id"])
         return {
             "has_active_boss": True,
             "boss": boss,
             "opening_text": opening,
-            "rank_top10": rank_all[:10],
+            "rank_top10": rank_top10,
             "rank_all_count": len(rank_all),
             "my_damage": int(my["total_damage"]) if my else 0,
             "my_rank": rank_index_map.get(user_id),

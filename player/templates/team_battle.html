@@ -515,7 +515,7 @@
             {% for row in view.rank_top10 %}
             <li class="{% if loop.index == 1 %}is-top1{% elif loop.index == 2 %}is-top2{% elif loop.index == 3 %}is-top3{% endif %} {% if row.user_id == session.user_id %}is-me{% endif %}">
                 <span class="rank-no">{{ loop.index }}</span>
-                <span class="rank-name cthulhu-player-name" data-cthulhu-name="{{ row.user_id }}">{{ row.user_id }}</span>
+                <span class="rank-name cthulhu-player-name" data-cthulhu-name="{{ row.nickname }}">{{ row.nickname }}</span>
                 {% if row.is_leader_at_last_settle %}<span class="rank-leader">👑</span>{% endif %}
                 <span class="rank-damage">{{ "{:,}".format(row.total_damage) }}</span>
             </li>
@@ -576,7 +576,7 @@
                 <tr>
                     <td>{{ {"sci_fi": "观测", "xianhuan": "问道", "cthulhu": "深潜", "magic": "讨伐"}.get(h.region_key, h.region_key) }}</td>
                     <td><strong>{{ h.boss_name }}</strong></td>
-                    <td>{% if h.finisher_user_id %}<span class="cthulhu-player-name" data-cthulhu-name="{{ h.finisher_user_id }}">{{ h.finisher_user_id }}</span>{% else %}—{% endif %}</td>
+                    <td>{% if h.finisher_user_id %}<span class="cthulhu-player-name" data-cthulhu-name="{{ h.finisher_nickname }}">{{ h.finisher_nickname }}</span>{% else %}—{% endif %}</td>
                     <td><small>{{ h.killed_at[:16].replace("T", " ") }}</small></td>
                 </tr>
                 {% endfor %}

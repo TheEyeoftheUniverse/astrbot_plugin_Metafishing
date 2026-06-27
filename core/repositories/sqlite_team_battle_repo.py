@@ -256,14 +256,24 @@ class SqliteTeamBattleRepository:
             conn.commit()
             return cur.rowcount
 
-    def expire_all_unclaimed(self, expired_at: str) -> int:
+    def expire_all_unclaimed(
+        self, expired_at: str, except_boss_id: Optional[int] = None
+    ) -> int:
         with self._cm.get_connection() as conn:
             cur = conn.cursor()
-            cur.execute(
-                "UPDATE team_battle_reward_inventory SET expired_at = ? "
-                "WHERE claimed_at IS NULL AND expired_at IS NULL",
-                (expired_at,),
-            )
+            if except_boss_id is None:
+                cur.execute(
+                    "UPDATE team_battle_reward_inventory SET expired_at = ? "
+                    "WHERE claimed_at IS NULL AND expired_at IS NULL",
+                    (expired_at,),
+                )
+            else:
+                cur.execute(
+                    "UPDATE team_battle_reward_inventory SET expired_at = ? "
+                    "WHERE claimed_at IS NULL AND expired_at IS NULL "
+                    "AND boss_id != ?",
+                    (expired_at, except_boss_id),
+                )
             conn.commit()
             return cur.rowcount
 
